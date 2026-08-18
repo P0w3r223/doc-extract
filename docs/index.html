@@ -171,7 +171,7 @@ footer {
 </head>
 <body>
 <header>
-  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;3 of 7</p>
+  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;4 of 7</p>
   <h1>Poland's national e-invoice schema checks nothing an accountant would</h1>
   <p class="lead">FA(3) &mdash; mandatory since 2026 &mdash; is 183 798 bytes of XSD carrying
   328 enumerations and <strong>0 assertions</strong>. It knows what shape an
@@ -197,21 +197,20 @@ footer {
     <div class="kpi-note">698 rows, gold with no annotation step</div>
   </li>
   <li class="kpi">
-    <div class="kpi-value">3 / 7</div>
+    <div class="kpi-value">4 / 7</div>
     <div class="kpi-label">Milestones built</div>
-    <div class="kpi-note">no model has been called yet &mdash; see what is missing, below</div>
+    <div class="kpi-note">no model has been called yet &mdash; the numbers below are baselines</div>
   </li>
 </ul>
 
 <div class="card caution">
   <strong>This is a project in progress, and the page says so on purpose.</strong> What exists is
-  the domain layer, the corpus generator and the extraction pipeline &mdash; the source layer, the
-  prompt, the output schema and the repair loop. All of it runs offline, with no network and no API
-  key: the pipeline is exercised end to end by a <em>scripted</em> model, so <strong>no model has
-  been called yet</strong>. The scorer, the detector study and the injection suite are milestones
-  4&ndash;6 and are <em>not built</em>. Every number on this page is a property of the schema, the
-  rules or the generated corpus. There are no accuracy figures here because there is nothing yet to
-  measure.
+  the domain layer, the corpus generator, the extraction pipeline and the scorer. All of it runs
+  offline, with no network and no API key, and <strong>no model has been called yet</strong>: the
+  accuracy figures below belong to four <em>baselines</em> &mdash; a perfect reading, a constant
+  answer, a regular-expression reader, and a deliberately corrupted gold. They are the bar a model
+  will be measured against, not a measurement of one. The detector study and the injection suite are
+  milestones 5&ndash;6 and are <em>not built</em>.
 </div>
 
 <h2>The gap this fills</h2>
@@ -295,13 +294,37 @@ its column with reportlab's padding still to spare.</p>
 layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
 costs, and the gap will be reported whichever way it comes out.</p>
 
+<h2>What the baselines say, before any model is involved</h2>
+<p>4 committed runs over the same 108 documents, scoring
+22 fields per invoice and 6066 gold field instances in total. Every
+baseline answers in the same wire format and goes through the same prompt, parse, validation and
+repair loop, so a column is comparable across the row. The numbers are recomputed for this page from
+each run's committed <code>predictions.jsonl</code> &mdash; not copied from a report.</p>
+<table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100.0&nbsp;%</td><td class="num">100.0&nbsp;%</td><td class="num">100.0&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">41</td><td class="num">99.3&nbsp;%</td><td class="num">98.4&nbsp;%</td><td class="num">97.7&nbsp;%</td></tr></tbody></table>
+<p class="note"><strong>recall</strong> is how many of the values on the page the prediction offered
+a value for; <strong>value</strong> is how many of those it read correctly; <strong>accuracy</strong>
+is the two together. They are separate columns because a field that is half missed and a field that
+is half misread read the same in one number and need different work. A dash means there was no
+denominator &mdash; never a zero, which would read as a measurement nobody made.</p>
+<p><code>oracle</code> is handed the gold, so its 100&nbsp;% is a check on the harness rather than a
+result: if a perfect reading scored anything less, every other number here would be wrong.
+<code>constant</code> answers the same lawful invoice for every document &mdash; the floor, and a
+diagnostic, because the fields it still scores well on (currency, invoice kind) are fields where the
+corpus's own distribution does most of the work. <code>pattern</code> is regular expressions and
+column positions with no model at all, and it was deliberately allowed to match the labels this
+project's own renderer prints, which the extraction prompt is forbidden to know: it is the strongest
+thing that is not a language model, and therefore the bar. <code>noisy</code> is the gold with known
+errors injected at a fixed rate &mdash; not a competitor but the labelled error set the detector study
+needs, since a detector measured only on a model's unlabelled mistakes is measured on a sample nobody
+chose.</p>
+
 <h2>What is not built yet</h2>
 <p>Stated plainly, because a portfolio page that reads as finished when it is not is worse than no
 page at all.</p>
 <table>
   <tbody>
-    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built, scripted model only</td></tr>
-    <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">not built</td></tr>
+    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built, no model called</td></tr>
+    <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, baselines only</td></tr>
     <tr><th>M5 &mdash; grounding, routing, <strong>the detector study</strong> and the coverage&ndash;accuracy curve</th><td class="num">not built</td></tr>
     <tr><th>M6 &mdash; prompt-injection suite and attack success rate</th><td class="num">not built</td></tr>
     <tr><th>M7 &mdash; real held-out set and the reported synthetic&harr;real gap</th><td class="num">not built</td></tr>
@@ -317,6 +340,7 @@ cd doc-extract
 python -m venv .venv &amp;&amp; .venv/Scripts/python -m pip install -e ".[dev]"
 pytest                                             # the figures above are assertions
 python -m doc_extract.synth --out data/synthetic   # 108 documents, reproducible from one seed
+python -m doc_extract.eval run --baseline pattern  # predict, score, write results/pattern/
 python docs/build_index.py                         # rebuild this page from the repository</code></pre>
 <p class="note">The corpus is not committed: it is a function of one integer, so a seed in the
 manifest is a smaller and more honest artifact than several hundred PDFs in git history. The
@@ -325,7 +349,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from
-  <code>ba3b282</code> &middot; part of a
+  <code>ec60103</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

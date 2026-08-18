@@ -59,11 +59,23 @@ src/doc_extract/
     scripted.py      # the fake model: canned replies, and the gold as an oracle (M4's B0)
     anthropic_client.py # the only module that touches the network; lazy import, optional extra
 
-# The three below do not exist yet. They are the plan, not the tree — do not import from them.
+  eval/              # M4 — gold vs prediction -> counts. Pure functions over committed artifacts
+    fields.py        # what is scored, how two values are compared, how an instance is keyed
+    scorer.py        # five outcomes that partition; matched by key, never by position
+    aggregate.py     # support per field, three rates, coverage asserted before anything is reported
+    predictions.py   # the committed JSONL: per-attempt usage, failure class, stop_reason
+    dataset.py       # the corpus read back, with every artifact's hash verified on use
+    pattern.py       # B2's regex reader — the one place allowed to know the corpus's own labels
+    corrupt.py       # B3's nine injected error kinds, three of them arithmetically invisible
+    baselines.py     # B0-B3 and the real model, all behind one `LLMClient`
+    run.py           # predict -> write -> score, in that order and with I/O only here
+    report.py        # the Markdown tables, with the qualifications printed beside the numbers
+
+# The two below do not exist yet. They are the plan, not the tree — do not import from them.
   ground/            # M5 (planned) — value -> source span provenance
   decide/            # M5 (planned) — per-field confidence, accept / review / reject routing
-  eval/              # M4-M6 (planned) — scorer, detector study, selective prediction, attacks
 schemas/*.xsd        # the national standard and its three imports + PROVENANCE.md
+results/<baseline>/  # committed: predictions.jsonl + run.meta.json + report.md per run
   assets/fonts/      # DejaVu, vendored as package data: reportlab's own fonts lack 12 Polish letters
 ```
 
@@ -109,6 +121,21 @@ schemas/*.xsd        # the national standard and its three imports + PROVENANCE.
   one helper, a wrong rounding rule would cancel and no test could see it.
 - **No metric may be validated against model-generated ground truth.** Grounding is checked against
   the source document, not against another LLM call's output.
+- **A rate with no denominator is `None`, never `0.0`.** `aggregate.Tally` returns `None` for an
+  empty support, and `report._rate` prints `—`. A zero would read as a measurement, and the whole
+  point of reporting `support` beside every rate is that a reader can tell the two apart.
+- **Every baseline is an `LLMClient`.** B0–B3 answer in the wire format and go through the same
+  prompt, parse, validation, repair loop and usage accounting as a real model. A baseline with its
+  own code path would be measuring its own code path, and the failure taxonomy would not be
+  comparable across the row of a results table.
+- **B2 is allowed to know the corpus's printed labels; the prompt is not.** `eval/pattern.py` matches
+  `Numer faktury:` and `Do zapłaty:` on purpose — its job is to be the strongest thing that is not a
+  model, and a model that cannot beat a reader handed the answer key to the layout has told us
+  something. The same knowledge in `extract/prompt.py` would close M7's synthetic↔real gap in
+  advance instead of measuring it, which is why a test asserts those strings are absent from it.
+- **A subset remembers what it is a subset of.** `dataset.Corpus.select` carries the manifest's full
+  document list, so scoring it reports incomplete coverage and refuses to be a headline number
+  unless the caller passes `allow_partial` — and the report then says so above its first table.
 - **The corpus is not sanitised to be easy to parse.** A quantity of 3 printed beside a price of
   466,62 reads as `3 466,62` in a flat text dump, because a space is also Poland's thousands
   separator. That ambiguity is in real invoices and it stays in this one; `source/layout.py`
@@ -131,10 +158,14 @@ python -m doc_extract.synth --out data/synthetic          # build the corpus (no
 python -m doc_extract.schema.generate_vocab --check       # vocab.py vs the vendored XSD
 python docs/build_index.py                                # regenerate the site from the repository
 
+python -m doc_extract.eval run --baseline pattern         # one baseline over the corpus, offline
+python -m doc_extract.eval score --run results/pattern    # re-score a committed run, no model
+python -m doc_extract.eval run --baseline claude --yes    # the only command that costs money
+
 .venv/Scripts/python -m pip install -e ".[llm]"           # only needed to call a real model
 ```
 
-M1 to M3 run entirely offline with no model and no key, and must stay that way — including schema
+M1 to M4 run entirely offline with no model and no key, and must stay that way — including schema
 validation, which resolves the Ministry's imports from `schemas/` with remote fetching disabled, and
 including the whole extraction pipeline, which the test suite drives through `extract.scripted`. A
 test suite that could not run without an API key is a result a reader cannot reproduce.
@@ -152,12 +183,18 @@ test suite that could not run without an API key is a result a reader cannot rep
    fixed stage order with an owned, bounded schema repair carrying the validator's own errors; a
    scripted model that makes the whole path testable offline, and the gold as an oracle whose
    round trip through the wire format is asserted to be the identity. No model has been called yet.
-4. Pure scorer, per-field metrics with support and coverage, failure taxonomy, baselines B0–B3.
+4. **Pure scorer, per-field metrics, failure taxonomy, baselines B0–B3.** ✅ Twenty-two scored fields
+   compared by key rather than by position, five outcomes that partition, support on every row and a
+   `None` wherever a denominator is empty; coverage asserted against the manifest before a number is
+   reported; predictions committed as JSONL with a failure class, a `stop_reason` and the usage of
+   every attempt. Four baselines share one client interface: `oracle` (the ceiling — 100 %, which is
+   what makes it a check on the harness), `constant` (the floor, and a per-field prior), `pattern`
+   (regex and columns, no model) and `noisy` (the oracle with known errors, for M5).
 5. Grounding + confidence + routing; the detector study and the selective-prediction curve.
 6. Injection suite, attack success rate, trust-boundary ADR.
 7. Real held-out set, the reported synthetic↔real gap, vision variant, site/README/ADRs.
 
-274 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+355 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

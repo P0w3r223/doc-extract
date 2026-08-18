@@ -53,7 +53,17 @@ class AnthropicClient:
             message = client.messages.create(
                 model=request.model,
                 max_tokens=request.max_tokens,
-                system=request.system,
+                system=[{
+                    "type": "text",
+                    "text": request.system,
+                    #: The system prompt is a constant and the document is everything after it, so
+                    #: the cacheable prefix is exactly the part that repeats across a corpus. Not an
+                    #: optimisation bolted on: `Usage` carries two cache fields precisely because
+                    #: this workload sends one prompt against a hundred documents, and a cost metric
+                    #: whose cache columns could only ever read zero would be reporting a number
+                    #: that cannot vary — which this project does not do.
+                    "cache_control": {"type": "ephemeral"},
+                }],
                 messages=[{"role": "user", "content": request.user}],
                 output_config=output_config,
             )

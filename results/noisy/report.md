@@ -1,0 +1,129 @@
+# noisy — 108 documents
+
+| | |
+|---|---|
+| baseline | `noisy` |
+| answered by | `noisy` |
+| saw | the gold |
+| corpus | `data\synthetic` |
+| corpus seed | 20260818 |
+| corpus built with | doc-extract 0.1.0, reportlab 5.0.0 |
+| budgets | extract 8192, repair 4096, at most 1 repair(s) |
+| started | 2026-08-18T16:05:38+00:00 |
+| rate | 0.1 |
+
+## Summary
+
+| | |
+|---|---|
+| documents scored | 108 of 108 (100.0 %) |
+| produced an invoice | 108 (100.0 %) |
+| every field right | 41 (38.0 %) |
+| field instances | 6674 (support 6066, correctly absent 608) |
+| detection recall | 99.3 % |
+| detection precision | 100.0 % |
+| value accuracy | 98.4 % |
+| accuracy | 97.7 % |
+
+## Per field
+
+| field | support | correct | wrong | missed | spurious | recall | precision | value acc. | accuracy |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `kind` | 108 | 108 | 0 | 0 | 0 | 100.0 % | 100.0 % | 100.0 % | 100.0 % |
+| `number` | 108 | 108 | 0 | 0 | 0 | 100.0 % | 100.0 % | 100.0 % | 100.0 % |
+| `issue_date` | 108 | 108 | 0 | 0 | 0 | 100.0 % | 100.0 % | 100.0 % | 100.0 % |
+| `sale_date` | 108 | 104 | 4 | 0 | 0 | 100.0 % | 100.0 % | 96.3 % | 96.3 % |
+| `currency` | 108 | 108 | 0 | 0 | 0 | 100.0 % | 100.0 % | 100.0 % | 100.0 % |
+| `total_gross` | 108 | 99 | 9 | 0 | 0 | 100.0 % | 100.0 % | 91.7 % | 91.7 % |
+| `payment_account` | 89 | 76 | 13 | 0 | 0 | 100.0 % | 100.0 % | 85.4 % | 85.4 % |
+| `seller.name` | 108 | 108 | 0 | 0 | 0 | 100.0 % | 100.0 % | 100.0 % | 100.0 % |
+| `seller.nip` | 108 | 94 | 14 | 0 | 0 | 100.0 % | 100.0 % | 87.0 % | 87.0 % |
+| `seller.address` | 108 | 108 | 0 | 0 | 0 | 100.0 % | 100.0 % | 100.0 % | 100.0 % |
+| `buyer.name` | 108 | 100 | 8 | 0 | 0 | 100.0 % | 100.0 % | 92.6 % | 92.6 % |
+| `buyer.nip` | 108 | 108 | 0 | 0 | 0 | 100.0 % | 100.0 % | 100.0 % | 100.0 % |
+| `buyer.address` | 108 | 108 | 0 | 0 | 0 | 100.0 % | 100.0 % | 100.0 % | 100.0 % |
+| `lines[].description` | 698 | 691 | 0 | 7 | 0 | 99.0 % | 100.0 % | 100.0 % | 99.0 % |
+| `lines[].quantity` | 698 | 691 | 0 | 7 | 0 | 99.0 % | 100.0 % | 100.0 % | 99.0 % |
+| `lines[].unit_price_net` | 698 | 691 | 0 | 7 | 0 | 99.0 % | 100.0 % | 100.0 % | 99.0 % |
+| `lines[].discount` | 109 | 107 | 0 | 2 | 0 | 98.2 % | 100.0 % | 100.0 % | 98.2 % |
+| `lines[].net` | 698 | 675 | 16 | 7 | 0 | 99.0 % | 100.0 % | 97.7 % | 96.7 % |
+| `lines[].vat` | 698 | 691 | 0 | 7 | 0 | 99.0 % | 100.0 % | 100.0 % | 99.0 % |
+| `lines[].vat_rate` | 698 | 691 | 0 | 7 | 0 | 99.0 % | 100.0 % | 100.0 % | 99.0 % |
+| `rate_totals[].net` | 192 | 184 | 8 | 0 | 0 | 100.0 % | 100.0 % | 95.8 % | 95.8 % |
+| `rate_totals[].vat` | 192 | 169 | 23 | 0 | 0 | 100.0 % | 100.0 % | 88.0 % | 88.0 % |
+
+## Per group
+
+| group | support | correct | wrong | missed | spurious | recall | precision | value acc. | accuracy |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `header` | 737 | 711 | 26 | 0 | 0 | 100.0 % | 100.0 % | 96.5 % | 96.5 % |
+| `seller` | 324 | 310 | 14 | 0 | 0 | 100.0 % | 100.0 % | 95.7 % | 95.7 % |
+| `buyer` | 324 | 316 | 8 | 0 | 0 | 100.0 % | 100.0 % | 97.5 % | 97.5 % |
+| `lines` | 4297 | 4237 | 16 | 44 | 0 | 99.0 % | 100.0 % | 99.6 % | 98.6 % |
+| `rate_totals` | 384 | 353 | 31 | 0 | 0 | 100.0 % | 100.0 % | 91.9 % | 91.9 % |
+
+## Per tier
+
+| tier | support | correct | wrong | missed | spurious | recall | precision | value acc. | accuracy |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `clean` | 366 | 341 | 12 | 13 | 0 | 96.4 % | 100.0 % | 96.6 % | 93.2 % |
+| `mixed_rates` | 628 | 614 | 14 | 0 | 0 | 100.0 % | 100.0 % | 97.8 % | 97.8 % |
+| `correction` | 354 | 346 | 8 | 0 | 0 | 100.0 % | 100.0 % | 97.7 % | 97.7 % |
+| `advance` | 274 | 265 | 9 | 0 | 0 | 100.0 % | 100.0 % | 96.7 % | 96.7 % |
+| `reverse_charge` | 394 | 381 | 6 | 7 | 0 | 98.2 % | 100.0 % | 98.4 % | 96.7 % |
+| `split_payment` | 468 | 446 | 10 | 12 | 0 | 97.4 % | 100.0 % | 97.8 % | 95.3 % |
+| `foreign_currency` | 473 | 455 | 18 | 0 | 0 | 100.0 % | 100.0 % | 96.2 % | 96.2 % |
+| `grosz_rounding` | 666 | 656 | 10 | 0 | 0 | 100.0 % | 100.0 % | 98.5 % | 98.5 % |
+| `multi_page` | 2443 | 2423 | 8 | 12 | 0 | 99.5 % | 100.0 % | 99.7 % | 99.2 % |
+
+## Per template
+
+| template | support | correct | wrong | missed | spurious | recall | precision | value acc. | accuracy |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `classic` | 1961 | 1903 | 34 | 24 | 0 | 98.8 % | 100.0 % | 98.2 % | 97.0 % |
+| `ledger` | 2068 | 2036 | 26 | 6 | 0 | 99.7 % | 100.0 % | 98.7 % | 98.5 % |
+| `compact` | 2037 | 1988 | 35 | 14 | 0 | 99.3 % | 100.0 % | 98.3 % | 97.6 % |
+
+## Failures and stop reasons
+
+| failure class | documents |
+|---|---:|
+| `none` | 108 |
+
+| stop reason | documents |
+|---|---:|
+| `end_turn` | 108 |
+
+## Cost
+
+Over **every** attempt, including the ones that failed and were repaired.
+
+| | |
+|---|---:|
+| attempts | 108 |
+| of which repairs | 0 |
+| input tokens | 0 |
+| output tokens | 0 |
+| cache write tokens | 0 |
+| cache read tokens | 0 |
+
+## Injected errors
+
+67 of 108 documents carry at least one known error.
+
+| kind | documents |
+|---|---:|
+| `total_transposed` | 9 |
+| `vat_cent` | 15 |
+| `rate_swapped` | 8 |
+| `line_dropped` | 7 |
+| `line_transposed` | 16 |
+| `nip_digit` | 14 |
+| `account_digit` | 13 |
+| `date_shifted` | 4 |
+| `name_truncated` | 8 |
+
+## Read this before the tables
+
+* This baseline saw **the gold**. A number produced by something that was handed the answer is a check on the harness, not a result about extraction.
+* Detection and value accuracy are separate columns on purpose. A field that is half missed and a field that is half misread both read as 50 % accuracy and need different work.
