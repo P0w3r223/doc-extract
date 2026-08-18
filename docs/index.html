@@ -171,7 +171,7 @@ footer {
 </head>
 <body>
 <header>
-  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;2 of 7</p>
+  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;3 of 7</p>
   <h1>Poland's national e-invoice schema checks nothing an accountant would</h1>
   <p class="lead">FA(3) &mdash; mandatory since 2026 &mdash; is 183 798 bytes of XSD carrying
   328 enumerations and <strong>0 assertions</strong>. It knows what shape an
@@ -197,18 +197,21 @@ footer {
     <div class="kpi-note">698 rows, gold with no annotation step</div>
   </li>
   <li class="kpi">
-    <div class="kpi-value">2 / 7</div>
+    <div class="kpi-value">3 / 7</div>
     <div class="kpi-label">Milestones built</div>
-    <div class="kpi-note">no model has run yet &mdash; see what is missing, below</div>
+    <div class="kpi-note">no model has been called yet &mdash; see what is missing, below</div>
   </li>
 </ul>
 
 <div class="card caution">
   <strong>This is a project in progress, and the page says so on purpose.</strong> What exists is
-  the domain layer and the corpus generator: both run offline, with no model, no network and no API
-  key. Extraction, the scorer, the detector study and the injection suite are milestones 3&ndash;6
-  and are <em>not built</em>. Every number on this page is a property of the schema, the rules or
-  the generated corpus. There are no accuracy figures here because there is nothing yet to measure.
+  the domain layer, the corpus generator and the extraction pipeline &mdash; the source layer, the
+  prompt, the output schema and the repair loop. All of it runs offline, with no network and no API
+  key: the pipeline is exercised end to end by a <em>scripted</em> model, so <strong>no model has
+  been called yet</strong>. The scorer, the detector study and the injection suite are milestones
+  4&ndash;6 and are <em>not built</em>. Every number on this page is a property of the schema, the
+  rules or the generated corpus. There are no accuracy figures here because there is nothing yet to
+  measure.
 </div>
 
 <h2>The gap this fills</h2>
@@ -282,6 +285,12 @@ to confuse with model error &mdash; which is what makes the detector study inter
 of 466,62 reads as <code>3&nbsp;466,62</code> in a flat text dump, because a space is also Poland's
 thousands separator. That ambiguity is in real invoices and it stays in this one; the source layer
 resolves it from word geometry rather than by having the generator avoid it.</p>
+<p>It is not a rare case: <strong>873 of the 1888 amounts</strong> the corpus
+prints (46%) carry that thousands space. The source layer reads each of them back as one
+field, and reads a quantity printed beside a price as two &mdash; from the boxes the words occupy,
+not from the string. The separation is not a tuned threshold either: a space is 0.32&nbsp;em wide,
+while every column gap in the corpus is at least 12&nbsp;pt, because each cell is asserted to fit
+its column with reportlab's padding still to spare.</p>
 <p>What it does <em>not</em> have is real-world visual chaos &mdash; skew, stamps, poor scans,
 layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
 costs, and the gap will be reported whichever way it comes out.</p>
@@ -291,7 +300,7 @@ costs, and the gap will be reported whichever way it comes out.</p>
 page at all.</p>
 <table>
   <tbody>
-    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">not built</td></tr>
+    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built, scripted model only</td></tr>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">not built</td></tr>
     <tr><th>M5 &mdash; grounding, routing, <strong>the detector study</strong> and the coverage&ndash;accuracy curve</th><td class="num">not built</td></tr>
     <tr><th>M6 &mdash; prompt-injection suite and attack success rate</th><td class="num">not built</td></tr>
@@ -316,7 +325,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from
-  <code>250516e</code> &middot; part of a
+  <code>ba3b282</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

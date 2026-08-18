@@ -14,3 +14,7 @@ dist/
 # Generated corpora and run outputs (M2+): reproducible from a seed, not versioned.
 data/synthetic/
 results/*/predictions/
+
+# Working notes for the assistant sessions, not part of the project. Scoped to `sessions/` so a
+# checked-in `.claude/settings.json` would still be versioned if one is ever added.
+.claude/sessions/

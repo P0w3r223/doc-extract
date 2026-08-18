@@ -25,6 +25,14 @@ dependencies = [
 # builds when the validator is installed would be harder to reproduce, not easier to trust.
 dev = ["pytest>=8", "ruff>=0.6", "xmlschema>=3.0"]
 
+# The only dependency that can reach the network, and the only one that costs money to use. It is an
+# extra rather than a runtime requirement because everything through M4 — the corpus, the source
+# layer, the prompt, the schema, the repair loop, the scorer — runs against `extract.scripted`, and
+# a project whose test suite cannot be run without an API key is a project whose results cannot be
+# reproduced by a reader. `extract.anthropic_client` imports it lazily and is the only module that
+# touches it.
+llm = ["anthropic>=0.40"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
