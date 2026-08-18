@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "doc-extract"
+version = "0.1.0"
+description = "Structured extraction from Polish invoices, with arithmetic invariants as a label-free error detector"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.7",
+    # Renders the synthetic corpus; pure Python, no system libraries. The upper bound is not
+    # caution about breakage: every `pdf_sha256` in a corpus manifest is a function of this
+    # version, so a major release would silently rewrite every hash the way a substituted font
+    # would. Pinned to the major the committed corpus was rendered with — crossing it is a
+    # decision to regenerate, not something a `pip install -U` should do on the way past.
+    # `manifest.meta.json` records the exact version each corpus was built with.
+    "reportlab>=5.0,<6",
+    "pdfplumber>=0.11",  # reads the text layer back, with the offsets grounding needs
+]
+
+[project.optional-dependencies]
+# `xmlschema` validates generated documents against the vendored XSD. It is a test dependency
+# rather than a runtime one: nothing in the library validates at run time, and a corpus that only
+# builds when the validator is installed would be harder to reproduce, not easier to trust.
+dev = ["pytest>=8", "ruff>=0.6", "xmlschema>=3.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# The fonts are shipped inside the package, not beside it: reportlab's own family is missing twelve
+# of the eighteen accented Polish letters, so rendering depends on these at run time and they have
+# to travel with the code. See `src/doc_extract/assets/fonts/PROVENANCE.md`.
+doc_extract = ["assets/fonts/*.ttf", "assets/fonts/LICENSE"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# These two modules hold the text an invoice is actually printed with, where an en dash between a
+# product and its variant and a multiplication sign between quantity and price are the correct
+# characters rather than typos. The rule stays on everywhere else, because `checksums` treats those
+# same codepoints as OCR hazards and a stray one in code would be a real bug.
+"src/doc_extract/synth/pools.py" = ["RUF001"]
+"src/doc_extract/synth/render.py" = ["RUF001"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
