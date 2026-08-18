@@ -194,7 +194,7 @@ test suite that could not run without an API key is a result a reader cannot rep
 6. Injection suite, attack success rate, trust-boundary ADR.
 7. Real held-out set, the reported synthetic↔real gap, vision variant, site/README/ADRs.
 
-355 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+366 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`
