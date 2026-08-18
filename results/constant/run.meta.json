@@ -1,0 +1,37 @@
+{
+  "baseline": "constant",
+  "model": "constant",
+  "corpus_dir": "data\\synthetic",
+  "documents": 108,
+  "max_tokens": 8192,
+  "repair_max_tokens": 4096,
+  "max_repairs": 1,
+  "effort": null,
+  "started_at": "2026-08-18T16:05:25+00:00",
+  "corpus": {
+    "corpus_seed": 20260818,
+    "per_tier": 12,
+    "tiers": [
+      "clean",
+      "mixed_rates",
+      "correction",
+      "advance",
+      "reverse_charge",
+      "split_payment",
+      "foreign_currency",
+      "grosz_rounding",
+      "multi_page"
+    ],
+    "documents": 108,
+    "doc_extract_version": "0.1.0",
+    "reportlab_version": "5.0.0",
+    "fa3_xsd_sha256": "b646b6b525f51adf1bb2545f111fc8ca6e7aa6dd2f98948f1667d3695c06d958",
+    "fonts_sha256": {
+      "DejaVuSans": "7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954",
+      "DejaVuSans-Bold": "e6476c1b80502924294eed40894c5b18e06c181444ca953e5334262df9c27724"
+    }
+  },
+  "options": {
+    "sees": "nothing"
+  }
+}

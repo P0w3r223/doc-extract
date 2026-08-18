@@ -16,10 +16,16 @@ import pathlib
 import re
 import subprocess
 
+from doc_extract.eval import fields
+from doc_extract.eval import predictions as prediction_file
+from doc_extract.eval.aggregate import Scored, summarise
+from doc_extract.eval.baselines import BASELINES
+from doc_extract.eval.scorer import judge
+from doc_extract.extract.result import FailureClass
 from doc_extract.schema import vocab
 from doc_extract.schema.generate_vocab import XSD_PATH
 from doc_extract.synth import render
-from doc_extract.synth.corpus import DEFAULT_PER_TIER, documents
+from doc_extract.synth.corpus import DEFAULT_PER_TIER, DEFAULT_SEED, documents
 from doc_extract.synth.tiers import TIERS
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -123,6 +129,102 @@ def printed_amounts(corpus: list) -> tuple[int, int]:
     return spaced, len(values)
 
 
+def baselines(corpus: list) -> list[dict[str, object]]:
+    """Every committed run, re-scored here from its prediction file against the corpus's gold.
+
+    Not read off a report and not typed in: the page recomputes the numbers from
+    `results/<run>/predictions.jsonl`, which is the same claim the prediction files exist to support
+    — that a figure can be checked without re-running a model. It also means a page built after a
+    change to the scorer shows the new numbers, and a stale committed report would be visible as a
+    disagreement rather than quietly reprinted.
+
+    Gold comes from the generator in memory, so building the page needs no corpus on disk. A run made
+    on a different seed is refused rather than mixed in: it would be a table whose rows describe
+    different documents.
+    """
+    gold = {document.doc_id: document.invoice for document in corpus}
+    tiers = {document.doc_id: document.tier for document in corpus}
+    templates = {document.doc_id: document.template for document in corpus}
+
+    results = ROOT / "results"
+    if not results.is_dir():  # pragma: no cover — a checkout with no committed runs
+        return []
+
+    rows: list[dict[str, object]] = []
+    for directory in sorted(results.iterdir()):
+        predictions_path = directory / prediction_file.PREDICTIONS_NAME
+        if not predictions_path.exists():
+            continue
+        meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
+        seed = meta.corpus.get("corpus_seed")
+        if seed != DEFAULT_SEED:
+            raise SystemExit(
+                f"{directory.name} was scored on corpus seed {seed}, and this page is built on "
+                f"{DEFAULT_SEED}; rebuild the run or leave it out of `results/`"
+            )
+        records = prediction_file.read(predictions_path)
+        report = summarise(
+            [
+                Scored(
+                    prediction=record,
+                    score=judge(
+                        gold[record.doc_id],
+                        record.parse(),
+                        doc_id=record.doc_id,
+                        tier=tiers[record.doc_id],
+                        template=templates[record.doc_id],
+                        failure=FailureClass(record.failure),
+                    ),
+                )
+                for record in records
+            ],
+            run=meta,
+            expected=list(gold),
+        )
+        rows.append({
+            "name": meta.baseline,
+            "sees": str(meta.options.get("sees", "unstated")),
+            "extracted": report.extracted,
+            "documents": report.documents,
+            "exact": report.exact,
+            "accuracy": report.overall.accuracy,
+            "recall": report.overall.detection_recall,
+            "value": report.overall.value_accuracy,
+            "support": report.overall.support,
+        })
+    #: Declared order (B0, B1, B2, B3, then the real model), not the directory listing's. The
+    #: baselines only mean anything read against each other, and `oracle` is the row the others are
+    #: read against — alphabetical would open the table on `constant`.
+    order = [baseline.name for baseline in BASELINES]
+    return sorted(rows, key=lambda row: (order.index(row["name"]) if row["name"] in order else 99))
+
+
+def percent(value: float | None) -> str:
+    """A rate, or an em dash. Never `0 %` for an absent denominator — see `eval/aggregate.py`."""
+    return "&mdash;" if value is None else f"{value * 100:.1f}&nbsp;%"
+
+
+def baseline_table(rows: list[dict[str, object]]) -> str:
+    if not rows:  # pragma: no cover — only when `results/` is empty
+        return "<p class=\"note\">No committed runs in <code>results/</code>.</p>"
+    head = (
+        "<table><thead><tr><th>baseline</th><th>saw</th><th class=\"num\">invoice</th>"
+        "<th class=\"num\">exact</th><th class=\"num\">recall</th><th class=\"num\">value</th>"
+        "<th class=\"num\">accuracy</th></tr></thead><tbody>"
+    )
+    body = "".join(
+        f'<tr><th><code>{html.escape(str(row["name"]))}</code></th>'
+        f'<td>{html.escape(str(row["sees"]))}</td>'
+        f'<td class="num">{row["extracted"]} / {row["documents"]}</td>'
+        f'<td class="num">{row["exact"]}</td>'
+        f'<td class="num">{percent(row["recall"])}</td>'  # type: ignore[arg-type]
+        f'<td class="num">{percent(row["value"])}</td>'   # type: ignore[arg-type]
+        f'<td class="num">{percent(row["accuracy"])}</td></tr>'  # type: ignore[arg-type]
+        for row in rows
+    )
+    return head + body + "</tbody></table>"
+
+
 def head_commit() -> str:
     try:
         return subprocess.run(
@@ -168,6 +270,8 @@ def build() -> str:
         (name, count, str(count))
         for name, count in sorted(family.items(), key=lambda item: -item[1])
     ]
+    runs = baselines(corpus)
+    scored_fields = len(fields.FIELDS)
 
     return TEMPLATE.format(
         url=URL,
@@ -199,6 +303,10 @@ def build() -> str:
         family_chart=bars(family_rows),
         hard_list=", ".join(f"<code>{html.escape(r)}</code>" for r in hard),
         heuristic_list=", ".join(f"<code>{html.escape(r)}</code>" for r in heuristic),
+        baseline_table=baseline_table(runs),
+        baseline_count=len(runs),
+        scored_fields=scored_fields,
+        field_instances=runs[0]["support"] if runs else 0,
     )
 
 
@@ -375,7 +483,7 @@ footer {{
 </head>
 <body>
 <header>
-  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;3 of 7</p>
+  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;4 of 7</p>
   <h1>Poland's national e-invoice schema checks nothing an accountant would</h1>
   <p class="lead">FA(3) &mdash; mandatory since 2026 &mdash; is {xsd_bytes} bytes of XSD carrying
   {enumerations} enumerations and <strong>{assertions} assertions</strong>. It knows what shape an
@@ -401,21 +509,20 @@ footer {{
     <div class="kpi-note">{rows} rows, gold with no annotation step</div>
   </li>
   <li class="kpi">
-    <div class="kpi-value">3 / 7</div>
+    <div class="kpi-value">4 / 7</div>
     <div class="kpi-label">Milestones built</div>
-    <div class="kpi-note">no model has been called yet &mdash; see what is missing, below</div>
+    <div class="kpi-note">no model has been called yet &mdash; the numbers below are baselines</div>
   </li>
 </ul>
 
 <div class="card caution">
   <strong>This is a project in progress, and the page says so on purpose.</strong> What exists is
-  the domain layer, the corpus generator and the extraction pipeline &mdash; the source layer, the
-  prompt, the output schema and the repair loop. All of it runs offline, with no network and no API
-  key: the pipeline is exercised end to end by a <em>scripted</em> model, so <strong>no model has
-  been called yet</strong>. The scorer, the detector study and the injection suite are milestones
-  4&ndash;6 and are <em>not built</em>. Every number on this page is a property of the schema, the
-  rules or the generated corpus. There are no accuracy figures here because there is nothing yet to
-  measure.
+  the domain layer, the corpus generator, the extraction pipeline and the scorer. All of it runs
+  offline, with no network and no API key, and <strong>no model has been called yet</strong>: the
+  accuracy figures below belong to four <em>baselines</em> &mdash; a perfect reading, a constant
+  answer, a regular-expression reader, and a deliberately corrupted gold. They are the bar a model
+  will be measured against, not a measurement of one. The detector study and the injection suite are
+  milestones 5&ndash;6 and are <em>not built</em>.
 </div>
 
 <h2>The gap this fills</h2>
@@ -499,13 +606,37 @@ its column with reportlab's padding still to spare.</p>
 layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
 costs, and the gap will be reported whichever way it comes out.</p>
 
+<h2>What the baselines say, before any model is involved</h2>
+<p>{baseline_count} committed runs over the same {documents} documents, scoring
+{scored_fields} fields per invoice and {field_instances} gold field instances in total. Every
+baseline answers in the same wire format and goes through the same prompt, parse, validation and
+repair loop, so a column is comparable across the row. The numbers are recomputed for this page from
+each run's committed <code>predictions.jsonl</code> &mdash; not copied from a report.</p>
+{baseline_table}
+<p class="note"><strong>recall</strong> is how many of the values on the page the prediction offered
+a value for; <strong>value</strong> is how many of those it read correctly; <strong>accuracy</strong>
+is the two together. They are separate columns because a field that is half missed and a field that
+is half misread read the same in one number and need different work. A dash means there was no
+denominator &mdash; never a zero, which would read as a measurement nobody made.</p>
+<p><code>oracle</code> is handed the gold, so its 100&nbsp;% is a check on the harness rather than a
+result: if a perfect reading scored anything less, every other number here would be wrong.
+<code>constant</code> answers the same lawful invoice for every document &mdash; the floor, and a
+diagnostic, because the fields it still scores well on (currency, invoice kind) are fields where the
+corpus's own distribution does most of the work. <code>pattern</code> is regular expressions and
+column positions with no model at all, and it was deliberately allowed to match the labels this
+project's own renderer prints, which the extraction prompt is forbidden to know: it is the strongest
+thing that is not a language model, and therefore the bar. <code>noisy</code> is the gold with known
+errors injected at a fixed rate &mdash; not a competitor but the labelled error set the detector study
+needs, since a detector measured only on a model's unlabelled mistakes is measured on a sample nobody
+chose.</p>
+
 <h2>What is not built yet</h2>
 <p>Stated plainly, because a portfolio page that reads as finished when it is not is worse than no
 page at all.</p>
 <table>
   <tbody>
-    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built, scripted model only</td></tr>
-    <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">not built</td></tr>
+    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built, no model called</td></tr>
+    <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, baselines only</td></tr>
     <tr><th>M5 &mdash; grounding, routing, <strong>the detector study</strong> and the coverage&ndash;accuracy curve</th><td class="num">not built</td></tr>
     <tr><th>M6 &mdash; prompt-injection suite and attack success rate</th><td class="num">not built</td></tr>
     <tr><th>M7 &mdash; real held-out set and the reported synthetic&harr;real gap</th><td class="num">not built</td></tr>
@@ -521,6 +652,7 @@ cd doc-extract
 python -m venv .venv &amp;&amp; .venv/Scripts/python -m pip install -e ".[dev]"
 pytest                                             # the figures above are assertions
 python -m doc_extract.synth --out data/synthetic   # {documents} documents, reproducible from one seed
+python -m doc_extract.eval run --baseline pattern  # predict, score, write results/pattern/
 python docs/build_index.py                         # rebuild this page from the repository</code></pre>
 <p class="note">The corpus is not committed: it is a function of one integer, so a seed in the
 manifest is a smaller and more honest artifact than several hundred PDFs in git history. The

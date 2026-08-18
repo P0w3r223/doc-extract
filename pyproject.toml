@@ -56,6 +56,10 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 # same codepoints as OCR hazards and a stray one in code would be a real bug.
 "src/doc_extract/synth/pools.py" = ["RUF001"]
 "src/doc_extract/synth/render.py" = ["RUF001"]
+# The pattern baseline matches the characters `render.py` prints — the multiplication sign between
+# a quantity and a price is the one on the page, and a regex written with a Latin `x` would match
+# nothing. Same rule, same reason, opposite side of the same string.
+"src/doc_extract/eval/pattern.py" = ["RUF001"]
 # The site template is prose and markup rather than code: an en dash between two row counts and a
 # no-break space inside a printed amount are the correct characters, and a table row carrying its
 # own qualifier does not survive being folded at column 100 — the break would land inside the

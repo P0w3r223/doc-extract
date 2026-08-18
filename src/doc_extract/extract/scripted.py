@@ -89,3 +89,32 @@ def oracle(invoice: Invoice, *, replies: int = 1) -> ScriptedClient:
 def script(replies: Iterable[Reply | LLMError]) -> ScriptedClient:
     """A client from an iterable, for tests that build their replies in a comprehension."""
     return ScriptedClient(*replies)
+
+
+class AlwaysClient:
+    """Answers the same reply however often it is asked, and records the asking.
+
+    `ScriptedClient` runs out on purpose, because a test that expects two calls should fail loudly
+    on a third. A **baseline** wants the opposite: whatever it read off the page is its answer, and
+    if the pipeline repairs, the answer to the repair request is the same answer. That is not a
+    degenerate case to be avoided — it is what a deterministic reader does, and recording the second
+    identical failure is how M4's cost and failure counts stay honest about the retry.
+    """
+
+    def __init__(self, reply: Reply) -> None:
+        self._reply = reply
+        self.requests: list[LLMRequest] = []
+
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        self.requests.append(request)
+        return LLMResponse(
+            text=self._reply.text,
+            stop_reason=self._reply.stop_reason,
+            usage=self._reply.usage,
+            model=self._reply.model,
+        )
+
+
+def always(reply: Reply) -> AlwaysClient:
+    """A model with one thing to say. The shape every deterministic baseline takes."""
+    return AlwaysClient(reply)

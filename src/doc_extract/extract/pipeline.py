@@ -38,11 +38,14 @@ from doc_extract.source.document import SourceDocument
 DEFAULT_MODEL = "claude-opus-5"
 
 #: Extraction and repair carry separate budgets, so "ran out of tokens" can be attributed to a
-#: stage. The extraction budget is generous because current models think before answering and
-#: `max_tokens` bounds the thinking and the answer together — a budget sized to the JSON alone
-#: truncates mid-object and charges the loss to the extractor.
-EXTRACTION_MAX_TOKENS = 8192
-REPAIR_MAX_TOKENS = 4096
+#: stage. Both are generous because current models think before answering and `max_tokens` bounds
+#: the thinking and the answer together — a budget sized to the JSON alone truncates mid-object and
+#: charges the loss to the extractor. The sizing is not a guess: the corpus's `multi_page` tier
+#: prints 26 to 34 rows, and one row is eight fields, so the answer alone runs to several thousand
+#: tokens before a single token of reasoning. 16000 also keeps a non-streaming request inside the
+#: SDK's HTTP timeout, which a larger ceiling would not.
+EXTRACTION_MAX_TOKENS = 16000
+REPAIR_MAX_TOKENS = 8192
 
 #: How many validator errors travel back to the model. A malformed answer can produce one error per
 #: line item; the cap keeps a repair prompt from being mostly complaint, and the errors are ordered
