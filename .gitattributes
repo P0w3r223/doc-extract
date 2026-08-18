@@ -1,0 +1,16 @@
+# Normalise line endings in the repository, and let the working copy follow the platform.
+* text=auto
+
+# The vendored artifacts are the exception, and the reason is the point of vendoring them: each is
+# pinned by SHA-256 in its PROVENANCE.md and checked by tests/test_vendored_artifacts.py. With
+# `core.autocrlf=true` — the Git for Windows default — a checkout would rewrite every LF in the
+# schemas into CRLF, so a fresh clone would hold files whose bytes no longer match the digests that
+# attest to what was downloaded from the Ministry. The test would be red on a clean checkout, and
+# the honest reading of that failure would be wrong: nothing was substituted, only re-encoded.
+schemas/*.xsd -text
+src/doc_extract/assets/fonts/** -text
+
+# Rendered corpora are written as bytes for the same reason (see synth/corpus.py), and are not
+# committed — this covers the case of someone unignoring them locally.
+*.pdf -text
+*.xml -text

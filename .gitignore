@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+# `pip wheel .` / `python -m build` leave a copy of the package here. Left in place it is not just
+# clutter: `ruff` lints it as source, and the per-file-ignores in pyproject.toml are keyed to paths
+# under `src/`, so the copy reports errors the original is exempt from.
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.env
+
+# Generated corpora and run outputs (M2+): reproducible from a seed, not versioned.
+data/synthetic/
+results/*/predictions/
