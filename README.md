@@ -45,7 +45,7 @@ against.
 | `source/` | PDF → words with boxes → lines and cells → one text with **a span per field** |
 | `extract/` | constant system prompt, owned output schema, fixed stage order, bounded schema repair |
 | `eval/` | 22 scored fields matched **by key, not position**; coverage asserted; predictions committed |
-| tests | **355 passing**, ruff clean |
+| tests | **366 passing**, ruff clean |
 
 Milestones 5–7: the detector study and selective prediction → prompt-injection suite → real held-out
 set and the reported synthetic↔real gap.
