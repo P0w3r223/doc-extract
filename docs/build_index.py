@@ -18,6 +18,7 @@ import subprocess
 
 from doc_extract.schema import vocab
 from doc_extract.schema.generate_vocab import XSD_PATH
+from doc_extract.synth import render
 from doc_extract.synth.corpus import DEFAULT_PER_TIER, documents
 from doc_extract.synth.tiers import TIERS
 
@@ -100,6 +101,28 @@ def ranges(rows: list[tuple[str, int, int, str]]) -> str:
     return "".join(out) + "</svg>"
 
 
+def printed_amounts(corpus: list) -> tuple[int, int]:
+    """How many of the corpus's amounts are printed with a thousands space, and how many there are.
+
+    The figure the source layer's whole argument rests on. `render._amount` is used rather than a
+    copy of the formatting rule, because a page that claimed a number about how amounts are printed
+    and then printed them differently would be the failure this whole file exists to prevent.
+    """
+    values = [
+        value
+        for document in corpus
+        for value in (
+            [document.invoice.total_gross]
+            + [total.net for total in document.invoice.rate_totals]
+            + [total.vat for total in document.invoice.rate_totals]
+            + [line.net for line in document.invoice.lines]
+            + [line.vat for line in document.invoice.lines]
+        )
+    ]
+    spaced = sum(1 for value in values if " " in render._amount(value))
+    return spaced, len(values)
+
+
 def head_commit() -> str:
     try:
         return subprocess.run(
@@ -130,6 +153,7 @@ def build() -> str:
     )
     templates = collections.Counter(doc.template for doc in corpus)
     kinds = collections.Counter(doc.invoice.kind for doc in corpus)
+    spaced, amounts = printed_amounts(corpus)
 
     tier_rows = [
         (tier.name, min(per_tier[tier.name]), max(per_tier[tier.name]),
@@ -160,6 +184,9 @@ def build() -> str:
         rows=sum(rows_per_doc),
         discounted=discounted,
         discounted_pct=f"{discounted * 100 / sum(rows_per_doc):.1f}",
+        spaced_amounts=spaced,
+        amounts=amounts,
+        spaced_pct=f"{spaced * 100 / amounts:.0f}",
         tiers=len(TIERS),
         per_tier=DEFAULT_PER_TIER,
         templates=" · ".join(f"{name} {count}" for name, count in sorted(templates.items())),
@@ -348,7 +375,7 @@ footer {{
 </head>
 <body>
 <header>
-  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;2 of 7</p>
+  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;3 of 7</p>
   <h1>Poland's national e-invoice schema checks nothing an accountant would</h1>
   <p class="lead">FA(3) &mdash; mandatory since 2026 &mdash; is {xsd_bytes} bytes of XSD carrying
   {enumerations} enumerations and <strong>{assertions} assertions</strong>. It knows what shape an
@@ -374,18 +401,21 @@ footer {{
     <div class="kpi-note">{rows} rows, gold with no annotation step</div>
   </li>
   <li class="kpi">
-    <div class="kpi-value">2 / 7</div>
+    <div class="kpi-value">3 / 7</div>
     <div class="kpi-label">Milestones built</div>
-    <div class="kpi-note">no model has run yet &mdash; see what is missing, below</div>
+    <div class="kpi-note">no model has been called yet &mdash; see what is missing, below</div>
   </li>
 </ul>
 
 <div class="card caution">
   <strong>This is a project in progress, and the page says so on purpose.</strong> What exists is
-  the domain layer and the corpus generator: both run offline, with no model, no network and no API
-  key. Extraction, the scorer, the detector study and the injection suite are milestones 3&ndash;6
-  and are <em>not built</em>. Every number on this page is a property of the schema, the rules or
-  the generated corpus. There are no accuracy figures here because there is nothing yet to measure.
+  the domain layer, the corpus generator and the extraction pipeline &mdash; the source layer, the
+  prompt, the output schema and the repair loop. All of it runs offline, with no network and no API
+  key: the pipeline is exercised end to end by a <em>scripted</em> model, so <strong>no model has
+  been called yet</strong>. The scorer, the detector study and the injection suite are milestones
+  4&ndash;6 and are <em>not built</em>. Every number on this page is a property of the schema, the
+  rules or the generated corpus. There are no accuracy figures here because there is nothing yet to
+  measure.
 </div>
 
 <h2>The gap this fills</h2>
@@ -459,6 +489,12 @@ to confuse with model error &mdash; which is what makes the detector study inter
 of 466,62 reads as <code>3&nbsp;466,62</code> in a flat text dump, because a space is also Poland's
 thousands separator. That ambiguity is in real invoices and it stays in this one; the source layer
 resolves it from word geometry rather than by having the generator avoid it.</p>
+<p>It is not a rare case: <strong>{spaced_amounts} of the {amounts} amounts</strong> the corpus
+prints ({spaced_pct}%) carry that thousands space. The source layer reads each of them back as one
+field, and reads a quantity printed beside a price as two &mdash; from the boxes the words occupy,
+not from the string. The separation is not a tuned threshold either: a space is 0.32&nbsp;em wide,
+while every column gap in the corpus is at least 12&nbsp;pt, because each cell is asserted to fit
+its column with reportlab's padding still to spare.</p>
 <p>What it does <em>not</em> have is real-world visual chaos &mdash; skew, stamps, poor scans,
 layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
 costs, and the gap will be reported whichever way it comes out.</p>
@@ -468,7 +504,7 @@ costs, and the gap will be reported whichever way it comes out.</p>
 page at all.</p>
 <table>
   <tbody>
-    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">not built</td></tr>
+    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built, scripted model only</td></tr>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">not built</td></tr>
     <tr><th>M5 &mdash; grounding, routing, <strong>the detector study</strong> and the coverage&ndash;accuracy curve</th><td class="num">not built</td></tr>
     <tr><th>M6 &mdash; prompt-injection suite and attack success rate</th><td class="num">not built</td></tr>

@@ -45,9 +45,21 @@ src/doc_extract/
     render.py        # three layouts, deterministic bytes, Polish diacritics
     corpus.py        # the corpus on disk plus a manifest of seeds and hashes
 
-# The five below do not exist yet. They are the plan, not the tree — do not import from them.
-  source/            # M3 (planned) — PDF text + offsets (the untrusted-data envelope)
-  extract/           # M3 (planned) — LLMClient protocol, prompt, structured output + schema retry
+  source/            # M3 — PDF -> text + offsets, read from geometry (the untrusted-data envelope)
+    words.py         # pdfplumber words with their boxes; reading order is never assumed
+    layout.py        # lines by vertical overlap, cells by a gap measured in em, not points
+    document.py      # the canonical text plus a span per word and per cell; tab = column break
+    envelope.py      # the fence around untrusted text, with a marker derived from the text
+  extract/           # M3 — source document -> Invoice, or a named failure
+    client.py        # LLMRequest / LLMResponse / Usage / the one-method LLMClient protocol
+    wire.py          # the JSON schema the model answers in, and Invoice -> that shape
+    prompt.py        # the constant system prompt, the extraction turn, the repair turn
+    pipeline.py      # fixed stage order, Decimal-native parse, the owned schema retry
+    result.py        # failure class + stop_reason + usage of every attempt, per the metric rules
+    scripted.py      # the fake model: canned replies, and the gold as an oracle (M4's B0)
+    anthropic_client.py # the only module that touches the network; lazy import, optional extra
+
+# The three below do not exist yet. They are the plan, not the tree — do not import from them.
   ground/            # M5 (planned) — value -> source span provenance
   decide/            # M5 (planned) — per-field confidence, accept / review / reject routing
   eval/              # M4-M6 (planned) — scorer, detector study, selective prediction, attacks
@@ -74,8 +86,23 @@ schemas/*.xsd        # the national standard and its three imports + PROVENANCE.
   violation means something is genuinely wrong. `Severity.HEURISTIC` usually holds but has lawful
   exceptions. Mixing them blunts the detector — a heuristic's false positives would be
   indistinguishable from a real arithmetic miss. Metrics report them separately.
-- **Document text is data, never instruction.** It is delimited (`<document>…</document>`) and never
-  interpolated into a system prompt. A tool error is a structured result, not an exception.
+- **Document text is data, never instruction.** It is delimited and never interpolated into a system
+  prompt. The fence is not a fixed `<document>` — an invoice that prints `</document>` would close
+  it — but `<document-{sha256(text)[:16]}>`, so forging it is a preimage problem. A tool error is a
+  structured result, not an exception.
+- **The extractor transcribes; it never computes.** A figure that is not printed is `null`, and a
+  printed figure is copied even when it looks wrong. An extractor that derived a missing VAT from a
+  net would *manufacture* the arithmetic agreement this project measures, and every invariant would
+  then hold by construction on exactly the documents whose reading was worst — the detector would be
+  measuring the model's arithmetic instead of the page's.
+- **Money crosses the wire as a string.** `"1234.56"` is exact on every path and in every SDK; a
+  JSON number is a float somewhere. The model's body is parsed with `parse_float=Decimal` anyway,
+  which is why `extract` asks for structured *output* rather than a tool call: a tool input arrives
+  already parsed by someone else.
+- **The prompt encodes the standard, not this corpus.** Rate codes and the Polish number format are
+  properties of FA(3); `Razem` and `Sprzedawca` are properties of `synth/render.py`. A prompt fitted
+  to the generator's own labels would score well in M4 and close M7's synthetic↔real gap in advance
+  instead of measuring it. `tests/test_extract_prompt.py` asserts the labels are absent.
 - **The generator and the scorer never share a rounding helper.** `synth/money.py`,
   `schema/invariants._round2` and `fa3_xml._money` are three deliberate copies, and
   `tests/test_synth_money.py` asserts they are not the same object. If both sides rounded through
@@ -84,8 +111,9 @@ schemas/*.xsd        # the national standard and its three imports + PROVENANCE.
   the source document, not against another LLM call's output.
 - **The corpus is not sanitised to be easy to parse.** A quantity of 3 printed beside a price of
   466,62 reads as `3 466,62` in a flat text dump, because a space is also Poland's thousands
-  separator. That ambiguity is in real invoices and it stays in this one; the source layer in M3
-  resolves it from word geometry, not by having the generator avoid it.
+  separator. That ambiguity is in real invoices and it stays in this one; `source/layout.py`
+  resolves it from word geometry, not by having the generator avoid it. It is not a corner case:
+  46 % of the amounts the corpus prints carry a thousands space.
 - **Vendored artifacts are pinned by hash and re-vendored as a commit** — the four XSDs and the two
   fonts. Changing a font changes every rendered byte and therefore every hash in a corpus manifest,
   which is the point: the manifest records which corpus a result was computed on.
@@ -101,10 +129,15 @@ ruff check .
 
 python -m doc_extract.synth --out data/synthetic          # build the corpus (not committed)
 python -m doc_extract.schema.generate_vocab --check       # vocab.py vs the vendored XSD
+python docs/build_index.py                                # regenerate the site from the repository
+
+.venv/Scripts/python -m pip install -e ".[llm]"           # only needed to call a real model
 ```
 
-M1 and M2 run entirely offline with no model and no key, and must stay that way — including schema
-validation, which resolves the Ministry's imports from `schemas/` with remote fetching disabled.
+M1 to M3 run entirely offline with no model and no key, and must stay that way — including schema
+validation, which resolves the Ministry's imports from `schemas/` with remote fetching disabled, and
+including the whole extraction pipeline, which the test suite drives through `extract.scripted`. A
+test suite that could not run without an API key is a result a reader cannot reproduce.
 
 ## Milestones
 
@@ -113,13 +146,18 @@ validation, which resolves the Ministry's imports from `schemas/` with remote fe
 2. **Synthetic corpus generator.** ✅ KSeF-conformant XML (gold) → rendered PDF, nine difficulty
    tiers × three layouts, validated against the vendored schema offline, round-trip asserted to be
    the identity, gold asserted to satisfy every invariant on the seeds the corpus actually ships.
-3. Source layer + extraction pipeline + structured outputs + owned schema retry; scripted fake model.
+3. **Source layer + extraction pipeline.** ✅ Words with geometry → lines and cells → one text with
+   a span per word and per cell; an envelope whose marker the document cannot forge; a constant
+   system prompt; an output schema derived from `vocab` and asserted against `model_fields`; a
+   fixed stage order with an owned, bounded schema repair carrying the validator's own errors; a
+   scripted model that makes the whole path testable offline, and the gold as an oracle whose
+   round trip through the wire format is asserted to be the identity. No model has been called yet.
 4. Pure scorer, per-field metrics with support and coverage, failure taxonomy, baselines B0–B3.
 5. Grounding + confidence + routing; the detector study and the selective-prediction curve.
 6. Injection suite, attack success rate, trust-boundary ADR.
 7. Real held-out set, the reported synthetic↔real gap, vision variant, site/README/ADRs.
 
-198 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+274 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

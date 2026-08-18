@@ -27,10 +27,11 @@ unenforced.** Checking those rules is therefore real work, not a re-run of valid
 exists. The vendored schema is in `schemas/` with its provenance and SHA-256, so the claim is
 checkable rather than asserted.
 
-## Status — milestones 1–2 of 7
+## Status — milestones 1–3 of 7
 
-The domain layer and the corpus generator are complete. Both run with no model, no network and no
-API key.
+The domain layer, the corpus generator and the extraction pipeline are complete. All of it runs
+with no model, no network and no API key: the pipeline is driven end to end by a **scripted** model,
+so **no model has been called yet** and there are no accuracy figures here to read.
 
 | | |
 |---|---|
@@ -39,10 +40,27 @@ API key.
 | `schema/ksef.py` | frozen Pydantic subset of FA(3); `extra="forbid"`, `Decimal` money, closed enums |
 | `schema/invariants.py` | 15 rules across totals, lines, identifiers and dates, reported as data |
 | `synth/` | KSeF-conformant XML **as the gold** → PDF, in 9 difficulty tiers × 3 layouts |
-| tests | **198 passing**, ruff clean |
+| `source/` | PDF → words with boxes → lines and cells → one text with **a span per field** |
+| `extract/` | constant system prompt, owned output schema, fixed stage order, bounded schema repair |
+| tests | **274 passing**, ruff clean |
 
-Milestones 3–7: extraction pipeline → scorer and baselines → the detector study and selective
-prediction → prompt-injection suite → real held-out set and the reported synthetic↔real gap.
+Milestones 4–7: scorer and baselines → the detector study and selective prediction →
+prompt-injection suite → real held-out set and the reported synthetic↔real gap.
+
+## Reading a page instead of dumping it
+
+`pdfplumber.extract_text()` throws away the one thing this task needs. A quantity of `3` printed
+beside a price of `466,62` comes back as `3 466,62`, because a space is also Poland's thousands
+separator — and **46 % of the amounts this corpus prints carry that space**. The column boundary
+that told them apart was geometry, and a flat string has none.
+
+So `source/` reads words with their boxes and rebuilds the page from them: words share a line when
+their boxes overlap vertically, and a field when the gap between them is narrower than three quarters
+of an em. The two populations that separates are far apart and both bounded — a space is 0.32 em,
+and every column gap in the corpus is at least 12 pt, because M2 already asserts every cell fits its
+column with reportlab's padding to spare. The result is a text where a tab means "different column"
+and a space means "part of this value", plus a span for every field pointing back at the page, which
+is what the grounding check in milestone 5 needs and cannot reconstruct after the fact.
 
 ## The corpus
 
@@ -79,7 +97,7 @@ reproducible, and nothing is committed.
 layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
 costs, and the gap will be reported whichever way it comes out.
 
-## Two design decisions worth stating up front
+## Four design decisions worth stating up front
 
 **Invariants report; they do not raise.** A document whose numbers disagree must still be
 constructible. Shape validation (types, decimal places, closed domains) raises, because a document
@@ -87,6 +105,18 @@ violating it is meaningless. Arithmetic goes through `invariants.check()`, which
 as data carrying a stable rule id, a severity and the signed miss. A model that refused to
 construct a broken invoice could not be routed, counted or explained — and inspecting broken
 invoices is the whole project.
+
+**The extractor transcribes; it never computes.** A figure that is not printed comes back as `null`,
+and a printed figure is copied even when it looks wrong. This is the instruction the detector study
+depends on: an extractor that helpfully derived a missing VAT from a net would *manufacture* the
+arithmetic agreement this project measures, so every invariant would hold by construction on exactly
+the documents whose reading was worst — and milestone 5 would be measuring the model's arithmetic
+instead of the page's.
+
+**The fence around the document is derived from the document.** A fixed `<document>…</document>` is
+forgeable: an invoice that prints the closing tag ends the fence, and everything after it reads as
+the caller's own words. The marker here carries the SHA-256 of the text it wraps, so closing it
+early means printing a string that is a function of a text containing that string.
 
 **Hard rules and heuristics are kept apart.** `Severity.HARD` is an arithmetic identity: a
 violation means something is genuinely wrong. `Severity.HEURISTIC` usually holds but has lawful
