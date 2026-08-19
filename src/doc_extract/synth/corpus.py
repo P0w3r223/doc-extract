@@ -21,11 +21,11 @@ from __future__ import annotations
 import hashlib
 import json
 import zlib
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from importlib import metadata
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from doc_extract.schema.generate_vocab import XSD_PATH
 from doc_extract.synth import fa3_xml, render
@@ -37,6 +37,22 @@ DEFAULT_PER_TIER = 12
 
 MANIFEST_NAME = "manifest.jsonl"
 PROVENANCE_NAME = "manifest.meta.json"
+
+class Page(Protocol):
+    """A rendered document: the bytes, and the one fact about them the manifest needs.
+
+    Structural rather than a shared base class, so M7's foreign renderer satisfies it by having the
+    right shape instead of by importing this module. `render.Rendered` is the implementation M2 and
+    M6 pass; the foreign package has its own, and that separation is the point.
+    """
+
+    data: bytes
+    pages: int
+
+
+#: How a document becomes a page. Anything returning bytes and a page count satisfies it, which is
+#: what lets M7's foreign renderer reuse the manifest machinery without sharing a line of layout.
+Draw = Callable[[Document], Page]
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,9 +177,17 @@ def write_index(out_dir: Path, entries: Sequence[Entry], built: Mapping[str, Any
     )
 
 
-def write_document(document: Document, out_dir: Path) -> Entry:
+def write_document(document: Document, out_dir: Path, *, draw: Draw = render.render) -> Entry:
+    """One document's XML and PDF on disk, plus the manifest row that attests to both.
+
+    `draw` is how a corpus other than M2's gets written by this function rather than beside it. M6's
+    attacked corpus keeps the default — an attacked page is this renderer's page with a string added
+    — and M7's foreign corpus passes its own, because the whole of what it varies is the page. The
+    manifest, the hashing and the byte-level write are not presentation and are not worth a second
+    copy: a second one is a second place for a corpus to become undescribed by its own index.
+    """
     xml_text = fa3_xml.to_xml(document)
-    pdf = render.render(document)
+    pdf = draw(document)
 
     xml_path = out_dir / f"{document.doc_id}.xml"
     pdf_path = out_dir / f"{document.doc_id}.pdf"

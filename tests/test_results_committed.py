@@ -9,7 +9,9 @@ So this asserts it. Gold is rebuilt in memory from the corpus seed, exactly as `
 does, which is what lets the check run on a clean checkout where `data/synthetic/` is not committed.
 A run over M6's attacked corpus is rebuilt the same way and stays covered: the suite's grid is a
 pure function of the base corpus and of the parameters the run's own provenance block records, so
-`suite.plan` reproduces the gold of an attacked document without the corpus being on disk.
+`suite.plan` reproduces the gold of an attacked document without the corpus being on disk. So is a
+run over M7's foreign one — same gold, a different `template` on each document, and the template is
+a whole column of the report.
 
 `gate.md` is the one report this cannot cover: every column of it comes from grounding, and
 grounding needs the rendered pages. `attack.md` is covered **as far as its gold-only columns go** —
@@ -31,6 +33,7 @@ from doc_extract.eval import detector, detector_report, predictions, report
 from doc_extract.eval.aggregate import Scored, summarise
 from doc_extract.eval.scorer import judge
 from doc_extract.extract.result import FailureClass
+from doc_extract.foreign.corpus import documents as foreign_documents
 from doc_extract.schema.invariants import Severity
 from doc_extract.synth.corpus import DEFAULT_SEED, documents
 
@@ -55,6 +58,11 @@ def golds():
     """
     base = list(documents())
     clean = {document.doc_id: document for document in base}
+    #: M7's foreign corpus is the same gold with a different `template` on each document, and the
+    #: template reaches the report — it is a whole column of it. Rebuilding a foreign run from the
+    #: synthetic assignment produced a report whose per-layout table named three layouts that page
+    #: was never printed in, which is exactly the drift this module exists to catch.
+    unfamiliar = {document.doc_id: document for document in foreign_documents()}
     planned: dict[tuple, list] = {}
 
     def grid(meta) -> list:
@@ -72,9 +80,9 @@ def golds():
         return planned[key]
 
     def for_run(meta):
-        if not meta.corpus.get("attacked"):
-            return clean
-        return {document.doc_id: document for document, _ in grid(meta)}
+        if meta.corpus.get("attacked"):
+            return {document.doc_id: document for document, _ in grid(meta)}
+        return unfamiliar if meta.corpus.get("renderer") == "foreign" else clean
 
     for_run.assignments = lambda meta: {
         assignment.doc_id: assignment for _, assignment in grid(meta)

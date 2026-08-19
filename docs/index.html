@@ -269,6 +269,29 @@ a prediction asserted, so a reading that loses three quarters of the invoice rou
 absent&rdquo; from &ldquo;silently dropped&rdquo;; the count of what was never asserted is the only
 column that sees it.</p>
 
+<h2>How much of a reading was the template?</h2>
+<p>The synthetic corpus varies what an invoice <em>means</em> and not how the page <em>says</em> it:
+three layouts, one vocabulary, one number format. So a second corpus prints the identical gold in
+three unfamiliar ones &mdash; other Polish labels for every field, other column orders, other number
+and date formats, and block orders that put the totals before the rows. Same seed, same invoices,
+document for document: a difference between the two columns is the <strong>page</strong>, because
+nothing else moved.</p>
+<table><thead><tr><th>baseline</th><th class="num">its own page</th><th class="num">an unfamiliar page</th><th class="num">read at all</th></tr></thead>
+<tbody>
+    <tr><th><code>oracle</code></th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">108 / 108</td></tr>
+    <tr><th><code>constant</code></th><td class="num">3.0&nbsp;%</td><td class="num">3.0&nbsp;%</td><td class="num">108 / 108</td></tr>
+    <tr><th><code>pattern</code></th><td class="num">86.3&nbsp;%</td><td class="num">0.0&nbsp;%</td><td class="num">0 / 108</td></tr>
+</tbody></table>
+<p class="note"><code>pattern</code> did not read the page badly &mdash; it could not <em>begin</em>. Not one of the 108 documents produced an invoice the schema would accept, every one recorded as <code>schema_invalid</code>. The labels it matches are the whole of what it was doing.</p>
+<p class="note">The other two rows are the controls that make the first one mean something. The
+oracle is handed the gold and is unaffected, which says the corpus is scorable and its gold did not
+move; the constant baseline never looks at the page and scores <em>identically</em> on both, which
+is what a paired comparison should do to a reader that reads nothing.</p>
+<p class="note"><strong>This is not a real held-out set and does not claim to be.</strong> It holds
+the semantics fixed on purpose, so it answers one question and not the other: how much of a result
+was presentation. Real invoices also bring skew, stamps, scans and layouts nobody anticipated, and
+none of that is here.</p>
+
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no
 <code>assert</code> element at all, so a conforming validator checks types, enumerations and
@@ -441,7 +464,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from
-  <code>807ad87</code> &middot; part of a
+  <code>6338873</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

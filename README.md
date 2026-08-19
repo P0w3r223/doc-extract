@@ -121,6 +121,40 @@ reading that drops three quarters of the invoice routes 100 % to `accept` at 100
 nothing leaked. That limit was disclosed when the curve was built; this is the arm that makes it
 concrete. `missed` is the only column that sees it.
 
+## How much of a reading was the template?
+
+The synthetic corpus varies what an invoice *means* — grosz rounding, corrections, reverse charge,
+two pages — and not how the page *says* it: three layouts, one vocabulary, one number format. So a
+second corpus prints the **identical gold** in three unfamiliar ones. Other Polish labels for every
+field (`Wystawca` and `Odbiorca` rather than `Sprzedawca` and `Nabywca`), other column orders (one
+puts the description **last**), other number and date formats, and a layout that prints the totals
+**before** the rows they summarise. Same seed, same invoices, document for document — so a
+difference between the two columns is the **page**, because nothing else moved.
+
+| baseline | its own page | an unfamiliar page | read at all |
+|---|---:|---:|---:|
+| `oracle` | 100 % | 100 % | 108 / 108 |
+| `constant` | 3.0 % | 3.0 % | 108 / 108 |
+| `pattern` | **86.3 %** | **0.0 %** | **0 / 108** |
+
+`pattern` did not read the page badly — it could not *begin*. Not one of the 108 documents produced
+an invoice the schema would accept, every one recorded as `schema_invalid`. Of the eleven fields its
+regexes fill on its own page it fills four here, and the only date it still recovers is on the third
+of the corpus whose dialect happens to print ISO. **The labels it matches were the whole of what it
+was doing** — which is the bound this corpus exists to put on the strongest thing in the project
+that is not a language model.
+
+The other two rows are the controls that make the first one mean anything. The oracle is handed the
+gold and is unaffected, so the corpus is scorable and its gold did not move. `constant` never looks
+at the page and scores *identically* on both, which is what a paired comparison must do to a reader
+that reads nothing. And the gold grounds against its own foreign page **0 ungrounded of 5892** — the
+same control that caught four defects when `ground/` was built, so the corpus is not merely
+different, it is still solvable.
+
+**It is not a real held-out set and does not claim to be.** It holds the semantics fixed on purpose,
+which is what lets it attribute a drop to presentation and nothing else; real invoices also bring
+skew, stamps, scans and layouts nobody anticipated, and none of that is here.
+
 A misread year — `2025-08-05` for `2026-08-05` — is the tenth injected error kind, and gives the
 date rules a recall too: on `noisy`, the heuristic half reads precision 100 %, recall 11.1 %, zero
 false positives. The recall is low by construction, because that half owns one of ten kinds, so each

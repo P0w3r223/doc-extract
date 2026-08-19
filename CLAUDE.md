@@ -83,6 +83,10 @@ src/doc_extract/
     resolve.py       # substring search over a projected page; three levels of support per field
   decide/            # M5 — the runtime gate. Reads a prediction against its page, never the gold
     confidence.py    # four levels from the two measured signals, and accept / review / reject
+  foreign/           # M7 — the same gold on a page whose vocabulary nothing here has seen
+    dialect.py       # three Polish label sets, number formats and column orders, as data
+    render.py        # three unfamiliar layouts; imports nothing from `synth/render.py`
+    corpus.py        # M2's documents reassigned to a foreign layout — the gold does not move
   attack/            # M6 — the invoice as untrusted input, measured by attacking it
     payloads.py      # what an attacker prints, what obeying looks like, when it has succeeded
     suite.py         # the attacked corpus: payload x placement, gold untouched, payload verified
@@ -92,6 +96,8 @@ src/doc_extract/
 schemas/*.xsd        # the national standard and its three imports + PROVENANCE.md
 results/<run>/       # committed: predictions.jsonl, run.meta.json, report.md, detector.md, gate.md,
                      # and attack.md for a run over the attacked corpus (`results/attack-<baseline>`).
+                     # A run over the foreign corpus is `results/foreign-<baseline>`, and the prefix
+                     # is what pairs it with the same baseline's run over the synthetic one.
                      # Named for the baseline, except a remote run, which is named for the model:
                      # the baseline is `claude` every time and the model is what varies, so two
                      # models over one corpus are two directories rather than one overwritten one.
@@ -196,6 +202,8 @@ python -m doc_extract.eval run --baseline pattern         # one baseline over th
 python -m doc_extract.eval score  --run results/pattern   # re-score a committed run, no model
 python -m doc_extract.eval detect --run results/pattern   # the detector study on a committed run
 python -m doc_extract.eval gate   --run results/pattern   # the gate's coverage-accuracy curve
+python -m doc_extract.foreign --out data/foreign          # the same gold, printed elsewhere (M7)
+python -m doc_extract.eval run --baseline pattern --corpus data/foreign --out results/foreign-pattern
 python -m doc_extract.attack --out data/attacked          # 112 attacked documents (M6)
 python -m doc_extract.eval run --baseline gullible --corpus data/attacked --out results/attack-gullible
 python -m doc_extract.eval attack --run results/attack-gullible  # the attack success rate
@@ -264,7 +272,10 @@ reproduce, and a detector study that had to re-run a paid model to be checked wo
    M7's real held-out set rather than twice on a synthetic one. It is also where `line_injected`'s
    judge would first be exercised on a real transcription, which is the one it had to be rewritten
    for.
-7. Real held-out set, the reported synthetic↔real gap, vision variant, site/README/ADRs.
+7. **Held-out set, the reported gap, vision variant, site/README/ADRs.** In progress. The
+   heuristic rules have a population and a number (*The heuristic half* above); `foreign/`
+   answers how much of a reading was the template (*How much of a reading* above). Still open:
+   the degraded/scanned corpus and the vision path, then the paid arms and the reported gap.
 
 ## The headline answer, and what it is really measuring
 
@@ -322,6 +333,41 @@ Two further cautions the study prints beside its own numbers:
   100 % and recall 0 %: it answers one lawful invoice for every document and trips nothing.
 - **An answer that omits most of the invoice is invisible too, and worse.** See *The heuristic half*
   below: the hard rules have nothing to compare, and the gate accepts everything that is left.
+
+## How much of a reading was the template? (M7)
+
+`foreign/` prints the **identical gold** on a page whose vocabulary nothing in the pipeline has
+seen: three layouts with their own Polish labels for every field, their own column orders (one puts
+the description last), their own number and date formats, and one that prints the totals *before*
+the rows. Same seed, same invoices, document for document — so a difference between the two runs is
+the **page**, because nothing else moved.
+
+| baseline | its own page | an unfamiliar page | read at all |
+|---|---:|---:|---:|
+| `oracle` | 100 % | 100 % | 108 / 108 |
+| `constant` | 3.0 % | 3.0 % | 108 / 108 |
+| `pattern` | **86.3 %** | **0.0 %** | **0 / 108** |
+
+`pattern` did not read badly — it could not *begin*: 108 of 108 `schema_invalid`. It fills four of
+the eleven wire fields it fills on its own page, and the one date it still recovers is on the third
+of the corpus whose dialect prints ISO. The labels it matches were the whole of what it was doing.
+
+Three things make that number trustworthy rather than merely dramatic, and each is a test:
+
+- **The pairing.** `foreign/corpus.py` reassigns `synth.corpus.documents()` to a foreign layout and
+  changes nothing else, asserted invoice-by-invoice. `constant` scoring *identically* on both is the
+  metric-level confirmation: a reader that never looks at the page must not move.
+- **Solvability.** Every gold value is recovered from every foreign page through `pdfplumber`, the
+  same obligation `synth/render.py` carries — plus the gold-grounds-against-its-own-page control,
+  **0 ungrounded of 5892**. A held-out set that is unsolvable in places measures its own defects,
+  and this caught two: a quantity fused to its line number by an over-narrow column, and a
+  description column a millimetre short of `wewnątrzwspólnotowa`.
+- **The disjointness.** No foreign page carries any label `eval/pattern.py` keys on, and
+  `foreign/render.py` imports nothing from `synth/render.py`, `pools.py` or `overlay.py`.
+
+**It is not a real held-out set and the docs say so wherever the number appears.** Holding the
+semantics fixed is what buys the attribution to presentation; it is also what leaves skew, stamps,
+scans and unanticipated layouts unmeasured.
 
 ## The heuristic half, and what it took to measure it
 
@@ -456,7 +502,7 @@ Hence the second remote arm: a weaker model on the same corpus buys a real error
 changing the corpus and invalidating every committed run. **M7's real held-out set remains
 load-bearing** — it is the only place the question gets asked on documents nobody generated.
 
-569 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+600 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`
