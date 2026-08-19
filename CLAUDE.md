@@ -73,8 +73,11 @@ src/doc_extract/
     run.py           # predict -> write -> score / detect, in that order and with I/O only here
     report.py        # the Markdown tables, with the qualifications printed beside the numbers
 
-# The two below do not exist yet. They are the plan, not the tree — do not import from them.
-  ground/            # M5 (planned) — value -> source span provenance
+  ground/            # M5 — value -> source span provenance, the complement to the arithmetic
+    surface.py       # a normalised value -> the forms a Polish invoice could have printed it in
+    resolve.py       # substring search over a projected page; three levels of support per field
+
+# The one below does not exist yet. It is the plan, not the tree — do not import from it.
   decide/            # M5 (planned) — per-field confidence, accept / review / reject routing
 schemas/*.xsd        # the national standard and its three imports + PROVENANCE.md
 results/<run>/       # committed: predictions.jsonl + run.meta.json + report.md + detector.md.
@@ -207,8 +210,12 @@ reproduce, and a detector study that had to re-run a paid model to be checked wo
    precision, localisation, and per-injected-kind recall in two readings (isolated and marginal).
    `detect` writes `detector.md` beside the predictions it was computed from, calling nothing.
    Answered on a real model-error population: **precision 100 %, recall 76.2 %, and every miss a
-   text field** — see *The headline answer* below. Still to come: `ground/` (value → source span),
-   `decide/` (per-field confidence and accept/review/reject routing), and the selective-prediction
+   text field** — see *The headline answer* below. `ground/` answers the other half: a value is
+   searched for as a substring of the page under its match class's normalisation, at three levels
+   of support, with **precision 100 % and recall 84.4 %** at the field level and zero false alarms
+   on 11 652 correctly-read fields. Its control is that gold grounds completely against its own
+   page — 0 of 5892, which is what caught the first version failing on 14.9 %. Still to come:
+   `decide/` (per-field confidence and accept/review/reject routing) and the selective-prediction
    curve.
 6. Injection suite, attack success rate, trust-boundary ADR.
 7. Real held-out set, the reported synthetic↔real gap, vision variant, site/README/ADRs.
@@ -234,9 +241,34 @@ Not one arithmetic error escaped. Every false negative is a misread **name or de
 field with no redundancy behind it for arithmetic to check. Eight of the ten sit in `multi_page`,
 where a description wraps across a page break.
 
-This is the architectural argument for the rest of M5, arrived at by measurement rather than
-assumed: `ground/` covers exactly the fields the arithmetic cannot see, because a description the
-model invented is a value that resolves to no span on the page.
+This was the architectural argument for `ground/`, arrived at by measurement rather than assumed —
+and the layer, once built, does what the measurement predicted. On the same run, at the **field**
+level:
+
+| signal | TP | FP | FN | precision | recall |
+|---|---:|---:|---:|---:|---:|
+| grounding | 65 | 0 | 12 | **100.0 %** | 84.4 % |
+| arithmetic, attributed to fields | 42 | 529 | 35 | 7.4 % | 54.5 % |
+| **the two together** | 75 | 529 | 2 | 12.4 % | **97.4 %** |
+
+Three things to read out of that, and the third is a caution rather than a result:
+
+- **They are complements, not alternatives.** Grounding's twelve misses are nine wrong discounts,
+  which is exactly what the row arithmetic catches. Together they leave two wrong fields standing
+  out of 5837 measured.
+- **Grounding raised zero false alarms** across both models — 11 652 correctly-read field
+  instances, none flagged.
+- **An arithmetic violation is a poor field-level accusation.** It names `lines`, so it implicates
+  every field of every row: 529 false positives against 42 true ones. That is why `detector.py`
+  keeps the *document* as its unit and reports localisation separately, and why the union's
+  precision is worse than either signal's document-level figure. A routing layer must not simply
+  OR them.
+
+The two survivors are `seller.name` and `buyer.name`, and the reason is instructive: coverage counts
+the words a value *has*, so a name with its legal form dropped is fully grounded — every word it
+kept is on the page. `corrupt.INVISIBLE_KINDS` already declares `name_truncated` invisible to
+arithmetic; it is invisible to token coverage too. Catching it needs a completeness check — does the
+page carry adjacent words the value omitted? — which is not built.
 
 Two further cautions the study prints beside its own numbers:
 
@@ -259,7 +291,7 @@ Hence the second remote arm: a weaker model on the same corpus buys a real error
 changing the corpus and invalidating every committed run. **M7's real held-out set remains
 load-bearing** — it is the only place the question gets asked on documents nobody generated.
 
-392 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+415 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`
