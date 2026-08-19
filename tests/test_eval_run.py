@@ -8,9 +8,11 @@ and reads them back through the same code a full run uses — with no model, no 
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
-from doc_extract.eval import dataset, predictions, report, run
+from doc_extract.eval import dataset, predictions, report, run, selective_report
 from doc_extract.eval.aggregate import CoverageError
 from doc_extract.eval.baselines import BY_NAME as BASELINES
 from doc_extract.eval.dataset import CorpusError
@@ -164,3 +166,58 @@ def test_a_perfect_reading_gives_the_detector_nothing_to_do(built):
     assert study.counts.prevalence == 0.0
     assert study.counts.recall is None, "no wrong documents means recall has no denominator"
     assert study.counts.false_positive == 0
+
+
+def test_the_gate_refuses_a_subset_nobody_declared(built):
+    """`gate` carries the same coverage guard as `score` and `detect`, by the same code."""
+    corpus, records, _, _ = _run(built, "noisy", rate=1.0)
+
+    with pytest.raises(CoverageError, match="scored 1 of the 2 documents"):
+        run.gate(corpus, records[:1])
+
+    assert run.gate(corpus, records[:1], allow_partial=True).asserted >= 0
+
+
+def test_the_gate_reports_everything_it_cannot_judge(built):
+    """Three exclusions, each counted rather than dropped — the failure the metric rules forbid.
+
+    A value the model never asserted, a value grounding declines to ask about, and a document that
+    produced no invoice: all three leave the curve's denominator, and a curve whose exclusions are
+    invisible is a metric over a subset nobody noticed.
+    """
+    corpus, records, _, _ = _run(built, "oracle")
+    curve = run.gate(corpus, records)
+
+    assert curve.without_prediction == 0
+    assert curve.missed == 0
+    assert curve.unassessable > 0, "`kind` is asserted on every document and never groundable"
+    assert curve.points[-1].total == curve.asserted
+
+
+def test_the_gate_accepts_a_perfect_reading_and_lets_nothing_leak(built):
+    """The oracle's values are all on the page, so every one of them should clear the gate."""
+    corpus, records, _, _ = _run(built, "oracle")
+    curve = run.gate(corpus, records)
+
+    assert curve.wrong == 0
+    assert curve.points[0].coverage == 1.0, "a perfect reading is entirely high-confidence"
+    assert all(point.leaked == 0 for point in curve.points)
+
+
+def test_the_gate_counts_a_document_that_produced_no_invoice(built):
+    """Not a leak and not a catch: no field of it was ever assessed."""
+    corpus, records, _, _ = _run(built, "oracle")
+    blinded = (dataclasses.replace(records[0], invoice=None), *records[1:])
+    curve = run.gate(corpus, blinded)
+
+    assert curve.without_prediction == 1
+    assert {row.doc_id for row in curve.judged} == {case.doc_id for case in corpus.cases[1:]}
+
+
+def test_the_gate_renders_with_what_the_curve_cannot_see_above_the_tables(built):
+    corpus, records, _, meta = _run(built, "oracle")
+    rendered = selective_report.render(run.gate(corpus, records), run=meta)
+
+    assert "| asserted but not assessable |" in rendered
+    assert "| gold values never asserted |" in rendered
+    assert "Coverage is over the values the model asserted" in rendered

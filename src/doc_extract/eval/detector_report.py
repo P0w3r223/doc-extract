@@ -85,8 +85,7 @@ def _rules(study: Study) -> str:
         "## Per rule",
         "",
         "Precision only. A rule's recall is not a quantity this study can report: a document is "
-        "wrong or not, and which of the twelve rules *should* have caught it is not something the "
-        "gold says.",
+        "wrong or not, and which rule *should* have caught it is not something the gold says.",
         "",
         "| rule | fired on | of which wrong | precision |",
         "|---|---:|---:|---:|",

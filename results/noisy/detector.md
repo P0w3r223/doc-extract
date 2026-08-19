@@ -23,28 +23,28 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 | | |
 |---|---:|
 | prevalence | 62.0 % |
-| precision | 100.0 % |
+| precision | 100 % |
 | recall | 89.6 % |
 | F1 | 94.5 % |
-| specificity | 100.0 % |
-| localisation | 100.0 % (60 / 60) |
+| specificity | 100 % |
+| localisation | 100 % (60 / 60) |
 
 ## Per rule
 
-Precision only. A rule's recall is not a quantity this study can report: a document is wrong or not, and which of the twelve rules *should* have caught it is not something the gold says.
+Precision only. A rule's recall is not a quantity this study can report: a document is wrong or not, and which rule *should* have caught it is not something the gold says.
 
 | rule | fired on | of which wrong | precision |
 |---|---:|---:|---:|
-| `totals.gross_equals_line_sum` | 29 | 29 | 100.0 % |
-| `lines.sum_matches_rate_net` | 27 | 27 | 100.0 % |
-| `lines.sum_matches_rate_vat` | 27 | 27 | 100.0 % |
-| `totals.gross_equals_net_plus_vat` | 24 | 24 | 100.0 % |
-| `totals.vat_matches_rate` | 23 | 23 | 100.0 % |
-| `lines.net_matches_quantity_times_price` | 16 | 16 | 100.0 % |
-| `identifiers.nip_checksum` | 14 | 14 | 100.0 % |
-| `lines.vat_matches_rate` | 14 | 14 | 100.0 % |
-| `identifiers.iban_checksum` | 13 | 13 | 100.0 % |
-| `totals.non_correction_amounts_non_negative` | 2 | 2 | 100.0 % |
+| `totals.gross_equals_line_sum` | 29 | 29 | 100 % |
+| `lines.sum_matches_rate_net` | 27 | 27 | 100 % |
+| `lines.sum_matches_rate_vat` | 27 | 27 | 100 % |
+| `totals.gross_equals_net_plus_vat` | 24 | 24 | 100 % |
+| `totals.vat_matches_rate` | 23 | 23 | 100 % |
+| `lines.net_matches_quantity_times_price` | 16 | 16 | 100 % |
+| `identifiers.nip_checksum` | 14 | 14 | 100 % |
+| `lines.vat_matches_rate` | 14 | 14 | 100 % |
+| `identifiers.iban_checksum` | 13 | 13 | 100 % |
+| `totals.non_correction_amounts_non_negative` | 2 | 2 | 100 % |
 
 ## Per injected error kind
 
@@ -52,13 +52,13 @@ Precision only. A rule's recall is not a quantity this study can report: a docum
 
 | kind | isolated | n | marginal | n | |
 |---|---:|---:|---:|---:|---|
-| `total_transposed` | 100.0 % | 5 | 100.0 % | 9 |  |
-| `vat_cent` | 100.0 % | 10 | 100.0 % | 15 |  |
-| `rate_swapped` | 100.0 % | 4 | 100.0 % | 8 |  |
-| `line_dropped` | 100.0 % | 2 | 100.0 % | 7 |  |
-| `line_transposed` | 100.0 % | 5 | 100.0 % | 16 |  |
-| `nip_digit` | 100.0 % | 8 | 100.0 % | 14 |  |
-| `account_digit` | 100.0 % | 6 | 100.0 % | 13 |  |
+| `total_transposed` | 100 % | 5 | 100 % | 9 |  |
+| `vat_cent` | 100 % | 10 | 100 % | 15 |  |
+| `rate_swapped` | 100 % | 4 | 100 % | 8 |  |
+| `line_dropped` | 100 % | 2 | 100 % | 7 |  |
+| `line_transposed` | 100 % | 5 | 100 % | 16 |  |
+| `nip_digit` | 100 % | 8 | 100 % | 14 |  |
+| `account_digit` | 100 % | 6 | 100 % | 13 |  |
 | `date_shifted` | 0.0 % | 2 | 50.0 % | 4 | declared invisible |
 | `name_truncated` | 0.0 % | 5 | 37.5 % | 8 | declared invisible |
 
@@ -98,7 +98,7 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 | precision | — |
 | recall | 0.0 % |
 | F1 | — |
-| specificity | 100.0 % |
+| specificity | 100 % |
 | localisation | — (0 / 0) |
 
 ## Per injected error kind

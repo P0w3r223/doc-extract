@@ -12,7 +12,7 @@ groups, an IBAN in fours: all of them are conventions a reader of any Polish inv
 distinction is the whole licence for this module to exist. `eval/pattern.py` is allowed to know the
 literal labels `synth/render.py` prints — `Numer faktury:`, `Do zapłaty:` — because its job is to be
 the strongest thing that is not a model. **Grounding is not allowed to know them**, and does not
-need to: it matches values, never labels, and `tests/test_ground_surface.py` asserts this package
+need to: it matches values, never labels, and `tests/test_ground.py` asserts this package
 imports nothing from `synth`.
 
 The forms are deliberately generous. A candidate that never occurs costs a failed comparison; a

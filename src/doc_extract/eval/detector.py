@@ -27,7 +27,7 @@ are counted as their own verdict and excluded from every denominator, with the e
 beside the rates. Counting them as caught would credit the invariants with a refusal the pipeline
 had already made on its own — the most flattering available reading, and the least true one.
 
-**The blind spot is the finding.** `eval.corrupt.INVISIBLE_KINDS` names three error kinds no
+**The blind spot is the finding.** `eval.corrupt.INVISIBLE_KINDS` names two error kinds no
 arithmetic can see, and the per-kind table exists to print their zero. A study reporting only the
 detectable kinds would have measured its own corruption set rather than the detector.
 """
@@ -425,6 +425,11 @@ def _kinds(rows: Sequence[DocumentVerdict]) -> tuple[KindRecall, ...]:
     marginal_fired: dict[str, int] = {}
 
     for row in rows:
+        if row.verdict is Verdict.NO_PREDICTION:
+            #: The detector never ran on this document, so it is neither a catch nor a miss — the
+            #: same exclusion `Counts` makes. Counting it here would deflate the very number the
+            #: blind-spot table exists to show, by charging the rules with a refusal upstream.
+            continue
         present = set(row.injected)
         for kind in present:
             marginal_documents[kind] = marginal_documents.get(kind, 0) + 1

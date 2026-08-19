@@ -23,22 +23,22 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 | | |
 |---|---:|
 | prevalence | 66.3 % |
-| precision | 100.0 % |
+| precision | 100 % |
 | recall | 39.1 % |
 | F1 | 56.2 % |
-| specificity | 100.0 % |
-| localisation | 100.0 % (27 / 27) |
+| specificity | 100 % |
+| localisation | 100 % (27 / 27) |
 
 ## Per rule
 
-Precision only. A rule's recall is not a quantity this study can report: a document is wrong or not, and which of the twelve rules *should* have caught it is not something the gold says.
+Precision only. A rule's recall is not a quantity this study can report: a document is wrong or not, and which rule *should* have caught it is not something the gold says.
 
 | rule | fired on | of which wrong | precision |
 |---|---:|---:|---:|
-| `lines.net_matches_quantity_times_price` | 26 | 26 | 100.0 % |
-| `lines.sum_matches_rate_net` | 1 | 1 | 100.0 % |
-| `lines.sum_matches_rate_vat` | 1 | 1 | 100.0 % |
-| `totals.gross_equals_line_sum` | 1 | 1 | 100.0 % |
+| `lines.net_matches_quantity_times_price` | 26 | 26 | 100 % |
+| `lines.sum_matches_rate_net` | 1 | 1 | 100 % |
+| `lines.sum_matches_rate_vat` | 1 | 1 | 100 % |
+| `totals.gross_equals_line_sum` | 1 | 1 | 100 % |
 
 ## Read this before the tables
 
@@ -77,7 +77,7 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 | precision | — |
 | recall | 0.0 % |
 | F1 | — |
-| specificity | 100.0 % |
+| specificity | 100 % |
 | localisation | — (0 / 0) |
 
 ## Read this before the tables

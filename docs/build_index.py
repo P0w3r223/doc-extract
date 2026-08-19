@@ -16,14 +16,16 @@ import pathlib
 import re
 import subprocess
 
-from doc_extract.eval import fields
+from doc_extract.eval import detector, fields
 from doc_extract.eval import predictions as prediction_file
 from doc_extract.eval.aggregate import Scored, summarise
 from doc_extract.eval.baselines import BASELINES, BY_NAME
+from doc_extract.eval.format import DASH, rate
 from doc_extract.eval.scorer import judge
 from doc_extract.extract.result import FailureClass
 from doc_extract.schema import vocab
 from doc_extract.schema.generate_vocab import XSD_PATH
+from doc_extract.schema.invariants import Severity
 from doc_extract.synth import render
 from doc_extract.synth.corpus import DEFAULT_PER_TIER, DEFAULT_SEED, documents
 from doc_extract.synth.tiers import TIERS
@@ -219,9 +221,84 @@ def _is_remote(baseline: str) -> bool:
     return entry is not None and entry.remote
 
 
+#: The run the headline question is asked of: the one with a real, unlabelled error population.
+STUDIED_RUN = "claude-haiku-4-5"
+
+
+def detector_study(corpus: list) -> dict[str, object] | None:
+    """The headline detector numbers, recomputed here from a committed prediction file.
+
+    Typed into this page they would be exactly the artifact the module docstring argues against —
+    and they were, until a review caught it. Gold comes from the generator in memory like every
+    other figure here, so this needs no corpus on disk and no model.
+    """
+    directory = ROOT / "results" / STUDIED_RUN
+    predictions_path = directory / prediction_file.PREDICTIONS_NAME
+    if not predictions_path.exists():  # pragma: no cover — a checkout without that run
+        return None
+
+    gold = {document.doc_id: document for document in corpus}
+    records = prediction_file.read(predictions_path)
+    verdicts = []
+    for record in records:
+        document = gold[record.doc_id]
+        score = judge(
+            document.invoice, record.parse(), doc_id=record.doc_id,
+            tier=document.tier, template=document.template,
+            failure=FailureClass(record.failure),
+        )
+        verdicts.append(detector.verdict(score, record.parse(), severity=Severity.HARD))
+    study = detector.summarise(verdicts, severity=Severity.HARD)
+
+    caught = collections.Counter(
+        field for row in study.verdicts
+        if row.verdict is detector.Verdict.TRUE_POSITIVE for field in row.wrong_fields
+    )
+    missed = collections.Counter(
+        field for row in study.verdicts
+        if row.verdict is detector.Verdict.FALSE_NEGATIVE for field in row.wrong_fields
+    )
+    missed_tiers = collections.Counter(
+        row.tier for row in study.verdicts if row.verdict is detector.Verdict.FALSE_NEGATIVE
+    )
+    top_tier, top_tier_count = (missed_tiers.most_common(1) or [("", 0)])[0]
+
+    counts = study.counts
+    return {
+        "model": STUDIED_RUN,
+        "true_positive": counts.true_positive,
+        "false_negative": counts.false_negative,
+        "false_positive": counts.false_positive,
+        "true_negative": counts.true_negative,
+        "wrong_documents": counts.true_positive + counts.false_negative,
+        "judged": counts.judged,
+        "precision": counts.precision,
+        "recall": counts.recall,
+        "localisation": study.localisation,
+        "caught": caught,
+        "missed": missed,
+        "missed_total": sum(missed.values()),
+        "top_missed_tier": top_tier,
+        "top_missed_tier_count": top_tier_count,
+    }
+
+
+def field_list(counts: collections.Counter, limit: int = 3) -> str:
+    return ", ".join(
+        f"<code>{html.escape(field)}</code>&nbsp;&times;&nbsp;{n}"
+        for field, n in counts.most_common(limit)
+    )
+
+
 def percent(value: float | None) -> str:
-    """A rate, or an em dash. Never `0 %` for an absent denominator — see `eval/aggregate.py`."""
-    return "&mdash;" if value is None else f"{value * 100:.1f}&nbsp;%"
+    """A rate, in HTML, written the way the committed reports write it.
+
+    Delegates to `eval/format.rate` rather than formatting again here, so the page and the report
+    cannot disagree about the same figure: an absent denominator is a dash in both, and `100 %`
+    means exactly 100 % in both. This file had its own `.1f` until that divergence was caught.
+    """
+    text = rate(value)
+    return "&mdash;" if text == DASH else text.replace(" %", "&nbsp;%")
 
 
 def baseline_table(rows: list[dict[str, object]]) -> str:
@@ -253,6 +330,78 @@ def head_commit() -> str:
         ).stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):  # pragma: no cover
         return "unknown"
+
+
+#: The one figure on this page that is typed rather than derived. Token counts are in the run's
+#: prediction file, but the price per token is not in this repository and inventing a constant for
+#: it would be worse than admitting the number came from an invoice.
+OPUS_COST = "$3.20"
+
+
+def formatting_only_differences(corpus: list, run: str = "claude-opus-5") -> int:
+    """Field values that differ from gold as text but not as quantities.
+
+    The page claims a specific count of trailing zeros, so it computes one: the model writes
+    `137.30` where the generator stored `137.3`, and `fields.equal` was already defined to call
+    those the same amount. Derived rather than typed, like everything else here except the cost.
+
+    Compared as **rendered text**, not as values. `Decimal("137.3") == Decimal("137.30")` is true,
+    which is the whole point of the scorer treating them as one quantity — and is exactly why a
+    naive value comparison here counted zero of them.
+    """
+    directory = ROOT / "results" / run
+    predictions_path = directory / prediction_file.PREDICTIONS_NAME
+    if not predictions_path.exists():  # pragma: no cover — a checkout without that run
+        return 0
+
+    gold = {document.doc_id: document.invoice for document in corpus}
+    differences = 0
+    for record in prediction_file.read(predictions_path):
+        predicted = record.parse()
+        if predicted is None:
+            continue
+        theirs = fields.read(predicted)
+        for (name, key), value in fields.read(gold[record.doc_id]).values.items():
+            other = theirs.get(name, key)
+            if value is None or other is None:
+                continue
+            if fields.render(value) != fields.render(other) and fields.equal(name, value, other):
+                differences += 1
+    return differences
+
+
+def detector_section(study: dict[str, object] | None) -> str:
+    """The headline question, rendered from `detector_study` rather than from memory."""
+    if study is None:  # pragma: no cover — a checkout without the studied run
+        return "<p class=\"note\">No committed run to ask the question of.</p>"
+    return f"""<p>The project's headline question, asked of <code>{html.escape(str(study["model"]))}</code>,
+which gets {study["wrong_documents"]} of {study["judged"]} documents wrong and so supplies a real,
+unlabelled model-error population. The invariants are run on the <strong>prediction</strong>, never
+on the gold &mdash; the signal has to be available at inference time on a document nobody
+annotated.</p>
+<table>
+  <thead><tr><th></th><th class="num">flagged</th><th class="num">silent</th></tr></thead>
+  <tbody>
+    <tr><th>fields wrong</th><td class="num">{study["true_positive"]}</td><td class="num">{study["false_negative"]}</td></tr>
+    <tr><th>fields right</th><td class="num">{study["false_positive"]}</td><td class="num">{study["true_negative"]}</td></tr>
+  </tbody>
+</table>
+<p><strong>Precision {percent(study["precision"])}, recall {percent(study["recall"])}</strong>, and
+{percent(study["localisation"])} of the catches point at a field that is genuinely wrong.</p>
+<p class="note">The recall is not a property of the detector. It is the fraction of that model's
+mistakes that happened to land on numeric fields. Caught: {field_list(study["caught"])}. Every one
+of the {study["missed_total"]} misses is a <strong>name or a description</strong> &mdash; a field
+with no redundancy behind it for arithmetic to check &mdash; and {study["top_missed_tier_count"]} of
+them sit in the <code>{html.escape(str(study["top_missed_tier"]))}</code> tier, where a description
+wraps across a page break. Not one arithmetic error escaped.</p>
+<p>That is the case for the grounding layer, arrived at by measurement rather than assumed: it
+covers exactly the fields the arithmetic cannot see, because a description the model invented is a
+value that resolves to no span on the page.</p>
+<p class="note">Two cautions the study prints beside its own numbers. The <strong>heuristic rules
+have never fired on any run</strong> &mdash; reported as a dash rather than pooled with the hard
+rules, because a metric identical across every variant is broken rather than stable. And a
+<strong>confidently wrong but internally consistent answer is invisible</strong>: the constant
+baseline sits at prevalence 100&nbsp;% with recall 0&nbsp;%.</p>"""
 
 
 def build() -> str:
@@ -324,6 +473,9 @@ def build() -> str:
         hard_list=", ".join(f"<code>{html.escape(r)}</code>" for r in hard),
         heuristic_list=", ".join(f"<code>{html.escape(r)}</code>" for r in heuristic),
         baseline_table=baseline_table(runs),
+        detector_section=detector_section(detector_study(corpus)),
+        formatting_only=formatting_only_differences(corpus),
+        opus_cost=OPUS_COST,
         baseline_count=len(runs),
         scored_fields=scored_fields,
         field_instances=runs[0]["support"] if runs else 0,
@@ -551,34 +703,7 @@ footer {{
 </div>
 
 <h2>Does &ldquo;the arithmetic holds&rdquo; predict &ldquo;the fields are right&rdquo;?</h2>
-<p>The project's headline question, asked of <code>claude-haiku-4-5</code>, which gets 42 of 107
-documents wrong and so supplies a real, unlabelled model-error population. The invariants are run on
-the <strong>prediction</strong>, never on the gold &mdash; the signal has to be available at
-inference time on a document nobody annotated.</p>
-<table>
-  <thead><tr><th></th><th class="num">flagged</th><th class="num">silent</th></tr></thead>
-  <tbody>
-    <tr><th>fields wrong</th><td class="num">32</td><td class="num">10</td></tr>
-    <tr><th>fields right</th><td class="num">0</td><td class="num">65</td></tr>
-  </tbody>
-</table>
-<p><strong>Precision 100.0&nbsp;%, recall 76.2&nbsp;%, zero false positives</strong>, and all 32
-catches point at a field that is genuinely wrong.</p>
-<p class="note">The recall is not a property of the detector. It is the fraction of that model's
-mistakes that happened to land on numeric fields. The 25 catches on <code>payment_account</code> are
-the IBAN mod-97 check digit; 9 more are row arithmetic catching a misread discount. Every one of the
-ten misses is a <strong>name or a description</strong> &mdash; a field with no redundancy behind it
-for arithmetic to check &mdash; and eight of those sit in the multi-page tier, where a description
-wraps across a page break. Not one arithmetic error escaped.</p>
-<p>That is the case for the grounding layer, arrived at by measurement rather than assumed: it
-covers exactly the fields the arithmetic cannot see, because a description the model invented is a
-value that resolves to no span on the page.</p>
-<p class="note">Two cautions the study prints beside its own numbers. The <strong>heuristic rules
-have never fired on any run</strong> &mdash; reported as a dash rather than pooled with the hard
-rules, and either the corpus needs a tier that exercises them or they need dropping, because a
-metric identical across every variant is broken rather than stable. And a <strong>confidently wrong
-but internally consistent answer is invisible</strong>: the constant baseline sits at prevalence
-100&nbsp;% with recall 0&nbsp;%.</p>
+{detector_section}
 
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no
@@ -685,8 +810,8 @@ errors injected at a fixed rate &mdash; not a competitor but the labelled error 
 needs, since a detector measured only on a model's unlabelled mistakes is measured on a sample nobody
 chose.</p>
 <p><code>claude-opus-5</code> is the system under test, and it ties the oracle: every field of every
-document, for $3.20. Its only divergence from the gold's own serialisation is 63 trailing zeros
-&mdash; it writes <code>137.30</code> where the generator stored <code>137.3</code>, which is what
+document, for {opus_cost}. Its only divergence from the gold's own serialisation is
+{formatting_only} trailing zeros &mdash; it writes <code>137.30</code> where the generator stored <code>137.3</code>, which is what
 the page prints and what the scorer's amount comparison was already defined to treat as the same
 quantity. A corpus that the strongest non-model reader finds hard and a frontier model finds trivial
 is measuring layout parsing, not reading.</p>

@@ -108,6 +108,10 @@ class Curve:
     signals: tuple[Signal, ...]
     #: Gold values the prediction never asserted. Outside the curve, and reported because of it.
     missed: int
+    #: Values the prediction *did* assert that grounding declines to ask about — `kind`, and a
+    #: non-numeric rate. Outside the curve for the same reason `missed` is, and reported for the
+    #: same reason: an exclusion nobody can see is a subset nobody noticed.
+    unassessable: int
     #: Documents that produced no invoice at all, so no field of them was ever assessed.
     without_prediction: int
 
@@ -125,19 +129,37 @@ def judge(
     gold: Invoice,
     prediction: Invoice,
     document: SourceDocument,
-) -> tuple[tuple[Judged, ...], int]:
-    """One document: the gate's verdict on each asserted field, and how many gold values it lost."""
+) -> tuple[tuple[Judged, ...], int, int]:
+    """One document: the gate's verdict on each asserted field, and the two counts it cannot judge.
+
+    Returns the rows, the gold values the prediction never asserted, and the asserted values
+    grounding declines to ask about. Both counts are returned rather than dropped because each is
+    an exclusion from the curve's denominator, and an exclusion the report does not print is the
+    subset the metric rules exist to forbid.
+    """
     assessments = {(a.field, a.key): a for a in assess(document, prediction)}
     named = _named(prediction)
     rows: list[Judged] = []
-    missed = 0
+    missed = unassessable = 0
+    seen: set[tuple[str, str]] = set()
 
     for result in compare(gold, prediction):
         if result.outcome is MISSED:
             missed += 1
             continue
-        assessment = assessments.get((result.field, result.key))
+        identity = (result.field, result.key)
+        if identity in seen:
+            #: `scorer._spurious_duplicates` emits a repeated row's values under the key it
+            #: collides with, while `fields.read` kept only the first — so the assessment here
+            #: belongs to a *different* value. Grading an invented row on the real one's grounding
+            #: would let a fabricated duplicate inherit its confidence.
+            unassessable += 1
+            continue
+        seen.add(identity)
+
+        assessment = assessments.get(identity)
         if assessment is None or not assessment.assessed:
+            unassessable += 1
             continue
         rows.append(Judged(
             doc_id=doc_id,
@@ -145,12 +167,13 @@ def judge(
             key=result.key,
             confidence=_confidence(assessment),
             wrong=result.outcome in WRONG,
-            ungrounded=any(
-                reason.startswith(("ungrounded", "partial")) for reason in assessment.reasons
-            ),
+            ungrounded=assessment.suspicious,
+            #: Recomputed rather than read off the assessment on purpose: `confidence` attaches a
+            #: `rule:` reason only when grounding already said `GROUNDED`, so reading the reasons
+            #: would undercount the arithmetic signal precisely where it is the only one talking.
             accused=result.field in named,
         ))
-    return tuple(rows), missed
+    return tuple(rows), missed, unassessable
 
 
 def _confidence(assessment: Assessment) -> Confidence:
@@ -168,7 +191,13 @@ def _named(invoice: Invoice) -> frozenset[str]:
     )
 
 
-def summarise(judged: Iterable[Judged], *, missed: int, without_prediction: int) -> Curve:
+def summarise(
+    judged: Iterable[Judged],
+    *,
+    missed: int,
+    unassessable: int = 0,
+    without_prediction: int,
+) -> Curve:
     """Rows into a curve and two signal scorecards. Pure: it never re-reads a page."""
     rows = tuple(judged)
     return Curve(
@@ -180,6 +209,7 @@ def summarise(judged: Iterable[Judged], *, missed: int, without_prediction: int)
             _signal("either", rows, lambda row: row.ungrounded or row.accused),
         ),
         missed=missed,
+        unassessable=unassessable,
         without_prediction=without_prediction,
     )
 

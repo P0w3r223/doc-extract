@@ -22,7 +22,7 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 
 | | |
 |---|---:|
-| prevalence | 100.0 % |
+| prevalence | 100 % |
 | precision | — |
 | recall | 0.0 % |
 | F1 | — |
@@ -62,7 +62,7 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 
 | | |
 |---|---:|
-| prevalence | 100.0 % |
+| prevalence | 100 % |
 | precision | — |
 | recall | 0.0 % |
 | F1 | — |

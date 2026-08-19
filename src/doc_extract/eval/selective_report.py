@@ -40,6 +40,7 @@ def _header(curve: Curve, *, run: RunMeta, directory: str) -> str:
         f"| values asserted | {curve.asserted} |",
         f"| of which wrong | {curve.wrong} |",
         f"| gold values never asserted | {curve.missed} |",
+        f"| asserted but not assessable | {curve.unassessable} |",
         f"| documents with no invoice | {curve.without_prediction} |",
     ]
     if directory:
@@ -94,6 +95,13 @@ def _caveats(curve: Curve) -> str:
         f"denominator above. {curve.missed} gold value(s) were never asserted at all, and no "
         "signal here can see them — a model that answered less would score better on this curve."
     )
+    if curve.unassessable:
+        lines.append(
+            f"* {curve.unassessable} asserted value(s) are **outside the curve** because grounding "
+            "declines to ask about them: `kind` is an FA(3) code the page never prints, and a "
+            "non-numeric rate is an exemption code each issuer abbreviates their own way. They are "
+            "values a model can get wrong, and nothing above measures whether it did."
+        )
     if curve.without_prediction:
         lines.append(
             f"* {curve.without_prediction} document(s) produced no invoice, so none of their "
@@ -106,18 +114,25 @@ def _caveats(curve: Curve) -> str:
             "correct work, and nothing about whether it blocks incorrect work."
         )
 
-    silent = [
+    silent = {
         signal.name for signal in curve.signals
         if curve.wrong and signal.true_positive == 0 and signal.false_positive == 0
-    ]
-    if silent:
+    }
+    if "grounding" in silent:
         lines.append(
-            f"* **{', '.join(f'`{name}`' for name in silent)} flagged nothing at all**, while "
-            f"{curve.wrong} asserted value(s) were wrong. For grounding that has one cause worth "
-            "naming: it asks whether a value is *on the page*, not whether it is in the *right "
-            "place*. A reader that lifts a real figure out of the wrong column is fully grounded "
-            "and completely wrong. The spans are recorded, so a geometric check could ask the "
-            "second question — it is not built."
+            f"* **`grounding` flagged nothing at all**, while {curve.wrong} asserted value(s) were "
+            "wrong. It asks whether a value is *on the page*, not whether it is in the *right "
+            "place*: a reader that lifts a real figure out of the wrong column is fully grounded "
+            "and completely wrong, and one that borrows a word from the other party's address is "
+            "too. The spans are recorded, so a geometric check could ask the second question — it "
+            "is not built."
+        )
+    if "arithmetic" in silent:
+        lines.append(
+            f"* **`arithmetic` flagged nothing at all**, while {curve.wrong} asserted value(s) "
+            "were wrong. No identity was broken: a prediction can be internally consistent and "
+            "still be wrong everywhere, which is what a constant or a wholly-invented answer looks "
+            "like from the arithmetic's side."
         )
     lines.append(
         "* The confidence levels are produced by fixed rules over the two signals, not by weights "

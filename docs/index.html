@@ -219,10 +219,11 @@ footer {
 </div>
 
 <h2>Does &ldquo;the arithmetic holds&rdquo; predict &ldquo;the fields are right&rdquo;?</h2>
-<p>The project's headline question, asked of <code>claude-haiku-4-5</code>, which gets 42 of 107
-documents wrong and so supplies a real, unlabelled model-error population. The invariants are run on
-the <strong>prediction</strong>, never on the gold &mdash; the signal has to be available at
-inference time on a document nobody annotated.</p>
+<p>The project's headline question, asked of <code>claude-haiku-4-5</code>,
+which gets 42 of 107 documents wrong and so supplies a real,
+unlabelled model-error population. The invariants are run on the <strong>prediction</strong>, never
+on the gold &mdash; the signal has to be available at inference time on a document nobody
+annotated.</p>
 <table>
   <thead><tr><th></th><th class="num">flagged</th><th class="num">silent</th></tr></thead>
   <tbody>
@@ -230,23 +231,22 @@ inference time on a document nobody annotated.</p>
     <tr><th>fields right</th><td class="num">0</td><td class="num">65</td></tr>
   </tbody>
 </table>
-<p><strong>Precision 100.0&nbsp;%, recall 76.2&nbsp;%, zero false positives</strong>, and all 32
-catches point at a field that is genuinely wrong.</p>
+<p><strong>Precision 100&nbsp;%, recall 76.2&nbsp;%</strong>, and
+100&nbsp;% of the catches point at a field that is genuinely wrong.</p>
 <p class="note">The recall is not a property of the detector. It is the fraction of that model's
-mistakes that happened to land on numeric fields. The 25 catches on <code>payment_account</code> are
-the IBAN mod-97 check digit; 9 more are row arithmetic catching a misread discount. Every one of the
-ten misses is a <strong>name or a description</strong> &mdash; a field with no redundancy behind it
-for arithmetic to check &mdash; and eight of those sit in the multi-page tier, where a description
+mistakes that happened to land on numeric fields. Caught: <code>payment_account</code>&nbsp;&times;&nbsp;25, <code>lines[].discount</code>&nbsp;&times;&nbsp;9, <code>lines[].description</code>&nbsp;&times;&nbsp;5. Every one
+of the 11 misses is a <strong>name or a description</strong> &mdash; a field
+with no redundancy behind it for arithmetic to check &mdash; and 8 of
+them sit in the <code>multi_page</code> tier, where a description
 wraps across a page break. Not one arithmetic error escaped.</p>
 <p>That is the case for the grounding layer, arrived at by measurement rather than assumed: it
 covers exactly the fields the arithmetic cannot see, because a description the model invented is a
 value that resolves to no span on the page.</p>
 <p class="note">Two cautions the study prints beside its own numbers. The <strong>heuristic rules
 have never fired on any run</strong> &mdash; reported as a dash rather than pooled with the hard
-rules, and either the corpus needs a tier that exercises them or they need dropping, because a
-metric identical across every variant is broken rather than stable. And a <strong>confidently wrong
-but internally consistent answer is invisible</strong>: the constant baseline sits at prevalence
-100&nbsp;% with recall 0&nbsp;%.</p>
+rules, because a metric identical across every variant is broken rather than stable. And a
+<strong>confidently wrong but internally consistent answer is invisible</strong>: the constant
+baseline sits at prevalence 100&nbsp;% with recall 0&nbsp;%.</p>
 
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no
@@ -335,7 +335,7 @@ costs, and the gap will be reported whichever way it comes out.</p>
 answers in the same wire format and goes through the same prompt, parse, validation and repair
 loop, so a column is comparable down the table. The numbers are recomputed for this page from each
 run's committed <code>predictions.jsonl</code> &mdash; not copied from a report.</p>
-<table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100.0&nbsp;%</td><td class="num">100.0&nbsp;%</td><td class="num">100.0&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">41</td><td class="num">99.3&nbsp;%</td><td class="num">98.4&nbsp;%</td><td class="num">97.7&nbsp;%</td></tr><tr><th><code>claude-haiku-4-5</code></th><td>the page</td><td class="num">107 / 108</td><td class="num">65</td><td class="num">98.9&nbsp;%</td><td class="num">98.9&nbsp;%</td><td class="num">97.8&nbsp;%</td></tr><tr><th><code>claude-opus-5</code></th><td>the page</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100.0&nbsp;%</td><td class="num">100.0&nbsp;%</td><td class="num">100.0&nbsp;%</td></tr></tbody></table>
+<table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">41</td><td class="num">99.3&nbsp;%</td><td class="num">98.4&nbsp;%</td><td class="num">97.7&nbsp;%</td></tr><tr><th><code>claude-haiku-4-5</code></th><td>the page</td><td class="num">107 / 108</td><td class="num">65</td><td class="num">98.9&nbsp;%</td><td class="num">98.9&nbsp;%</td><td class="num">97.8&nbsp;%</td></tr><tr><th><code>claude-opus-5</code></th><td>the page</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr></tbody></table>
 <p class="note"><strong>recall</strong> is how many of the values on the page the prediction offered
 a value for; <strong>value</strong> is how many of those it read correctly; <strong>accuracy</strong>
 is the two together. They are separate columns because a field that is half missed and a field that
@@ -353,8 +353,8 @@ errors injected at a fixed rate &mdash; not a competitor but the labelled error 
 needs, since a detector measured only on a model's unlabelled mistakes is measured on a sample nobody
 chose.</p>
 <p><code>claude-opus-5</code> is the system under test, and it ties the oracle: every field of every
-document, for $3.20. Its only divergence from the gold's own serialisation is 63 trailing zeros
-&mdash; it writes <code>137.30</code> where the generator stored <code>137.3</code>, which is what
+document, for $3.20. Its only divergence from the gold's own serialisation is
+63 trailing zeros &mdash; it writes <code>137.30</code> where the generator stored <code>137.3</code>, which is what
 the page prints and what the scorer's amount comparison was already defined to treat as the same
 quantity. A corpus that the strongest non-model reader finds hard and a frontier model finds trivial
 is measuring layout parsing, not reading.</p>
@@ -392,7 +392,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from
-  <code>c7b2c08</code> &middot; part of a
+  <code>cd84ff0</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by
