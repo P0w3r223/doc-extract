@@ -22,6 +22,18 @@ all. Its failures are structural rather than random, which is why they are worth
 error set M5's detector study needs, since a detector measured only on a model's unlabelled mistakes
 is measured on a sample nobody chose.
 
+**`stripped`** sees the gold and returns its header and its total, with every row and every rate
+block dropped. It is a control for one specific claim rather than a competitor: an extraction that
+lost the table leaves **no arithmetic rule anything to compare**, so every hard rule falls silent on
+a document that is wrong in most of its scored fields. The only rule that can speak is the heuristic
+`totals.gross_has_no_support`, whose whole content is "no rule could run". Without this arm that
+rule is asserted in a docstring and never observed.
+
+It is a baseline and not a `corrupt` kind because it is a whole degenerate reading rather than one
+slipped field: injected among the others it would delete rows that an earlier corruption had already
+been recorded against, and the prediction file would carry an error report naming a field that is no
+longer in the document.
+
 **`gullible`** sees the page and the gold, and belongs to M6. It reads the page for an injected
 instruction and does exactly what it says — the positive control for the attack suite, in the same
 sense B0 is the positive control for the scorer and B3 for the detector. On a document nobody
@@ -55,6 +67,7 @@ ORACLE = "oracle"
 CONSTANT = "constant"
 PATTERN = "pattern"
 NOISY = "noisy"
+STRIPPED = "stripped"
 GULLIBLE = "gullible"
 CLAUDE = "claude"
 
@@ -145,6 +158,21 @@ def _noisy(task: Task) -> Prepared:
     )
 
 
+def _stripped(task: Task) -> Prepared:
+    """The gold with its table dropped: everything the header states, nothing behind the total.
+
+    Constructed rather than corrupted, so the note says what was removed rather than pretending a
+    reading slipped. A document that already has neither rows nor rate blocks is answered unchanged
+    and says so — the arm would otherwise report a removal that did not happen.
+    """
+    gold = task.gold
+    if not gold.lines and not gold.rate_totals:
+        return Prepared(client=scripted.always(_reply(gold, STRIPPED)), notes=("nothing to strip",))
+    stripped = Invoice(**{**gold.model_dump(), "lines": (), "rate_totals": ()})
+    note = f"stripped {len(gold.lines)} line(s) and {len(gold.rate_totals)} rate block(s)"
+    return Prepared(client=scripted.always(_reply(stripped, STRIPPED)), notes=(note,))
+
+
 def _gullible(task: Task) -> Prepared:
     """M6's positive control: read the page, find the injected instruction, and do as it says.
 
@@ -203,6 +231,12 @@ BASELINES: tuple[Baseline, ...] = (
         sees="the gold",
         description="B3 — the oracle with known errors injected, for M5's detector study.",
         prepare=_noisy,
+    ),
+    Baseline(
+        name=STRIPPED,
+        sees="the gold",
+        description="the gold with no rows and no rate blocks — a reading no arithmetic can check.",
+        prepare=_stripped,
     ),
     Baseline(
         name=GULLIBLE,

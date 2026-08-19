@@ -244,11 +244,30 @@ wraps across a page break. Not one arithmetic error escaped.</p>
 <p>That is the case for the grounding layer, arrived at by measurement rather than assumed: it
 covers exactly the fields the arithmetic cannot see, because a description the model invented is a
 value that resolves to no span on the page.</p>
-<p class="note">Two cautions the study prints beside its own numbers. The <strong>heuristic rules
-have never fired on any run</strong> &mdash; reported as a dash rather than pooled with the hard
-rules, because a metric identical across every variant is broken rather than stable. And a
-<strong>confidently wrong but internally consistent answer is invisible</strong>: the constant
-baseline sits at prevalence 100&nbsp;% with recall 0&nbsp;%.</p>
+<p class="note">A caution the study prints beside its own numbers: a <strong>confidently wrong but
+internally consistent answer is invisible</strong>. The constant baseline sits at prevalence
+100&nbsp;% with recall 0&nbsp;%.</p>
+
+<h2>When the arithmetic has nothing to say</h2>
+<p>Every identity here needs two figures to compare. An answer that keeps the total and drops the
+rows and the rate blocks offers one &mdash; so the hard rules are not <em>wrong</em> about it, they
+are <strong>unable to speak</strong>. The <code>stripped</code> baseline is exactly that reading, on
+all 108 documents.</p>
+<table><thead><tr><th></th><th class="num">prevalence</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
+<tbody>
+    <tr><th>hard rules</th><td class="num">100&nbsp;%</td><td class="num">&mdash;</td><td class="num">0.0&nbsp;%</td></tr>
+    <tr><th>heuristic rules</th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
+</tbody></table>
+<p>The one rule that fires is the heuristic whose entire content is <em>no rule could run</em>, and
+it fires on every document, with 0 false positives. Those three
+heuristic rules had never fired on any earlier run &mdash; a metric identical across every variant,
+which this project's own rules call broken rather than stable. Giving them a population was the fix;
+dropping them was the alternative.</p>
+<p class="note"><strong>And the gate accepts all of it.</strong> Coverage is measured over the values
+a prediction asserted, so a reading that loses three quarters of the invoice routes everything to
+<code>accept</code>, at 100&nbsp;% accuracy, leaking nothing. No signal here separates &ldquo;correctly
+absent&rdquo; from &ldquo;silently dropped&rdquo;; the count of what was never asserted is the only
+column that sees it.</p>
 
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no
@@ -332,12 +351,12 @@ layouts no template anticipated. Milestone 7's real held-out set exists to measu
 costs, and the gap will be reported whichever way it comes out.</p>
 
 <h2>What the baselines say, and what the model says</h2>
-<p>6 committed runs over the same 108 documents, scoring
+<p>7 committed runs over the same 108 documents, scoring
 22 fields per invoice and 6066 gold field instances in total. Every row
 answers in the same wire format and goes through the same prompt, parse, validation and repair
 loop, so a column is comparable down the table. The numbers are recomputed for this page from each
 run's committed <code>predictions.jsonl</code> &mdash; not copied from a report.</p>
-<table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">41</td><td class="num">99.3&nbsp;%</td><td class="num">98.4&nbsp;%</td><td class="num">97.7&nbsp;%</td></tr><tr><th><code>claude-haiku-4-5</code></th><td>the page</td><td class="num">107 / 108</td><td class="num">65</td><td class="num">98.9&nbsp;%</td><td class="num">98.9&nbsp;%</td><td class="num">97.8&nbsp;%</td></tr><tr><th><code>claude-opus-5</code></th><td>the page</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr></tbody></table>
+<table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">36</td><td class="num">99.3&nbsp;%</td><td class="num">98.2&nbsp;%</td><td class="num">97.5&nbsp;%</td></tr><tr><th><code>stripped</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">22.8&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">22.8&nbsp;%</td></tr><tr><th><code>claude-haiku-4-5</code></th><td>the page</td><td class="num">107 / 108</td><td class="num">65</td><td class="num">98.9&nbsp;%</td><td class="num">98.9&nbsp;%</td><td class="num">97.8&nbsp;%</td></tr><tr><th><code>claude-opus-5</code></th><td>the page</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr></tbody></table>
 <p class="note"><strong>recall</strong> is how many of the values on the page the prediction offered
 a value for; <strong>value</strong> is how many of those it read correctly; <strong>accuracy</strong>
 is the two together. They are separate columns because a field that is half missed and a field that
@@ -422,7 +441,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from
-  <code>823fa77</code> &middot; part of a
+  <code>807ad87</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

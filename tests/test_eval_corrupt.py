@@ -8,6 +8,7 @@ invariants *cannot* see (otherwise the detector's recall is 1.0 by construction)
 
 from __future__ import annotations
 
+import datetime as dt
 import random
 from decimal import Decimal
 
@@ -85,6 +86,61 @@ def test_the_invisible_corruptions_are_invisible(kind, invoice):
         violation for violation in invariants.check(corrupted)
         if violation.severity is Severity.HARD
     ]
+
+
+def test_every_kind_declares_which_severity_should_catch_it():
+    """A kind absent from `CAUGHT_BY` would print in the per-kind table with no label at all.
+
+    The mapping is what lets a zero mean "not asked" rather than "missed", so a kind added without
+    one would quietly read as a detector failure at whichever severity happened to report it.
+    """
+    assert set(corrupt.CAUGHT_BY) == set(corrupt.KINDS)
+
+
+@pytest.mark.parametrize("kind", corrupt.KINDS)
+def test_caught_by_is_asserted_against_the_rules_and_not_trusted(kind, invoice):
+    """What `CAUGHT_BY` claims is what `invariants` actually does to that corruption.
+
+    This is the check the whole per-kind table rests on. Declaring a kind heuristic-only and having
+    a hard rule catch it would inflate hard recall; declaring it hard and having a heuristic catch
+    it would inflate the half of the rule set that has lawful exceptions. Either way the severity
+    split — the thing that keeps a heuristic's false positives out of the arithmetic's precision —
+    would be reported wrongly, and nothing else in the suite would notice.
+    """
+    assert invariants.check(invoice) == (), "the fixture must start clean for this to mean anything"
+    corrupted, injection = _one(kind, invoice)
+    fired = {violation.severity for violation in invariants.check(corrupted)}
+    expected = corrupt.CAUGHT_BY[kind]
+
+    if expected is None:
+        assert not fired, f"{injection.note} was declared invisible and {fired} saw it"
+    else:
+        assert fired == {expected}, f"{injection.note} was declared {expected} and fired {fired}"
+
+
+def test_a_misread_year_is_caught_by_the_date_rule_and_by_nothing_else(invoice):
+    """The corruption exists to exercise a rule that had never fired; name the rule it fires.
+
+    Asserting the severity alone would pass if some unrelated heuristic caught it for an unrelated
+    reason, and the point of the kind is that `dates.issue_near_sale` — widened for exactly this
+    reading error — is what sees it.
+    """
+    corrupted, injection = _one("year_misread", invoice)
+    rules = {violation.rule for violation in invariants.check(corrupted)}
+
+    assert rules <= {"dates.issue_near_sale", "dates.issue_follows_sale"}
+    assert rules, f"{injection.note} fired nothing"
+    assert corrupted.sale_date.year != invoice.sale_date.year
+    assert (corrupted.sale_date.month, corrupted.sale_date.day) == (
+        invoice.sale_date.month, invoice.sale_date.day
+    )
+
+
+def test_a_leap_day_survives_the_year_it_cannot_be_moved_to(invoice):
+    """29 February is moved to the 28th rather than raising, so no document is silently skipped."""
+    leap = invoice.model_copy(update={"sale_date": dt.date(2024, 2, 29)})
+    corrupted, _ = _one("year_misread", leap)
+    assert corrupted.sale_date in (dt.date(2023, 2, 28), dt.date(2025, 2, 28))
 
 
 def test_a_transposition_keeps_the_sign_and_the_decimal_places(invoice):

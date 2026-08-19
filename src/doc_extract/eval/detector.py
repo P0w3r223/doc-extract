@@ -27,9 +27,15 @@ are counted as their own verdict and excluded from every denominator, with the e
 beside the rates. Counting them as caught would credit the invariants with a refusal the pipeline
 had already made on its own — the most flattering available reading, and the least true one.
 
-**The blind spot is the finding.** `eval.corrupt.INVISIBLE_KINDS` names two error kinds no
-arithmetic can see, and the per-kind table exists to print their zero. A study reporting only the
-detectable kinds would have measured its own corruption set rather than the detector.
+**The blind spot is the finding.** `eval.corrupt.INVISIBLE_KINDS` names two error kinds no rule at
+either severity can see, and the per-kind table exists to print their zero. A study reporting only
+the detectable kinds would have measured its own corruption set rather than the detector.
+
+`corrupt.CAUGHT_BY` extends that from a set to a mapping, because with both severities reported each
+table necessarily contains rows the *other* one owns. A row a study was never asked to catch is
+labelled as such rather than left to read as a miss — otherwise the heuristic half would report a
+recall near zero for the arithmetic kinds it was never meant to see, which is the same mistake as
+pooling the two severities, made in the other direction.
 """
 
 from __future__ import annotations
@@ -312,6 +318,8 @@ class KindRecall:
     """
 
     kind: str
+    #: The severity this row was computed at, so the row can say whether its own zero was expected.
+    severity: Severity = Severity.HARD
     isolated_documents: int = 0
     isolated_fired: int = 0
     marginal_documents: int = 0
@@ -327,8 +335,21 @@ class KindRecall:
 
     @property
     def expected_invisible(self) -> bool:
-        """Whether `corrupt` declares this kind beyond what any arithmetic rule can see."""
+        """Whether `corrupt` declares this kind beyond what *any* rule can see."""
         return self.kind in corrupt.INVISIBLE_KINDS
+
+    @property
+    def out_of_scope(self) -> bool:
+        """Whether some rule is expected to catch this kind, but not one at this severity.
+
+        A transposed total is not a failure of the heuristic half of the rule set and a misread year
+        is not a failure of the arithmetic half. Both halves are reported, so both tables contain
+        rows the other one owns, and a zero in such a row means "not asked" rather than "missed".
+        Without this distinction the heuristic table would read as a detector that catches almost
+        nothing — which is what it looked like before there was anything for it to catch.
+        """
+        expected = corrupt.CAUGHT_BY.get(self.kind)
+        return expected is not None and expected is not self.severity
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,7 +392,7 @@ def summarise(
         counts=_counts(rows),
         verdicts=rows,
         rules=_rules(rows),
-        kinds=_kinds(rows),
+        kinds=_kinds(rows, severity),
         localised=sum(1 for row in rows if row.localised),
         localisable=sum(1 for row in rows if row.verdict is Verdict.TRUE_POSITIVE),
     )
@@ -413,11 +434,11 @@ def _rules(rows: Sequence[DocumentVerdict]) -> tuple[RulePerformance, ...]:
     )
 
 
-def _kinds(rows: Sequence[DocumentVerdict]) -> tuple[KindRecall, ...]:
+def _kinds(rows: Sequence[DocumentVerdict], severity: Severity) -> tuple[KindRecall, ...]:
     """Per-kind recall, in `corrupt.KINDS` order so the table is stable across runs.
 
     Kinds that were never injected are dropped: on a run that injects nothing — every baseline but
-    the noisy oracle — this returns empty rather than nine rows of dashes.
+    the noisy oracle — this returns empty rather than eleven rows of dashes.
     """
     isolated_documents: dict[str, int] = {}
     isolated_fired: dict[str, int] = {}
@@ -442,6 +463,7 @@ def _kinds(rows: Sequence[DocumentVerdict]) -> tuple[KindRecall, ...]:
     return tuple(
         KindRecall(
             kind=kind,
+            severity=severity,
             isolated_documents=isolated_documents.get(kind, 0),
             isolated_fired=isolated_fired.get(kind, 0),
             marginal_documents=marginal_documents.get(kind, 0),

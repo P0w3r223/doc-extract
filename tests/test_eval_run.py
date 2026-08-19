@@ -16,6 +16,7 @@ from doc_extract.eval import dataset, predictions, report, run, selective_report
 from doc_extract.eval.aggregate import CoverageError
 from doc_extract.eval.baselines import BY_NAME as BASELINES
 from doc_extract.eval.dataset import CorpusError
+from doc_extract.schema.invariants import Severity
 from doc_extract.synth import corpus as synth_corpus
 from doc_extract.synth.tiers import BY_NAME as TIERS
 
@@ -155,6 +156,75 @@ def test_the_detector_sees_the_injected_errors_the_noisy_oracle_made(built):
     assert study.counts.judged == len(records)
     assert study.counts.true_positive, "an all-corruptions run must trip a hard rule somewhere"
     assert {row.kind for row in study.kinds}, "the injected kinds must reach the study"
+
+
+def test_the_heuristic_half_catches_the_kind_the_arithmetic_cannot(built):
+    """Why `year_misread` exists: a heuristic rate that was zero on every run measures nothing.
+
+    Asserted end to end rather than on `invariants` alone, because the claim is about the *study* —
+    a kind can break a heuristic rule and still never reach the table if the severity split, the
+    per-kind attribution or the note parsing drops it on the way.
+    """
+    corpus, records, _, _ = _run(built, "noisy", rate=1.0)
+    study = run.detect(corpus, records, severity=Severity.HEURISTIC)
+    rows = {row.kind: row for row in study.kinds}
+
+    assert study.counts.true_positive, "the heuristic rules must fire on an all-corruptions run"
+    assert study.counts.false_positive == 0
+    assert rows["year_misread"].marginal_fired == rows["year_misread"].marginal_documents
+    assert not rows["year_misread"].out_of_scope
+    assert rows["total_transposed"].out_of_scope, "an arithmetic kind is not asked of a heuristic"
+
+
+def test_a_kind_the_other_severity_owns_is_labelled_rather_than_counted_as_a_miss(built):
+    """`not asked` and `missed` both print a zero, and only one of them is a detector failure."""
+    corpus, records, _, _ = _run(built, "noisy", rate=1.0)
+    hard = {row.kind: row for row in run.detect(corpus, records).kinds}
+
+    assert hard["year_misread"].out_of_scope
+    assert not hard["year_misread"].expected_invisible, "a rule does see it — just not a hard one"
+    assert hard["date_shifted"].expected_invisible
+    assert not hard["date_shifted"].out_of_scope, "nothing owns it, so nobody is off the hook"
+    assert not hard["total_transposed"].out_of_scope
+
+
+def test_an_extraction_with_no_table_is_invisible_to_every_hard_rule(built):
+    """`stripped` is the control for the one heuristic no corruption is allowed to produce.
+
+    Every hard rule needs two figures to compare, so an answer carrying only the total leaves them
+    nothing to run on: they are silent on a document that is wrong in most of its scored fields.
+    That silence is a property of the rule set worth demonstrating rather than asserting in prose.
+    """
+    corpus, records, summary, _ = _run(built, "stripped")
+
+    assert summary.extracted == 2, "a degenerate reading is still a well-formed invoice"
+    assert summary.exact == 0
+    assert all("stripped" in note for record in records for note in record.notes)
+
+    hard = run.detect(corpus, records)
+    assert hard.counts.prevalence == 1.0
+    assert hard.counts.true_positive == 0, "no hard rule can see a table that is not there"
+
+    heuristic = run.detect(corpus, records, severity=Severity.HEURISTIC)
+    assert heuristic.counts.recall == 1.0
+    assert heuristic.counts.false_positive == 0
+
+
+def test_the_gate_cannot_see_what_a_reading_never_asserted(built):
+    """A limit the curve already discloses, made concrete by the arm that maximises it.
+
+    `stripped` drops most of the scored fields and every value it *does* assert is correct, so the
+    gate accepts all of them and leaks nothing — a perfect-looking curve over a reading that lost
+    the invoice. Coverage is over asserted values, and no signal here separates "correctly absent"
+    from "silently dropped". The count of what was never asserted is the only thing that says so.
+    """
+    corpus, records, _, meta = _run(built, "stripped")
+    curve = run.gate(corpus, records)
+
+    assert curve.missed > curve.asserted, "most of the invoice is gone, and only `missed` says so"
+    assert curve.wrong == 0, "every value it did assert is correct — which is the trap"
+    assert all(point.leaked == 0 for point in curve.points)
+    assert str(curve.missed) in selective_report.render(curve, run=meta)
 
 
 def test_a_perfect_reading_gives_the_detector_nothing_to_do(built):

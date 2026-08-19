@@ -11,12 +11,33 @@ gold invoice, with a seeded RNG, and every one that fires is **recorded** on the
 then cross two columns it did not have to infer: what was actually broken, and what `invariants`
 said about it.
 
-**The nine kinds are chosen to span the detector's blind spot, not to be uniformly detectable.**
+**The ten kinds are chosen to span the detector's blind spot, not to be uniformly detectable.**
 Five break a hard arithmetic identity and should be caught: a transposed total, a cent on a VAT
-figure, a swapped net and VAT, a dropped row, a transposed row net. Two break a check digit. Two
-break nothing an invariant can see — a shifted sale date and a truncated buyer name — and the whole
-value of the study is in how many of those slip through. A corruption set that only contained
-detectable errors would report a recall of 1.0 and would have measured its own construction.
+figure, a swapped net and VAT, a dropped row, a transposed row net. Two break a check digit. One
+breaks a **heuristic** rule and no hard one. Two break nothing an invariant can see — a shifted sale
+date and a truncated buyer name — and the whole value of the study is in how many of those slip
+through. A corruption set that only contained detectable errors would report a recall of 1.0 and
+would have measured its own construction.
+
+`CAUGHT_BY` states, per kind, which severity is expected to notice it, and that is what makes the
+per-kind table readable at *both* severities: a transposed total is not a failure of the heuristic
+half, and a misread year is not a failure of the arithmetic half. Deriving `INVISIBLE_KINDS` from
+that one mapping keeps the claim in a single place.
+
+`year_misread` exists because the heuristic rules had **never fired on any run**, which the
+project's own metric rules call broken rather than stable — a rate identical across every variant
+measures nothing. It is written to what the rule it exercises already describes in prose:
+`dates.issue_near_sale` names a misread year (`2025-08-05` for `2026-08-05`) as the reading error it
+was widened to catch. Writing the corruption to that description rather than to the code means a
+rule that stopped matching its own docstring would show up as a recall of zero.
+
+**A corruption may not remove a field a later corruption records having changed.** The third
+heuristic rule, `totals.gross_has_no_support`, wants an extraction that kept the gross and lost
+everything behind it — but emptying `lines` here would erase the row a `line_transposed` injected
+one line earlier had already been recorded against, and the prediction file would then claim an
+error against a field that is no longer in the document. That scenario is a whole degenerate
+extraction rather than one slipped field, so it is a **baseline** (`baselines.stripped`) and not a
+kind: every document, honestly labelled, and no interaction with anything here.
 
 Nothing here is random about *whether* the corpus is corrupted: the rate is a parameter, the seed
 comes from the document, and re-running the baseline produces the identical errors.
@@ -30,6 +51,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 
+from doc_extract.schema.invariants import Severity
 from doc_extract.schema.ksef import Invoice, LineItem, Party, RateTotal
 
 #: How often each kind fires on a given document, independently of the others.
@@ -188,6 +210,31 @@ def _buyer_name_truncated(invoice: Invoice, rng: random.Random) -> tuple[Invoice
     )
 
 
+def _sale_year_misread(invoice: Invoice, rng: random.Random) -> tuple[Invoice, Injection] | None:
+    """The sale date's year off by one — a whole year wrong, and every hard rule silent.
+
+    `2025-08-05` for `2026-08-05` is the error `dates.issue_near_sale` was widened to catch, and it
+    is the one date error a reader would call serious: `date_shifted` moves the day inside the
+    lawful window and is genuinely undetectable, while a wrong year puts the sale hundreds of days
+    from the invoice that documents it. Nothing arithmetic touches a date, so the only rule that can
+    see this is the heuristic one — which is exactly why it is here.
+
+    A leap day cannot survive the shift, so it is moved rather than dropped: `Decimal`-style
+    exactness is not the point here, and refusing to corrupt one document in 1461 would leave a
+    silent hole in the support column.
+    """
+    sale = invoice.sale_date
+    if sale is None:
+        return None
+    years = rng.choice((-1, 1))
+    day = 28 if (sale.month, sale.day) == (2, 29) else sale.day
+    changed = sale.replace(year=sale.year + years, day=day)
+    return (
+        _replace(invoice, sale_date=changed),
+        Injection("year_misread", "sale_date", sale.isoformat(), changed.isoformat()),
+    )
+
+
 #: In a fixed order, so the same seed and the same rate give the same document every time. Two
 #: corruptions can fire on one document, which is realistic and is also why the order is fixed: a
 #: dropped line changes what a later corruption can pick.
@@ -200,16 +247,34 @@ CORRUPTIONS: tuple[tuple[str, Corruption], ...] = (
     ("nip_digit", _nip_digit),
     ("account_digit", _account_digit),
     ("date_shifted", _sale_date_shifted),
+    ("year_misread", _sale_year_misread),
     ("name_truncated", _buyer_name_truncated),
 )
 
 KINDS: tuple[str, ...] = tuple(name for name, _ in CORRUPTIONS)
 
-#: The kinds no invariant can see. Named here rather than in M5, because the claim belongs with the
-#: corruptions it describes: a date shift inside the lawful window, a shortened name, and — once
-#: `invariants` gains no rule for them — nothing else. M5 asserts this against the rule set rather
-#: than trusting it.
-INVISIBLE_KINDS: frozenset[str] = frozenset({"date_shifted", "name_truncated"})
+#: Which severity is expected to notice each kind, or `None` for the ones nothing can see. This is
+#: the single place the claim is made: `INVISIBLE_KINDS` is derived from it, the per-kind table
+#: reads it to label a row at the severity being reported, and M5 asserts it against the rule set
+#: rather than trusting it. A kind absent from a study's own severity is not that severity's
+#: failure — a transposed total is not something a heuristic was ever going to catch.
+CAUGHT_BY: dict[str, Severity | None] = {
+    "total_transposed": Severity.HARD,
+    "vat_cent": Severity.HARD,
+    "rate_swapped": Severity.HARD,
+    "line_dropped": Severity.HARD,
+    "line_transposed": Severity.HARD,
+    "nip_digit": Severity.HARD,
+    "account_digit": Severity.HARD,
+    "date_shifted": None,
+    "year_misread": Severity.HEURISTIC,
+    "name_truncated": None,
+}
+
+#: The kinds no invariant can see: a date shift inside the lawful window and a shortened name.
+INVISIBLE_KINDS: frozenset[str] = frozenset(
+    kind for kind, severity in CAUGHT_BY.items() if severity is None
+)
 
 
 def corrupt(
