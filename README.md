@@ -27,13 +27,53 @@ unenforced.** Checking those rules is therefore real work, not a re-run of valid
 exists. The vendored schema is in `schemas/` with its provenance and SHA-256, so the claim is
 checkable rather than asserted.
 
-## Status — milestones 1–4 of 7
+## Status — milestones 1–4 of 7, and the detector study begun
 
-The domain layer, the corpus generator, the extraction pipeline and the scorer are complete. All of
-it runs with no model, no network and no API key: the pipeline is driven end to end by baselines that
-implement the same one-method client interface a real model does, so **no model has been called yet**
-— the accuracy figures below are the baselines', and they are what the model will be measured
-against.
+The domain layer, the corpus generator, the extraction pipeline and the scorer are complete, and the
+real model has been run through the identical path. Everything except that one command runs with no
+model, no network and no API key: the pipeline is driven end to end by baselines implementing the
+same one-method client interface a real model does, and the detector study reads committed
+prediction files rather than calling anything.
+
+**`claude-opus-5` scores 100 % on all 108 documents and 6066 field instances, for $3.20.** That is a
+result about the corpus at least as much as about the model. The nine difficulty tiers vary what an
+invoice *means* — grosz rounding, corrections, reverse charge, multiple pages — and not how hard the
+page is to *read*, which is difficult for a regex parser (`pattern` reaches 86.3 %) and not difficult
+at all for a language model given a clean PDF text layer.
+
+So the corpus is saturated, and the headline question cannot be asked of *that* run: with no errors,
+the detector has nothing to detect. What it does establish is that the gate never blocks correct
+work — **0 false positives on 108 correct documents**. The question itself is answered on a second
+arm: the same corpus, the same pipeline, a weaker model.
+
+## Does "the arithmetic holds" predict "the fields are right"?
+
+`claude-haiku-4-5` gets 42 of 107 documents wrong, which is a real and unlabelled model-error
+population. Against it the hard rules score **precision 100.0 %, recall 76.2 %, zero false
+positives**, and all 32 catches point at a field that is genuinely wrong.
+
+**The recall is not a property of the detector — it is the fraction of that model's mistakes that
+happened to land on numeric fields.**
+
+| caught (32) | | missed (10) | |
+|---|---:|---|---:|
+| `payment_account` — IBAN mod-97 | 25 | `lines[].description` | 9 |
+| `lines[].discount` — row arithmetic | 9 | `seller.name` | 1 |
+| `lines[].description` — incidental | 5 | `buyer.name` | 1 |
+| `seller.nip` — check digit | 1 | | |
+
+Not one arithmetic error escaped. Every miss is a misread **name or description** — a field with no
+redundancy behind it for arithmetic to check, and eight of the ten are in the multi-page tier, where
+a description wraps across a page break.
+
+That is the case for the grounding layer, arrived at by measurement rather than assumed: it covers
+exactly the fields the arithmetic cannot see, because a description the model invented is a value
+that resolves to no span on the page.
+
+Two cautions the study prints beside its own numbers. The **heuristic rules have never fired on any
+run** — reported as a dash rather than pooled with the hard rules, and either the corpus needs a
+tier that exercises them or they need dropping. And a **confidently wrong but internally consistent
+answer is invisible**: `constant` sits at prevalence 100 % and recall 0 %.
 
 | | |
 |---|---|
@@ -50,11 +90,12 @@ against.
 Milestones 5–7: the detector study and selective prediction → prompt-injection suite → real held-out
 set and the reported synthetic↔real gap.
 
-## What the baselines say, before any model is involved
+## What the baselines say, and what the model says
 
-Four baselines, one corpus of 108 documents, 6066 gold field instances. Each answers in the same
-wire format and goes through the same prompt, parse, validation and repair loop, so the column is
-comparable across the row. Everything here is reproducible offline from a seed.
+Four baselines and one real model, over one corpus of 108 documents and 6066 gold field instances.
+Every row answers in the same wire format and goes through the same prompt, parse, validation and
+repair loop, so the columns are comparable down the table. Everything but the last row is
+reproducible offline from a seed.
 
 | | sees | produced an invoice | every field right | accuracy |
 |---|---|---|---|---|
@@ -62,6 +103,14 @@ comparable across the row. Everything here is reproducible offline from a seed.
 | **B1** `constant` | nothing | 108 / 108 | 0 | 3.0 % |
 | **B2** `pattern` | the page | 104 / 108 | 35 | 86.3 % |
 | **B3** `noisy` | the gold | 108 / 108 | 41 | 97.7 % |
+| `claude-opus-5` | the page | 108 / 108 | 108 | **100.0 %** |
+| `claude-haiku-4-5` | the page | 107 / 108 | 65 | 97.8 % |
+
+**The model ties the oracle, which is a fact about the corpus.** B0 was handed the gold; the model
+was handed the page and matched it, on every tier including eight-decimal unit prices and multi-page
+tables. Its only divergence from the gold's own serialisation is 63 trailing zeros — it writes
+`137.30` where the generator stored `137.3`, which is what the page prints and what
+`fields.Match.AMOUNT` was already defined to treat as the same quantity.
 
 **B0 is the point of B0.** A perfect reading has to score 100 %, and if it did not, the harness would
 be wrong and every other number with it. **B1 answers the same lawful invoice for every document** —
@@ -182,16 +231,21 @@ python -m venv .venv
 pytest
 ruff check .
 
-python -m doc_extract.synth --out data/synthetic        # 108 documents, ~6 MB, not committed
-python -m doc_extract.eval run --baseline pattern       # predict, score, write a report
-python -m doc_extract.eval score --run results/pattern  # re-score the committed predictions
+python -m doc_extract.synth --out data/synthetic         # 108 documents, ~6 MB, not committed
+python -m doc_extract.eval run --baseline pattern        # predict, score, write a report
+python -m doc_extract.eval score  --run results/pattern  # re-score the committed predictions
+python -m doc_extract.eval detect --run results/pattern  # the detector study on the same file
 ```
 
-Each run writes `results/<baseline>/` — `predictions.jsonl`, `run.meta.json` and `report.md` — and
-those are **committed**. A number in a report is therefore recomputable from the file that produced
-it, without re-running anything: `score` reads the predictions and the gold and prints the same
-tables. That is also what makes a change to the scorer a reviewable diff in the numbers rather than a
-claim about them.
+Each run writes `results/<run>/` — `predictions.jsonl`, `run.meta.json`, `report.md` and
+`detector.md` — and those are **committed**. A number in either report is therefore recomputable
+from the file that produced it, without re-running anything: `score` and `detect` both read the
+predictions and the gold and print the same tables. That is also what makes a change to the scorer,
+or to a rule, a reviewable diff in the numbers rather than a claim about them.
+
+A run is named for its baseline, except a remote one, which is named for its model — the baseline is
+`claude` every time and the model is what varies, so two models over one corpus are two directories
+rather than one overwritten one.
 
 ## Licence
 

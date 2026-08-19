@@ -126,3 +126,41 @@ def test_every_baseline_runs_offline_and_produces_a_report(built):
         rendered = report.render(summary, predictions=records)
         assert rendered.startswith(f"# {name}")
         assert "| support |" in rendered
+
+
+def test_the_detector_study_refuses_a_subset_nobody_declared(built):
+    """The easiest number in this project to inflate, and the check that stops it.
+
+    Dropping the documents a detector missed raises its recall. So `detect` asserts coverage the
+    same way `score` does, by the same code, and a caller who genuinely wants a subset has to say
+    so — after which the study is over a subset and cannot be quoted as one over the corpus.
+    """
+    corpus, records, _, _ = _run(built, "noisy", rate=1.0)
+    short = records[:1]
+
+    with pytest.raises(CoverageError, match="scored 1 of the 2 documents"):
+        run.detect(corpus, short)
+
+    study = run.detect(corpus, short, allow_partial=True)
+    assert study.counts.documents == 1
+
+
+def test_the_detector_sees_the_injected_errors_the_noisy_oracle_made(built):
+    """End to end: corrupt a document, and the study reports both the verdict and the kind."""
+    corpus, records, _, _ = _run(built, "noisy", rate=1.0)
+    study = run.detect(corpus, records)
+
+    assert study.counts.judged == len(records)
+    assert study.counts.true_positive, "an all-corruptions run must trip a hard rule somewhere"
+    assert {row.kind for row in study.kinds}, "the injected kinds must reach the study"
+
+
+def test_a_perfect_reading_gives_the_detector_nothing_to_do(built):
+    """The oracle is the control: no error, therefore no detection, therefore no rate."""
+    corpus, records, _, _ = _run(built, "oracle")
+    study = run.detect(corpus, records)
+
+    assert study.counts.true_negative == len(records)
+    assert study.counts.prevalence == 0.0
+    assert study.counts.recall is None, "no wrong documents means recall has no denominator"
+    assert study.counts.false_positive == 0

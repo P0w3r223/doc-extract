@@ -19,7 +19,7 @@ import subprocess
 from doc_extract.eval import fields
 from doc_extract.eval import predictions as prediction_file
 from doc_extract.eval.aggregate import Scored, summarise
-from doc_extract.eval.baselines import BASELINES
+from doc_extract.eval.baselines import BASELINES, BY_NAME
 from doc_extract.eval.scorer import judge
 from doc_extract.extract.result import FailureClass
 from doc_extract.schema import vocab
@@ -182,7 +182,13 @@ def baselines(corpus: list) -> list[dict[str, object]]:
             expected=list(gold),
         )
         rows.append({
-            "name": meta.baseline,
+            #: A baseline is named by what it is; a real model is named by *which* model, because
+            #: that is the only thing that varies between two remote runs. `claude` appearing twice
+            #: would be a table whose rows a reader cannot tell apart — and comparing two models on
+            #: one corpus is exactly what those rows are for.
+            "name": meta.model if _is_remote(meta.baseline) else meta.baseline,
+            "baseline": meta.baseline,
+            "directory": directory.name,
             "sees": str(meta.options.get("sees", "unstated")),
             "extracted": report.extracted,
             "documents": report.documents,
@@ -192,11 +198,25 @@ def baselines(corpus: list) -> list[dict[str, object]]:
             "value": report.overall.value_accuracy,
             "support": report.overall.support,
         })
-    #: Declared order (B0, B1, B2, B3, then the real model), not the directory listing's. The
+    #: Declared order (B0, B1, B2, B3, then the real models), not the directory listing's. The
     #: baselines only mean anything read against each other, and `oracle` is the row the others are
-    #: read against — alphabetical would open the table on `constant`.
+    #: read against — alphabetical would open the table on `constant`. Two runs of the same baseline
+    #: — two models through the identical pipeline — fall back to their directory name, so the row
+    #: order is a property of the repository rather than of the filesystem's iteration order.
     order = [baseline.name for baseline in BASELINES]
-    return sorted(rows, key=lambda row: (order.index(row["name"]) if row["name"] in order else 99))
+    return sorted(
+        rows,
+        key=lambda row: (
+            order.index(row["baseline"]) if row["baseline"] in order else len(order),
+            row["directory"],
+        ),
+    )
+
+
+def _is_remote(baseline: str) -> bool:
+    """Whether a run called a model over the network, per the baseline registry."""
+    entry = BY_NAME.get(baseline)
+    return entry is not None and entry.remote
 
 
 def percent(value: float | None) -> str:
@@ -511,19 +531,54 @@ footer {{
   <li class="kpi">
     <div class="kpi-value">4 / 7</div>
     <div class="kpi-label">Milestones built</div>
-    <div class="kpi-note">no model has been called yet &mdash; the numbers below are baselines</div>
+    <div class="kpi-note">the fifth, the detector study, is under way</div>
   </li>
 </ul>
 
 <div class="card caution">
   <strong>This is a project in progress, and the page says so on purpose.</strong> What exists is
-  the domain layer, the corpus generator, the extraction pipeline and the scorer. All of it runs
-  offline, with no network and no API key, and <strong>no model has been called yet</strong>: the
-  accuracy figures below belong to four <em>baselines</em> &mdash; a perfect reading, a constant
-  answer, a regular-expression reader, and a deliberately corrupted gold. They are the bar a model
-  will be measured against, not a measurement of one. The detector study and the injection suite are
-  milestones 5&ndash;6 and are <em>not built</em>.
+  the domain layer, the corpus generator, the extraction pipeline, the scorer and the first half of
+  the detector study. Everything but one command runs offline with no network and no API key; that
+  command has been run, and <strong><code>claude-opus-5</code> reads all 108 documents
+  perfectly</strong>.
+  <br><br>
+  That is a result about the corpus as much as about the model. The nine tiers vary what an invoice
+  <em>means</em> &mdash; grosz rounding, corrections, reverse charge, multiple pages &mdash; not how
+  hard the page is to <em>read</em>. With no errors left to find, the detector has nothing to detect
+  on that run, so the headline question is answered on a second arm: the same corpus and the same
+  pipeline, with a weaker model. Grounding, routing and the coverage&ndash;accuracy curve are the
+  rest of milestone 5; the injection suite is milestone 6 and is <em>not built</em>.
 </div>
+
+<h2>Does &ldquo;the arithmetic holds&rdquo; predict &ldquo;the fields are right&rdquo;?</h2>
+<p>The project's headline question, asked of <code>claude-haiku-4-5</code>, which gets 42 of 107
+documents wrong and so supplies a real, unlabelled model-error population. The invariants are run on
+the <strong>prediction</strong>, never on the gold &mdash; the signal has to be available at
+inference time on a document nobody annotated.</p>
+<table>
+  <thead><tr><th></th><th class="num">flagged</th><th class="num">silent</th></tr></thead>
+  <tbody>
+    <tr><th>fields wrong</th><td class="num">32</td><td class="num">10</td></tr>
+    <tr><th>fields right</th><td class="num">0</td><td class="num">65</td></tr>
+  </tbody>
+</table>
+<p><strong>Precision 100.0&nbsp;%, recall 76.2&nbsp;%, zero false positives</strong>, and all 32
+catches point at a field that is genuinely wrong.</p>
+<p class="note">The recall is not a property of the detector. It is the fraction of that model's
+mistakes that happened to land on numeric fields. The 25 catches on <code>payment_account</code> are
+the IBAN mod-97 check digit; 9 more are row arithmetic catching a misread discount. Every one of the
+ten misses is a <strong>name or a description</strong> &mdash; a field with no redundancy behind it
+for arithmetic to check &mdash; and eight of those sit in the multi-page tier, where a description
+wraps across a page break. Not one arithmetic error escaped.</p>
+<p>That is the case for the grounding layer, arrived at by measurement rather than assumed: it
+covers exactly the fields the arithmetic cannot see, because a description the model invented is a
+value that resolves to no span on the page.</p>
+<p class="note">Two cautions the study prints beside its own numbers. The <strong>heuristic rules
+have never fired on any run</strong> &mdash; reported as a dash rather than pooled with the hard
+rules, and either the corpus needs a tier that exercises them or they need dropping, because a
+metric identical across every variant is broken rather than stable. And a <strong>confidently wrong
+but internally consistent answer is invisible</strong>: the constant baseline sits at prevalence
+100&nbsp;% with recall 0&nbsp;%.</p>
 
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no
@@ -606,12 +661,12 @@ its column with reportlab's padding still to spare.</p>
 layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
 costs, and the gap will be reported whichever way it comes out.</p>
 
-<h2>What the baselines say, before any model is involved</h2>
+<h2>What the baselines say, and what the model says</h2>
 <p>{baseline_count} committed runs over the same {documents} documents, scoring
-{scored_fields} fields per invoice and {field_instances} gold field instances in total. Every
-baseline answers in the same wire format and goes through the same prompt, parse, validation and
-repair loop, so a column is comparable across the row. The numbers are recomputed for this page from
-each run's committed <code>predictions.jsonl</code> &mdash; not copied from a report.</p>
+{scored_fields} fields per invoice and {field_instances} gold field instances in total. Every row
+answers in the same wire format and goes through the same prompt, parse, validation and repair
+loop, so a column is comparable down the table. The numbers are recomputed for this page from each
+run's committed <code>predictions.jsonl</code> &mdash; not copied from a report.</p>
 {baseline_table}
 <p class="note"><strong>recall</strong> is how many of the values on the page the prediction offered
 a value for; <strong>value</strong> is how many of those it read correctly; <strong>accuracy</strong>
@@ -629,22 +684,30 @@ thing that is not a language model, and therefore the bar. <code>noisy</code> is
 errors injected at a fixed rate &mdash; not a competitor but the labelled error set the detector study
 needs, since a detector measured only on a model's unlabelled mistakes is measured on a sample nobody
 chose.</p>
+<p><code>claude-opus-5</code> is the system under test, and it ties the oracle: every field of every
+document, for $3.20. Its only divergence from the gold's own serialisation is 63 trailing zeros
+&mdash; it writes <code>137.30</code> where the generator stored <code>137.3</code>, which is what
+the page prints and what the scorer's amount comparison was already defined to treat as the same
+quantity. A corpus that the strongest non-model reader finds hard and a frontier model finds trivial
+is measuring layout parsing, not reading.</p>
 
 <h2>What is not built yet</h2>
 <p>Stated plainly, because a portfolio page that reads as finished when it is not is worse than no
 page at all.</p>
 <table>
   <tbody>
-    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built, no model called</td></tr>
-    <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, baselines only</td></tr>
-    <tr><th>M5 &mdash; grounding, routing, <strong>the detector study</strong> and the coverage&ndash;accuracy curve</th><td class="num">not built</td></tr>
+    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built</td></tr>
+    <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
+    <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">study built; grounding and routing not</td></tr>
     <tr><th>M6 &mdash; prompt-injection suite and attack success rate</th><td class="num">not built</td></tr>
     <tr><th>M7 &mdash; real held-out set and the reported synthetic&harr;real gap</th><td class="num">not built</td></tr>
   </tbody>
 </table>
 <p class="note">The headline question &mdash; does &ldquo;the invariants hold&rdquo; actually predict
-&ldquo;the fields are correct&rdquo;? &mdash; is answered in M5, and a negative result is a
-publishable result.</p>
+&ldquo;the fields are correct&rdquo;? &mdash; is measurable now, and the first answer is an awkward
+one: on the run that matters most there is nothing to predict, because the model made no mistakes.
+The question is being answered instead against injected errors, a weaker reader, and M7's real set.
+A negative result is a publishable result, and so is a corpus that turned out to be too easy.</p>
 
 <h2>Reproduce it</h2>
 <pre><code>git clone {repo}

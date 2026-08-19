@@ -17,15 +17,23 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from doc_extract.eval import detector, scorer
 from doc_extract.eval import predictions as prediction_file
-from doc_extract.eval import scorer
-from doc_extract.eval.aggregate import Report, Scored, summarise
+from doc_extract.eval.aggregate import (
+    Coverage,
+    CoverageError,
+    Report,
+    Scored,
+    coverage_message,
+    summarise,
+)
 from doc_extract.eval.baselines import Baseline, Task
 from doc_extract.eval.dataset import Case, Corpus
 from doc_extract.eval.predictions import Prediction, RunMeta
 from doc_extract.extract import pipeline
 from doc_extract.extract.pipeline import DEFAULT_CONFIG, ExtractionConfig
 from doc_extract.extract.result import FailureClass
+from doc_extract.schema.invariants import Severity
 
 #: Called after each document, for a CLI that wants to say something while a paid run is going.
 Progress = Callable[[Case, Prediction], None]
@@ -107,6 +115,42 @@ def score(
         if record.doc_id not in by_id
     )
     return summarise(scored, run=run, expected=corpus.expected, allow_partial=allow_partial)
+
+
+def detect(
+    corpus: Corpus,
+    records: Sequence[Prediction],
+    *,
+    severity: Severity = Severity.HARD,
+    allow_partial: bool = False,
+) -> detector.Study:
+    """The same predictions, judged as a detection problem rather than as a reading problem.
+
+    Coverage is asserted here exactly as it is in `score`, and for a reason specific to this study:
+    a detector's recall over a subset nobody noticed is the single easiest number to inflate, since
+    dropping the documents it missed raises it. The check is the same one, by the same code, so it
+    cannot drift apart from the scorer's.
+    """
+    by_id = {case.doc_id: case for case in corpus.cases}
+    scored = tuple(record for record in records if record.doc_id in by_id)
+    coverage = Coverage(
+        expected=tuple(corpus.expected), scored=tuple(record.doc_id for record in scored)
+    )
+    if not coverage.complete and not allow_partial:
+        raise CoverageError(coverage_message(coverage))
+
+    return detector.summarise(
+        (
+            detector.verdict(
+                _judge(by_id[record.doc_id], record),
+                record.parse(),
+                severity=severity,
+                notes=record.notes,
+            )
+            for record in scored
+        ),
+        severity=severity,
+    )
 
 
 def _judge(case: Case, record: Prediction) -> scorer.DocumentScore:

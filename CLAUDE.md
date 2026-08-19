@@ -66,16 +66,21 @@ src/doc_extract/
     predictions.py   # the committed JSONL: per-attempt usage, failure class, stop_reason
     dataset.py       # the corpus read back, with every artifact's hash verified on use
     pattern.py       # B2's regex reader — the one place allowed to know the corpus's own labels
-    corrupt.py       # B3's nine injected error kinds, three of them arithmetically invisible
+    corrupt.py       # B3's nine injected error kinds, two of them arithmetically invisible
     baselines.py     # B0-B3 and the real model, all behind one `LLMClient`
-    run.py           # predict -> write -> score, in that order and with I/O only here
+    detector.py      # M5 — the invariants scored as a binary classifier of "something is wrong"
+    detector_report.py # the detector study as Markdown; a dash wherever there was no denominator
+    run.py           # predict -> write -> score / detect, in that order and with I/O only here
     report.py        # the Markdown tables, with the qualifications printed beside the numbers
 
 # The two below do not exist yet. They are the plan, not the tree — do not import from them.
   ground/            # M5 (planned) — value -> source span provenance
   decide/            # M5 (planned) — per-field confidence, accept / review / reject routing
 schemas/*.xsd        # the national standard and its three imports + PROVENANCE.md
-results/<baseline>/  # committed: predictions.jsonl + run.meta.json + report.md per run
+results/<run>/       # committed: predictions.jsonl + run.meta.json + report.md + detector.md.
+                     # Named for the baseline, except a remote run, which is named for the model:
+                     # the baseline is `claude` every time and the model is what varies, so two
+                     # models over one corpus are two directories rather than one overwritten one.
   assets/fonts/      # DejaVu, vendored as package data: reportlab's own fonts lack 12 Polish letters
 ```
 
@@ -159,16 +164,20 @@ python -m doc_extract.schema.generate_vocab --check       # vocab.py vs the vend
 python docs/build_index.py                                # regenerate the site from the repository
 
 python -m doc_extract.eval run --baseline pattern         # one baseline over the corpus, offline
-python -m doc_extract.eval score --run results/pattern    # re-score a committed run, no model
+python -m doc_extract.eval score  --run results/pattern   # re-score a committed run, no model
+python -m doc_extract.eval detect --run results/pattern   # the detector study on a committed run
 python -m doc_extract.eval run --baseline claude --yes    # the only command that costs money
+python -m doc_extract.eval run --baseline claude --model claude-haiku-4-5 --yes   # a second arm
 
 .venv/Scripts/python -m pip install -e ".[llm]"           # only needed to call a real model
 ```
 
-M1 to M4 run entirely offline with no model and no key, and must stay that way — including schema
-validation, which resolves the Ministry's imports from `schemas/` with remote fetching disabled, and
-including the whole extraction pipeline, which the test suite drives through `extract.scripted`. A
-test suite that could not run without an API key is a result a reader cannot reproduce.
+Everything except `--baseline claude` runs entirely offline with no model and no key, and must stay
+that way — including schema validation, which resolves the Ministry's imports from `schemas/` with
+remote fetching disabled, including the whole extraction pipeline, which the test suite drives
+through `extract.scripted`, and including `detect`, which reads a committed prediction file and
+calls nothing. A test suite that could not run without an API key is a result a reader cannot
+reproduce, and a detector study that had to re-run a paid model to be checked would be one too.
 
 ## Milestones
 
@@ -182,19 +191,75 @@ test suite that could not run without an API key is a result a reader cannot rep
    system prompt; an output schema derived from `vocab` and asserted against `model_fields`; a
    fixed stage order with an owned, bounded schema repair carrying the validator's own errors; a
    scripted model that makes the whole path testable offline, and the gold as an oracle whose
-   round trip through the wire format is asserted to be the identity. No model has been called yet.
+   round trip through the wire format is asserted to be the identity.
 4. **Pure scorer, per-field metrics, failure taxonomy, baselines B0–B3.** ✅ Twenty-two scored fields
    compared by key rather than by position, five outcomes that partition, support on every row and a
    `None` wherever a denominator is empty; coverage asserted against the manifest before a number is
    reported; predictions committed as JSONL with a failure class, a `stop_reason` and the usage of
    every attempt. Four baselines share one client interface: `oracle` (the ceiling — 100 %, which is
    what makes it a check on the harness), `constant` (the floor, and a per-field prior), `pattern`
-   (regex and columns, no model) and `noisy` (the oracle with known errors, for M5).
-5. Grounding + confidence + routing; the detector study and the selective-prediction curve.
+   (regex and columns, no model) and `noisy` (the oracle with known errors, for M5). The real model
+   has since been run through the identical path: **`claude-opus-5` scores 100 % on all 108
+   documents and 6066 field instances**, for $3.20. That is a result about the corpus as much as
+   about the model — see *The corpus is saturated* below.
+5. **The detector study.** ◐ `eval/detector.py` measures `invariants` as a binary classifier of
+   "this document has at least one wrong field", per severity, with the confusion matrix, per-rule
+   precision, localisation, and per-injected-kind recall in two readings (isolated and marginal).
+   `detect` writes `detector.md` beside the predictions it was computed from, calling nothing.
+   Answered on a real model-error population: **precision 100 %, recall 76.2 %, and every miss a
+   text field** — see *The headline answer* below. Still to come: `ground/` (value → source span),
+   `decide/` (per-field confidence and accept/review/reject routing), and the selective-prediction
+   curve.
 6. Injection suite, attack success rate, trust-boundary ADR.
 7. Real held-out set, the reported synthetic↔real gap, vision variant, site/README/ADRs.
 
-366 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+## The headline answer, and what it is really measuring
+
+Run the invariants as a binary classifier of "this document has at least one wrong field", on the
+prediction and never on the gold. On `claude-haiku-4-5` — 42 wrong documents out of 107, a real and
+unlabelled model-error population — the hard rules give **precision 100.0 %, recall 76.2 %, zero
+false positives**, and every one of the 32 catches points at a field that is genuinely wrong.
+
+**The recall is not a property of the detector. It is the fraction of that model's errors that
+happened to land on numeric fields.** The split is total and it is the finding:
+
+| caught (32) | | missed (10) | |
+|---|---:|---|---:|
+| `payment_account` (IBAN mod-97) | 25 | `lines[].description` | 9 |
+| `lines[].discount` (row arithmetic) | 9 | `seller.name` | 1 |
+| `lines[].description` (incidental) | 5 | `buyer.name` | 1 |
+| `seller.nip` (check digit) | 1 | | |
+
+Not one arithmetic error escaped. Every false negative is a misread **name or description** — a
+field with no redundancy behind it for arithmetic to check. Eight of the ten sit in `multi_page`,
+where a description wraps across a page break.
+
+This is the architectural argument for the rest of M5, arrived at by measurement rather than
+assumed: `ground/` covers exactly the fields the arithmetic cannot see, because a description the
+model invented is a value that resolves to no span on the page.
+
+Two further cautions the study prints beside its own numbers:
+
+- **The heuristic rules have never fired**, on any run. Reported as `—`/0 %, not quietly pooled with
+  the hard rules. Either the corpus needs a tier that exercises them or they need dropping — a
+  metric identical across every variant is broken, not stable.
+- **A confidently wrong but internally consistent answer is invisible.** `constant` has prevalence
+  100 % and recall 0 %: it answers one lawful invoice for every document and trips nothing.
+
+## The corpus is saturated, and that is also a finding
+
+`claude-opus-5` reads every document perfectly — 100 % on all 108, exact everywhere. That arm of the
+study is **degenerate**: prevalence 0 %, so precision and recall have no denominator. The one thing
+it establishes is that the gate never blocks correct work.
+
+The diagnosis is that M2's tiers vary the *semantics* of an invoice — grosz rounding, corrections,
+reverse charge, multiple pages — and not the *legibility* of the page. That is hard for a parser
+(`pattern` reaches 86.3 %) and not hard at all for a frontier model reading a clean PDF text layer.
+Hence the second remote arm: a weaker model on the same corpus buys a real error population without
+changing the corpus and invalidating every committed run. **M7's real held-out set remains
+load-bearing** — it is the only place the question gets asked on documents nobody generated.
+
+392 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

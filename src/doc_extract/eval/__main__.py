@@ -1,12 +1,20 @@
-"""Run a baseline over the corpus and write its predictions, or score predictions already written.
+"""Run a baseline over the corpus, score predictions already written, or measure the detector.
 
     python -m doc_extract.eval run --baseline pattern
     python -m doc_extract.eval run --baseline noisy --rate 0.15 --out results/noisy-015
-    python -m doc_extract.eval score --run results/pattern
+    python -m doc_extract.eval run --baseline claude --model claude-haiku-4-5 --out results/haiku
+    python -m doc_extract.eval score  --run results/pattern
+    python -m doc_extract.eval detect --run results/pattern
 
 `run` writes `predictions.jsonl`, `run.meta.json` and `report.md` into the output directory. `score`
 recomputes the report from a directory that already has the first two, which is what makes a paid
-run re-scorable for free after a change to the metric.
+run re-scorable for free after a change to the metric. `detect` reads the same two files and asks
+the project's own question of them — whether the invariants predict the errors — writing
+`detector.md` beside them.
+
+Both readings therefore come from one committed artifact and neither needs the model again. The
+model a run used is `--model`, and it is recorded in `run.meta.json`: two models over the same
+corpus are two directories, not two baselines.
 
 The four offline baselines need no key and no network. `--baseline claude` does, costs money, and
 therefore refuses to start without `--yes`.
@@ -17,7 +25,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from doc_extract.eval import dataset, predictions, report, run
+from doc_extract.eval import dataset, detector_report, predictions, report, run
 from doc_extract.eval.aggregate import CoverageError
 from doc_extract.eval.baselines import BY_NAME
 from doc_extract.eval.corrupt import DEFAULT_RATE
@@ -30,9 +38,13 @@ from doc_extract.extract.pipeline import (
     REPAIR_MAX_TOKENS,
     ExtractionConfig,
 )
+from doc_extract.schema.invariants import Severity
 
 DEFAULT_CORPUS = Path("data/synthetic")
 DEFAULT_RESULTS = Path("results")
+
+#: The detector study, written beside the predictions it was computed from.
+DETECTOR_NAME = "detector.md"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -67,9 +79,18 @@ def main(argv: list[str] | None = None) -> int:
                         help="override the corpus recorded in run.meta.json")
     scorer.add_argument("--allow-partial", action="store_true")
 
+    detect = commands.add_parser(
+        "detect", help="measure the invariants as an error detector over predictions on disk"
+    )
+    detect.add_argument("--run", type=Path, required=True, help="a directory written by `run`")
+    detect.add_argument("--corpus", type=Path, default=None,
+                        help="override the corpus recorded in run.meta.json")
+    detect.add_argument("--allow-partial", action="store_true")
+
     args = parser.parse_args(argv)
+    handlers = {"run": _run, "score": _score, "detect": _detect}
     try:
-        return _run(args) if args.command == "run" else _score(args)
+        return handlers[args.command](args)
     except (CorpusError, CoverageError) as error:
         print(f"error: {error}")
         return 2
@@ -98,7 +119,11 @@ def _run(args: argparse.Namespace) -> int:
     )
     options = {"rate": args.rate} if baseline.name == "noisy" else {}
     meta = run.meta(corpus, baseline, config=config, options=options)
-    out_dir = args.out or DEFAULT_RESULTS / baseline.name
+    #: A baseline writes to a directory named for itself; a remote run writes to one named for the
+    #: model, because the baseline is the same `claude` every time and the model is the variable.
+    #: Two models over one corpus have to be two directories or the second silently overwrites the
+    #: first — and comparing them is the whole reason for running more than one.
+    out_dir = args.out or DEFAULT_RESULTS / (config.model if baseline.remote else baseline.name)
 
     print(f"{baseline.name}: {baseline.description}")
     print(f"  corpus  : {corpus.directory} ({len(corpus.cases)} documents)")
@@ -117,6 +142,41 @@ def _score(args: argparse.Namespace) -> int:
     records = predictions.read(args.run / predictions.PREDICTIONS_NAME)
     corpus = dataset.load(args.corpus or Path(meta.corpus_dir))
     return _report(corpus, records, meta, args.run, allow_partial=args.allow_partial)
+
+
+def _detect(args: argparse.Namespace) -> int:
+    """Both severities, into one file, because they are two detectors over the same documents.
+
+    Written beside the predictions rather than into a directory of its own: the study is a reading
+    of that run, and a reader who has the numbers should be one `ls` away from the predictions they
+    were computed from.
+    """
+    meta = predictions.read_meta(args.run / predictions.RUN_NAME)
+    records = predictions.read(args.run / predictions.PREDICTIONS_NAME)
+    corpus = dataset.load(args.corpus or Path(meta.corpus_dir))
+
+    studies = [
+        run.detect(corpus, records, severity=severity, allow_partial=args.allow_partial)
+        for severity in Severity
+    ]
+    #: `as_posix`, not `str`: this file is committed, and a backslash would make the bytes differ
+    #: between the machine that wrote it and the one that reviews the diff.
+    body = "\n\n---\n\n".join(
+        detector_report.render(study, run=meta, directory=args.run.as_posix())
+        for study in studies
+    )
+    path = args.run / DETECTOR_NAME
+    path.write_bytes(body.encode("utf-8"))
+
+    print(f"{meta.baseline} — {meta.model}")
+    print(f"  corpus  : {corpus.directory} ({len(corpus.cases)} documents)")
+    print()
+    for study in studies:
+        for line in detector_report.summary_lines(study):
+            print(f"  {line}")
+        print()
+    print(f"  report     : {path}")
+    return 0
 
 
 def _report(
