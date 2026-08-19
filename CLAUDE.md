@@ -69,18 +69,20 @@ src/doc_extract/
     corrupt.py       # B3's nine injected error kinds, two of them arithmetically invisible
     baselines.py     # B0-B3 and the real model, all behind one `LLMClient`
     detector.py      # M5 — the invariants scored as a binary classifier of "something is wrong"
-    detector_report.py # the detector study as Markdown; a dash wherever there was no denominator
-    run.py           # predict -> write -> score / detect, in that order and with I/O only here
+    selective.py     # M5 — the gate measured against gold: the coverage-accuracy curve
+    format.py        # how a rate is written; `100 %` means exactly 100 %, and `—` means no denominator
+    detector_report.py  # the detector study as Markdown
+    selective_report.py # the gate as Markdown, with what the curve cannot see printed above it
+    run.py           # predict -> write -> score / detect / gate, with I/O only here
     report.py        # the Markdown tables, with the qualifications printed beside the numbers
 
   ground/            # M5 — value -> source span provenance, the complement to the arithmetic
     surface.py       # a normalised value -> the forms a Polish invoice could have printed it in
     resolve.py       # substring search over a projected page; three levels of support per field
-
-# The one below does not exist yet. It is the plan, not the tree — do not import from it.
-  decide/            # M5 (planned) — per-field confidence, accept / review / reject routing
+  decide/            # M5 — the runtime gate. Reads a prediction against its page, never the gold
+    confidence.py    # four levels from the two measured signals, and accept / review / reject
 schemas/*.xsd        # the national standard and its three imports + PROVENANCE.md
-results/<run>/       # committed: predictions.jsonl + run.meta.json + report.md + detector.md.
+results/<run>/       # committed: predictions.jsonl, run.meta.json, report.md, detector.md, gate.md.
                      # Named for the baseline, except a remote run, which is named for the model:
                      # the baseline is `claude` every time and the model is what varies, so two
                      # models over one corpus are two directories rather than one overwritten one.
@@ -169,6 +171,7 @@ python docs/build_index.py                                # regenerate the site 
 python -m doc_extract.eval run --baseline pattern         # one baseline over the corpus, offline
 python -m doc_extract.eval score  --run results/pattern   # re-score a committed run, no model
 python -m doc_extract.eval detect --run results/pattern   # the detector study on a committed run
+python -m doc_extract.eval gate   --run results/pattern   # the gate's coverage-accuracy curve
 python -m doc_extract.eval run --baseline claude --yes    # the only command that costs money
 python -m doc_extract.eval run --baseline claude --model claude-haiku-4-5 --yes   # a second arm
 
@@ -205,7 +208,8 @@ reproduce, and a detector study that had to re-run a paid model to be checked wo
    has since been run through the identical path: **`claude-opus-5` scores 100 % on all 108
    documents and 6066 field instances**, for $3.20. That is a result about the corpus as much as
    about the model — see *The corpus is saturated* below.
-5. **The detector study.** ◐ `eval/detector.py` measures `invariants` as a binary classifier of
+5. **Grounding, confidence, routing; the detector study and the curve.** ✅ `eval/detector.py`
+   measures `invariants` as a binary classifier of
    "this document has at least one wrong field", per severity, with the confusion matrix, per-rule
    precision, localisation, and per-injected-kind recall in two readings (isolated and marginal).
    `detect` writes `detector.md` beside the predictions it was computed from, calling nothing.
@@ -214,9 +218,9 @@ reproduce, and a detector study that had to re-run a paid model to be checked wo
    searched for as a substring of the page under its match class's normalisation, at three levels
    of support, with **precision 100 % and recall 84.4 %** at the field level and zero false alarms
    on 11 652 correctly-read fields. Its control is that gold grounds completely against its own
-   page — 0 of 5892, which is what caught the first version failing on 14.9 %. Still to come:
-   `decide/` (per-field confidence and accept/review/reject routing) and the selective-prediction
-   curve.
+   page — 0 of 5892, which is what caught the first version failing on 14.9 %. `decide/` turns the
+   two into four confidence levels by fixed rules, and `gate` measures the result as a
+   coverage–accuracy curve — see *What the gate buys* below.
 6. Injection suite, attack success rate, trust-boundary ADR.
 7. Real held-out set, the reported synthetic↔real gap, vision variant, site/README/ADRs.
 
@@ -278,6 +282,37 @@ Two further cautions the study prints beside its own numbers:
 - **A confidently wrong but internally consistent answer is invisible.** `constant` has prevalence
   100 % and recall 0 %: it answers one lawful invoice for every document and trips nothing.
 
+## What the gate buys
+
+`decide/` turns the two signals into four confidence levels by fixed rules — no weight was fitted on
+the corpus it is measured against, which is why the curve has four points and not a smooth sweep.
+Grounding decides the level; a hard rule that *names* a field demotes it one step and can never
+override grounding, because its field-level precision is 7.4 %. On `claude-haiku-4-5`:
+
+| accept down to | route | coverage | accuracy | leaked |
+|---|---|---:|---:|---:|
+| `high` | accept | 89.7 % | **99.96 %** | 2 |
+| `medium` | review | 98.9 % | 99.8 % | 12 |
+| `low` | review | 99.5 % | 99.2 % | 49 |
+| `none` | reject | 100 % | 98.7 % | 77 |
+
+Read the top row against the bottom: **answering everything gives 98.7 %; auto-accepting only the
+high-confidence values gives 99.96 % while still doing 89.7 % of the work**, and lets two wrong
+values through instead of seventy-seven.
+
+Three limits, all printed beside the numbers rather than left for a reader to find:
+
+- **Coverage is over values the model asserted.** A field it left `null` cannot be grounded, and no
+  signal here separates "correctly absent" from "silently dropped". A model that answered less
+  would score better on this curve, so `missed` is reported above it.
+- **Grounding asks whether a value is on the page, not whether it is in the right place.** On
+  `pattern` it flags *nothing* while 292 values are wrong: a regex reader lifts real figures out of
+  the wrong column, and every one of them grounds. The spans are recorded, so a geometric check
+  could ask the second question. It is not built.
+- **`100 %` means exactly 100 %.** `eval/format.py` grows the precision rather than rounding, after
+  the first version printed `100.0 %` in a row whose own next column said two wrong values had been
+  accepted.
+
 ## The corpus is saturated, and that is also a finding
 
 `claude-opus-5` reads every document perfectly — 100 % on all 108, exact everywhere. That arm of the
@@ -291,7 +326,7 @@ Hence the second remote arm: a weaker model on the same corpus buys a real error
 changing the corpus and invalidating every committed run. **M7's real held-out set remains
 load-bearing** — it is the only place the question gets asked on documents nobody generated.
 
-415 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+430 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

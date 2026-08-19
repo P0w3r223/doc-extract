@@ -27,7 +27,7 @@ unenforced.** Checking those rules is therefore real work, not a re-run of valid
 exists. The vendored schema is in `schemas/` with its provenance and SHA-256, so the claim is
 checkable rather than asserted.
 
-## Status — milestones 1–4 of 7, and the detector study begun
+## Status — milestones 1–5 of 7
 
 The domain layer, the corpus generator, the extraction pipeline and the scorer are complete, and the
 real model has been run through the identical path. Everything except that one command runs with no
@@ -66,9 +66,34 @@ Not one arithmetic error escaped. Every miss is a misread **name or description*
 redundancy behind it for arithmetic to check, and eight of the ten are in the multi-page tier, where
 a description wraps across a page break.
 
-That is the case for the grounding layer, arrived at by measurement rather than assumed: it covers
-exactly the fields the arithmetic cannot see, because a description the model invented is a value
-that resolves to no span on the page.
+That was the case for the grounding layer, arrived at by measurement rather than assumed — and the
+layer, once built, does what the measurement predicted. At the **field** level it scores precision
+100.0 % and recall 84.4 %, with **zero false alarms across 11 652 correctly-read field instances**.
+Its twelve misses are nine wrong discounts, which is exactly what the row arithmetic catches; put
+together the two leave two wrong fields standing out of 5837.
+
+## What the gate buys
+
+`decide/` turns the two signals into four confidence levels by fixed rules — nothing fitted on the
+corpus it is measured against — and routes accept / review / reject.
+
+| accept down to | route | coverage | accuracy | leaked |
+|---|---|---:|---:|---:|
+| `high` | accept | 89.7 % | **99.96 %** | 2 |
+| `medium` | review | 98.9 % | 99.8 % | 12 |
+| `low` | review | 99.5 % | 99.2 % | 49 |
+| `none` | reject | 100 % | 98.7 % | 77 |
+
+Answering everything gives 98.7 %. Auto-accepting only the high-confidence values gives 99.96 %
+while still doing 89.7 % of the work, and lets two wrong values through instead of seventy-seven.
+
+Three limits, printed beside the numbers rather than left to be found. Coverage is over values the
+model **asserted** — a field it left `null` cannot be grounded, so a model that answered less would
+score better here. Grounding asks whether a value is on the page, **not whether it is in the right
+place**: on the regex baseline it flags nothing at all while 292 values are wrong, because a column
+shift lifts real figures out of the wrong column and every one of them grounds. And `100 %` means
+exactly 100 % — the formatter grows its precision rather than rounding, after an early version
+printed `100.0 %` in a row whose next column said two wrong values had been accepted.
 
 Two cautions the study prints beside its own numbers. The **heuristic rules have never fired on any
 run** — reported as a dash rather than pooled with the hard rules, and either the corpus needs a
@@ -85,10 +110,11 @@ answer is invisible**: `constant` sits at prevalence 100 % and recall 0 %.
 | `source/` | PDF → words with boxes → lines and cells → one text with **a span per field** |
 | `extract/` | constant system prompt, owned output schema, fixed stage order, bounded schema repair |
 | `eval/` | 22 scored fields matched **by key, not position**; coverage asserted; predictions committed |
-| tests | **366 passing**, ruff clean |
+| `ground/`, `decide/` | value → source span, then four confidence levels and a route |
+| tests | **430 passing**, ruff clean |
 
-Milestones 5–7: the detector study and selective prediction → prompt-injection suite → real held-out
-set and the reported synthetic↔real gap.
+Milestones 6–7, both **not built**: the prompt-injection suite and attack success rate, then a real
+held-out set and the reported synthetic↔real gap.
 
 ## What the baselines say, and what the model says
 
@@ -152,7 +178,7 @@ of an em. The two populations that separates are far apart and both bounded — 
 and every column gap in the corpus is at least 12 pt, because M2 already asserts every cell fits its
 column with reportlab's padding to spare. The result is a text where a tab means "different column"
 and a space means "part of this value", plus a span for every field pointing back at the page, which
-is what the grounding check in milestone 5 needs and cannot reconstruct after the fact.
+is what the grounding check needs and cannot reconstruct after the fact.
 
 ## The corpus
 
@@ -235,10 +261,11 @@ python -m doc_extract.synth --out data/synthetic         # 108 documents, ~6 MB,
 python -m doc_extract.eval run --baseline pattern        # predict, score, write a report
 python -m doc_extract.eval score  --run results/pattern  # re-score the committed predictions
 python -m doc_extract.eval detect --run results/pattern  # the detector study on the same file
+python -m doc_extract.eval gate   --run results/pattern  # the gate's coverage-accuracy curve
 ```
 
-Each run writes `results/<run>/` — `predictions.jsonl`, `run.meta.json`, `report.md` and
-`detector.md` — and those are **committed**. A number in either report is therefore recomputable
+Each run writes `results/<run>/` — `predictions.jsonl`, `run.meta.json`, `report.md`,
+`detector.md` and `gate.md` — and those are **committed**. A number in either report is therefore recomputable
 from the file that produced it, without re-running anything: `score` and `detect` both read the
 predictions and the gold and print the same tables. That is also what makes a change to the scorer,
 or to a rule, a reviewable diff in the numbers rather than a claim about them.

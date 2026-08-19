@@ -16,9 +16,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from doc_extract.eval.detector import Study
+from doc_extract.eval.format import rate as _rate
 from doc_extract.eval.predictions import RunMeta
-
-_DASH = "—"
 
 
 def render(study: Study, *, run: RunMeta, directory: str = "") -> str:
@@ -156,11 +155,6 @@ def _caveats(study: Study) -> str:
         "rule can be right that a document is broken and wrong about which field broke it."
     )
     return "\n".join(lines)
-
-
-def _rate(value: float | None) -> str:
-    """A percentage, or a dash when there was no denominator. Never `0 %` for `None`."""
-    return _DASH if value is None else f"{value * 100:.1f} %"
 
 
 def summary_lines(study: Study) -> Iterable[str]:
