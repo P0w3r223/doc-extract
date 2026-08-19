@@ -184,7 +184,7 @@ def summarise(
     scored_ids = tuple(item.score.doc_id for item in scored)
     coverage = Coverage(expected=tuple(expected), scored=scored_ids)
     if not coverage.complete and not allow_partial:
-        raise CoverageError(_coverage_message(coverage))
+        raise CoverageError(coverage_message(coverage))
 
     results = [result for item in scored for result in item.score.results]
     by_field = tuple(
@@ -250,7 +250,7 @@ def _counted(values: Iterable[str]) -> tuple[tuple[str, int], ...]:
     return tuple(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
 
 
-def _coverage_message(coverage: Coverage) -> str:
+def coverage_message(coverage: Coverage) -> str:
     missing, unexpected = coverage.missing, coverage.unexpected
     parts = [
         f"scored {len(coverage.scored)} of the {len(coverage.expected)} documents the corpus "
@@ -282,6 +282,7 @@ __all__ = [
     "Report",
     "Scored",
     "Tally",
+    "coverage_message",
     "summarise",
     "tally",
 ]

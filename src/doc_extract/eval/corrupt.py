@@ -12,10 +12,10 @@ then cross two columns it did not have to infer: what was actually broken, and w
 said about it.
 
 **The nine kinds are chosen to span the detector's blind spot, not to be uniformly detectable.**
-Four break a hard arithmetic identity and should be caught: a transposed total, a cent on a VAT
-figure, a swapped net and VAT, a dropped row. Two break a check digit. Three break nothing an
-invariant can see — a shifted sale date, a truncated buyer name, a dropped optional field — and the
-whole value of the study is in how many of those slip through. A corruption set that only contained
+Five break a hard arithmetic identity and should be caught: a transposed total, a cent on a VAT
+figure, a swapped net and VAT, a dropped row, a transposed row net. Two break a check digit. Two
+break nothing an invariant can see — a shifted sale date and a truncated buyer name — and the whole
+value of the study is in how many of those slip through. A corruption set that only contained
 detectable errors would report a recall of 1.0 and would have measured its own construction.
 
 Nothing here is random about *whether* the corpus is corrupted: the rate is a parameter, the seed
