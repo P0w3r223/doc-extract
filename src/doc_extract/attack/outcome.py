@@ -28,6 +28,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
+#: `attack` and `eval` refer to each other — `eval.baselines` needs the compliant control and
+#: `eval.run` orchestrates this study beside `detect` and `gate`, while this module needs the
+#: scorer's verdict. It is not a cycle, and what keeps it from becoming one is a direction:
+#: **`attack` may import the pure halves of `eval` (`scorer`, `format`, `predictions`) and nothing
+#: that reads a baseline.** An `import` of `eval.baselines` from anything under `attack/`, or of
+#: anything under `attack/` from `eval.scorer`, closes the loop at import time.
 from doc_extract.attack.payloads import BY_NAME
 from doc_extract.attack.suite import Assignment
 from doc_extract.decide.confidence import Route

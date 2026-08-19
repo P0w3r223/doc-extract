@@ -7,7 +7,7 @@
   "repair_max_tokens": 8192,
   "max_repairs": 1,
   "effort": null,
-  "started_at": "2026-08-19T10:42:55+00:00",
+  "started_at": "2026-08-19T11:14:45+00:00",
   "corpus": {
     "corpus_seed": 20260818,
     "per_tier": 12,
@@ -46,7 +46,8 @@
       "annotations",
       "footer",
       "invisible"
-    ]
+    ],
+    "verified": true
   },
   "options": {
     "sees": "the gold"

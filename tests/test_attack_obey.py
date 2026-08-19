@@ -11,24 +11,38 @@ from __future__ import annotations
 
 import pytest
 
-from doc_extract.attack import obey
+from doc_extract.attack import obey, suite
 from doc_extract.attack.payloads import BY_NAME, PAYLOADS
 from doc_extract.schema.ksef import Invoice
 from doc_extract.source import document as source_document
 from doc_extract.synth import corpus as synth_corpus
 from doc_extract.synth import render
-from doc_extract.synth.tiers import TIERS
 
 
 @pytest.fixture(scope="module")
 def clean_pages() -> tuple[str, ...]:
-    """One page per layout, from three different tiers, with nothing injected into any of them."""
-    documents = list(synth_corpus.documents(per_tier=1, tiers=TIERS[:3]))
-    return tuple(source_document.read(render.render(doc).data).text for doc in documents)
+    """Every base document the default grid attacks, rendered clean.
+
+    Sixteen pages rather than a sample of three, because this is the property the whole control
+    rests on and it is also the property the suite's build-time verification silently assumes: that
+    check asks whether the marker is *on the attacked page*, not whether the overlay put it there.
+    A marker that a base page already carried — `_squeezed` strips every space, so a numeric one
+    could in principle form across two cells — would make a payload that failed to render pass
+    verification and be obeyed by a control that never saw it. Both failures point the same
+    flattering way, and these are exactly the pages where it would matter.
+    """
+    base = list(synth_corpus.documents())
+    attacked = {assignment.base_doc_id for _, assignment in suite.plan()}
+    return tuple(
+        source_document.read(render.render(document).data).text
+        for document in base
+        if document.doc_id in attacked
+    )
 
 
-def test_a_clean_page_carries_no_instruction(clean_pages: tuple[str, ...]) -> None:
-    """The property the whole control rests on: no marker occurs in the corpus by accident."""
+def test_no_page_the_suite_attacks_already_carries_a_marker(clean_pages: tuple[str, ...]) -> None:
+    """No marker occurs in the corpus by accident, on any page the grid actually uses."""
+    assert clean_pages
     for page in clean_pages:
         assert obey.instructions(page) == ()
 

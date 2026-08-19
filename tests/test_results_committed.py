@@ -11,8 +11,12 @@ A run over M6's attacked corpus is rebuilt the same way and stays covered: the s
 pure function of the base corpus and of the parameters the run's own provenance block records, so
 `suite.plan` reproduces the gold of an attacked document without the corpus being on disk.
 
-`gate.md` and `attack.md` are the two reports this cannot cover, and for one reason: both carry a
-column that comes from grounding, and grounding needs the rendered pages.
+`gate.md` is the one report this cannot cover: every column of it comes from grounding, and
+grounding needs the rendered pages. `attack.md` is covered **as far as its gold-only columns go** —
+how many attacks met their objective, over how many documents — because those need the payload's own
+judge and nothing else. Its leak column does need the pages and is left to the committed file, which
+is why the check below is a containment rather than an equality: the headline number of milestone 6
+should not be the one committed artifact that can drift in silence.
 """
 
 from __future__ import annotations
@@ -51,30 +55,30 @@ def golds():
     """
     base = list(documents())
     clean = {document.doc_id: document for document in base}
-    planned: dict[tuple, dict] = {}
+    planned: dict[tuple, list] = {}
 
-    def for_run(meta):
+    def grid(meta) -> list:
+        """The suite's plan for an attacked run, cached per distinct set of parameters."""
         corpus = meta.corpus
-        if not corpus.get("attacked"):
-            return clean
-        key = (
-            corpus["per_cell"],
-            tuple(corpus["payloads"]),
-            tuple(corpus["placements"]),
-        )
+        key = (corpus["per_cell"], tuple(corpus["payloads"]), tuple(corpus["placements"]))
         if key not in planned:
             per_cell, payload_names, placements = key
-            planned[key] = {
-                document.doc_id: document
-                for document, _ in suite.plan(
-                    per_cell=per_cell,
-                    payloads=tuple(PAYLOADS[name] for name in payload_names),
-                    placements=placements,
-                    base=base,
-                )
-            }
+            planned[key] = suite.plan(
+                per_cell=per_cell,
+                payloads=tuple(PAYLOADS[name] for name in payload_names),
+                placements=placements,
+                base=base,
+            )
         return planned[key]
 
+    def for_run(meta):
+        if not meta.corpus.get("attacked"):
+            return clean
+        return {document.doc_id: document for document, _ in grid(meta)}
+
+    for_run.assignments = lambda meta: {
+        assignment.doc_id: assignment for _, assignment in grid(meta)
+    }
     return for_run
 
 
@@ -147,3 +151,37 @@ def test_the_committed_detector_report_is_what_the_renderer_produces(name, golds
         f"results/{name}/detector.md is stale — re-run "
         f"`python -m doc_extract.eval detect --run results/{name}`"
     )
+
+
+@pytest.mark.skipif(not RUNS, reason="no committed runs")
+@pytest.mark.parametrize("name", RUNS)
+def test_the_committed_attack_report_still_counts_the_same_successes(name, golds):
+    """M6's headline row, recomputed from the prediction file and looked for in the committed file.
+
+    Containment rather than equality, because a rendered `attack.md` also carries the leak column
+    and that one needs the rendered pages. What is checked is the part that does not: how many
+    attacks met their objective, per payload, judged by the payload itself against the rebuilt gold.
+    """
+    directory, meta, records = _read(name)
+    if not meta.corpus.get("attacked"):
+        pytest.skip(f"{name} is not a run over an attacked corpus")
+
+    gold = golds(meta)
+    planned = golds.assignments(meta)
+    counted: dict[str, list[int]] = {}
+    for record in records:
+        assignment = planned[record.doc_id]
+        payload = PAYLOADS[assignment.payload]
+        row = counted.setdefault(assignment.payload, [0, 0])
+        row[0] += 1
+        row[1] += payload.achieved(
+            gold[record.doc_id].invoice, record.parse(), FailureClass(record.failure)
+        )
+
+    committed = (directory / "attack.md").read_text(encoding="utf-8")
+    for payload, (attempted, succeeded) in counted.items():
+        row = f"| `{payload}` | {PAYLOADS[payload].goal} | {attempted} | {succeeded} |"
+        assert row in committed, (
+            f"results/{name}/attack.md disagrees with the judge about `{payload}` — re-run "
+            f"`python -m doc_extract.eval attack --run results/{name}`"
+        )

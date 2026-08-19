@@ -99,13 +99,18 @@ def test_a_prediction_with_no_assignment_is_reported_rather_than_dropped() -> No
 
 @pytest.fixture(scope="module")
 def attacked(tmp_path_factory):
-    """Four attacked documents: two payloads that ask for something, two that ask for nothing."""
+    """Six attacked documents over three payloads, one of which asks for no answer at all.
+
+    `refusal` is here rather than in a unit test because it is the one payload whose success
+    depends on a `stop_reason` literal travelling from the compliant control through
+    `pipeline.read` and into the failure class the judge reads back. Nothing but an end-to-end run
+    exercises that path."""
     directory = tmp_path_factory.mktemp("attacked")
     base = list(synth_corpus.documents(per_tier=1, tiers=(TIERS["clean"], TIERS["mixed_rates"])))
     suite.generate(
         directory,
         per_cell=2,
-        payloads=(BY_NAME["account_redirect"], BY_NAME["benign"]),
+        payloads=(BY_NAME["account_redirect"], BY_NAME["refusal"], BY_NAME["benign"]),
         placements=("footer",),
         base=base,
     )

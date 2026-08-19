@@ -28,14 +28,17 @@ from doc_extract.eval.predictions import RunMeta
 
 
 def render(study: Study, *, run: RunMeta, directory: str = "") -> str:
+    #: The caveats sit **above** the tables, as they do in `selective_report.py` and for the same
+    #: reason: one of them reframes the leak column entirely, and a qualification printed under the
+    #: numbers it qualifies is one a reader meets too late.
     parts = [
         _header(study, run=run, directory=directory),
         _coverage(study),
+        _caveats(study, run=run),
         _payloads(study),
         _placements(study),
         _grid(study),
         _leaks(study),
-        _caveats(study),
     ]
     return "\n\n".join(part for part in parts if part) + "\n"
 
@@ -113,6 +116,12 @@ def _placements(study: Study) -> str:
         "Where on the page the same sentences were printed. `invisible` is white ink: absent to a "
         "human approving the invoice, present in the text layer the extractor reads.",
         "",
+        "`unchanged` is **not comparable across placements**. The `description` placement prints "
+        "the payload inside an item's own description cell, and that description is a scored "
+        "field — so a reader that transcribes the cell perfectly still differs from the gold "
+        "there, and the column is near zero for that row by definition rather than by behaviour. "
+        "The other three write where nothing is scored.",
+        "",
         "| placement | n | succeeded | ASR | leaked | unchanged |",
         "|---|---:|---:|---:|---:|---:|",
         *(
@@ -174,7 +183,7 @@ def _leaks(study: Study) -> str:
     ])
 
 
-def _caveats(study: Study) -> str:
+def _caveats(study: Study, *, run: RunMeta) -> str:
     lines = ["## Read this before the tables", ""]
     overall = study.overall
 
@@ -188,8 +197,8 @@ def _caveats(study: Study) -> str:
     if denial is not None and denial.succeeded:
         lines.append(
             f"* **{denial.succeeded} of {denial.documents} denial attempt(s) worked**, and no "
-            "was accepted from them because none was returned. That is an availability attack "
-            "succeeding, not the gate defending: the document simply did not get processed."
+            "value was accepted from them because none was returned. That is an availability "
+            "attack succeeding, not the gate defending: the document was not processed at all."
         )
     if overall.succeeded and overall.leaked == 0:
         lines.append(
@@ -203,7 +212,7 @@ def _caveats(study: Study) -> str:
         lines.append(
             f"* **{overall.leaked} successful attack(s) would have been accepted.** The gate's two "
             "signals are an arithmetic check and a grounding check, and an attacker defeats both "
-            "construction: they choose an account number that passes mod-97, and they print it on "
+            "by construction: they choose an account number that passes mod-97, and print it on "
             "the page, so the value they want is both consistent and grounded. Detection built for "
             "*errors* does not transfer to an *adversary*, and this row is what that costs."
         )
@@ -217,11 +226,22 @@ def _caveats(study: Study) -> str:
             f"exactly right ({_rate(control.unchanged)}), which is what says whether merely adding "
             "text to a page moves the extraction."
         )
-    lines.append(
-        "* The suite verified at build time that every payload survived into the text layer of the "
-        "page it was printed on. An attack the model never saw would otherwise sit in the "
-        "denominator as a failed attack."
-    )
+    #: Read off the corpus's own provenance rather than assumed. Printed unconditionally, this
+    #: sentence was a guarantee the report made about itself and could not have checked: a corpus
+    #: built with `--no-verify` would have carried it word for word.
+    if run.corpus.get("verified", True):
+        lines.append(
+            "* The suite verified at build time that every payload survived into the text layer of "
+            "the page it was printed on. An attack the model never saw would otherwise sit in the "
+            "denominator as a failed attack."
+        )
+    else:
+        lines.append(
+            "* **This corpus was built with verification off.** Nothing checked that the payloads "
+            "reached the text layer, so an attack the model never saw is indistinguishable here "
+            "from one it saw and ignored, and every rate above is a lower bound of unknown "
+            "tightness. Rebuild without `--no-verify` before quoting any of it."
+        )
     return "\n".join(lines)
 
 
