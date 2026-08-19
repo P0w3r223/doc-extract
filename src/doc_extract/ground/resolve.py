@@ -181,13 +181,16 @@ class _Projection:
 class _Page:
     """One document, projected the ways a lookup needs it. Built once; asked sixty-odd questions."""
 
-    __slots__ = ("_amounts", "_identifiers", "_source", "_spans", "_words")
+    __slots__ = ("_amounts", "_identifiers", "_literal", "_source", "_spans", "_words")
 
     def __init__(self, document: SourceDocument) -> None:
         self._source = document.text
         self._spans = document.words
         self._amounts = _project(document.text, _as_amount)
         self._identifiers = _project(document.text, _as_identifier)
+        #: Built here like the other two: `_Page` exists to be built once and asked sixty
+        #: times, and rebuilding the identity map per lookup quietly undid that.
+        self._literal = _Projection(document.text, tuple(range(len(document.text))))
 
         self._words: dict[str, list[Span]] = {}
         for span in document.words:
@@ -208,8 +211,7 @@ class _Page:
             return self._scan(
                 self._identifiers, surface.normalise_identifier(candidate), self._source_boundary
             )
-        return self._scan(_Projection(self._source, tuple(range(len(self._source)))),
-                          candidate, self._source_boundary)
+        return self._scan(self._literal, candidate, self._source_boundary)
 
     def _scan(
         self,

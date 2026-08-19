@@ -77,6 +77,11 @@ class Assessment:
     #: `None` when the prediction asserted nothing, so there was nothing to check.
     confidence: Confidence | None
     route: Route
+    #: What grounding said, carried structurally rather than left to be parsed back out of
+    #: `reasons`. A consumer that recovered the signal by prefix-matching prose would go silently
+    #: all-negative the day a token is renamed, and a measurement failure that looks like a
+    #: finding is the worst kind.
+    support: Support = Support.ABSENT
     #: Stable tokens naming what drove the verdict, for a report to group by: `ungrounded`,
     #: `partial:0.60`, `rule:lines.net_matches_quantity_times_price`, `document:flagged`.
     reasons: tuple[str, ...] = ()
@@ -84,6 +89,12 @@ class Assessment:
     @property
     def assessed(self) -> bool:
         return self.confidence is not None
+
+    @property
+    def suspicious(self) -> bool:
+        """Whether **grounding** doubted this value. Not the same as a low confidence: a field a
+        hard rule accuses is demoted without grounding having said anything against it."""
+        return self.support in (Support.UNGROUNDED, Support.PARTIAL)
 
 
 def assess(document: SourceDocument, invoice: Invoice) -> tuple[Assessment, ...]:
@@ -116,8 +127,7 @@ def _assess(grounding: Grounding, *, named: frozenset[str], flagged: bool) -> As
     if grounding.support is Support.PARTIAL:
         return _at(grounding, Confidence.LOW, [*reasons, f"partial:{grounding.coverage:.2f}"])
 
-    accusing = sorted(named & {grounding.field})
-    if accusing:
+    if grounding.field in named:
         return _at(grounding, Confidence.MEDIUM, [*reasons, f"rule:{grounding.field}"])
     return _at(grounding, Confidence.HIGH, reasons)
 
@@ -129,6 +139,7 @@ def _at(grounding: Grounding, confidence: Confidence, reasons: list[str]) -> Ass
         value=grounding.value,
         confidence=confidence,
         route=ROUTES[confidence],
+        support=grounding.support,
         reasons=tuple(reasons),
     )
 
@@ -146,6 +157,7 @@ def _unassessed(grounding: Grounding) -> Assessment:
         value=grounding.value,
         confidence=None,
         route=Route.ACCEPT,
+        support=grounding.support,
         reasons=(f"unassessed:{grounding.support}",),
     )
 

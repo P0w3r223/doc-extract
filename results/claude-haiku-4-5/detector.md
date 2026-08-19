@@ -23,21 +23,21 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 | | |
 |---|---:|
 | prevalence | 39.3 % |
-| precision | 100.0 % |
+| precision | 100 % |
 | recall | 76.2 % |
 | F1 | 86.5 % |
-| specificity | 100.0 % |
-| localisation | 100.0 % (32 / 32) |
+| specificity | 100 % |
+| localisation | 100 % (32 / 32) |
 
 ## Per rule
 
-Precision only. A rule's recall is not a quantity this study can report: a document is wrong or not, and which of the twelve rules *should* have caught it is not something the gold says.
+Precision only. A rule's recall is not a quantity this study can report: a document is wrong or not, and which rule *should* have caught it is not something the gold says.
 
 | rule | fired on | of which wrong | precision |
 |---|---:|---:|---:|
-| `identifiers.iban_checksum` | 25 | 25 | 100.0 % |
-| `lines.net_matches_quantity_times_price` | 9 | 9 | 100.0 % |
-| `identifiers.nip_checksum` | 1 | 1 | 100.0 % |
+| `identifiers.iban_checksum` | 25 | 25 | 100 % |
+| `lines.net_matches_quantity_times_price` | 9 | 9 | 100 % |
+| `identifiers.nip_checksum` | 1 | 1 | 100 % |
 
 ## Read this before the tables
 
@@ -76,7 +76,7 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 | precision | — |
 | recall | 0.0 % |
 | F1 | — |
-| specificity | 100.0 % |
+| specificity | 100 % |
 | localisation | — (0 / 0) |
 
 ## Read this before the tables

@@ -175,18 +175,23 @@ def gate(
         raise CoverageError(coverage_message(coverage))
 
     rows: list[selective.Judged] = []
-    missed = without_prediction = 0
+    missed = unassessable = without_prediction = 0
     for record in scored:
         invoice = record.parse()
         if invoice is None:
             without_prediction += 1
             continue
         case = by_id[record.doc_id]
-        judged, lost = selective.judge(case.doc_id, case.gold(), invoice, case.source())
+        judged, lost, skipped = selective.judge(
+            case.doc_id, case.gold(), invoice, case.source()
+        )
         rows.extend(judged)
         missed += lost
+        unassessable += skipped
 
-    return selective.summarise(rows, missed=missed, without_prediction=without_prediction)
+    return selective.summarise(
+        rows, missed=missed, unassessable=unassessable, without_prediction=without_prediction
+    )
 
 
 def _judge(case: Case, record: Prediction) -> scorer.DocumentScore:
@@ -224,7 +229,10 @@ def meta(
     return RunMeta(
         baseline=baseline.name,
         model=config.model if baseline.remote else baseline.name,
-        corpus_dir=str(corpus.directory),
+        #: `as_posix`, not `str`: this is committed, and `score`/`detect`/`gate` all default
+        #: to reading it back as a path. A Windows separator makes every one of them fail
+        #: on a POSIX checkout of the same repository.
+        corpus_dir=corpus.directory.as_posix(),
         documents=len(corpus.cases),
         max_tokens=config.max_tokens,
         repair_max_tokens=config.repair_max_tokens,

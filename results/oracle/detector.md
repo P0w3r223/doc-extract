@@ -26,7 +26,7 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 | precision | — |
 | recall | — |
 | F1 | — |
-| specificity | 100.0 % |
+| specificity | 100 % |
 | localisation | — (0 / 0) |
 
 ## Read this before the tables
@@ -66,7 +66,7 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 | precision | — |
 | recall | — |
 | F1 | — |
-| specificity | 100.0 % |
+| specificity | 100 % |
 | localisation | — (0 / 0) |
 
 ## Read this before the tables

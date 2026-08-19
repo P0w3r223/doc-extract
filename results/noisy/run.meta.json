@@ -1,7 +1,7 @@
 {
   "baseline": "noisy",
   "model": "noisy",
-  "corpus_dir": "data\\synthetic",
+  "corpus_dir": "data/synthetic",
   "documents": 108,
   "max_tokens": 8192,
   "repair_max_tokens": 4096,
