@@ -25,6 +25,7 @@ from doc_extract.eval.baselines import BASELINES, BY_NAME
 from doc_extract.eval.format import DASH, rate
 from doc_extract.eval.scorer import judge
 from doc_extract.extract.result import FailureClass
+from doc_extract.foreign.corpus import documents as foreign_documents
 from doc_extract.schema import invariants, vocab
 from doc_extract.schema.generate_vocab import XSD_PATH
 from doc_extract.schema.invariants import Severity
@@ -160,10 +161,11 @@ def baselines(corpus: list) -> list[dict[str, object]]:
         if not predictions_path.exists():
             continue
         meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
-        #: M6's runs are over a different corpus — the same invoices with an injected string on
-        #: each page. Their accuracy belongs in the injection section, not in a table whose rows
-        #: are meant to be comparable because they describe the same documents.
-        if meta.corpus.get("attacked"):
+        #: M6's and M7's runs are over different corpora — the same invoices with an injected
+        #: string on each page, and the same invoices printed by another renderer. Their accuracy
+        #: belongs in the section that explains what the page did to it, not in a table whose rows
+        #: are comparable *because* they describe the same documents rendered the same way.
+        if meta.corpus.get("attacked") or meta.corpus.get("renderer") == "foreign":
             continue
         seed = meta.corpus.get("corpus_seed")
         if seed != DEFAULT_SEED:
@@ -226,6 +228,74 @@ def _is_remote(baseline: str) -> bool:
     """Whether a run called a model over the network, per the baseline registry."""
     entry = BY_NAME.get(baseline)
     return entry is not None and entry.remote
+
+
+#: How a run over M7's foreign corpus is named. The prefix is what pairs it with the run of the
+#: same baseline over the synthetic one, which is the only reason either number is interesting.
+FOREIGN_PREFIX = "foreign-"
+
+
+def foreign_study(corpus: list) -> list[dict[str, object]] | None:
+    """Each baseline's accuracy on its own page and on an unfamiliar one, paired.
+
+    Both halves come from committed prediction files and the gold rebuilt from the seed, so this
+    needs neither corpus on disk. The pairing is by name — `foreign-pattern` against `pattern` —
+    and a foreign run with no counterpart is dropped rather than shown beside a blank, because a
+    column with one number in it is not a comparison.
+    """
+    gold = {document.doc_id: document for document in corpus}
+    unfamiliar = {document.doc_id: document for document in foreign_documents()}
+
+    rows = []
+    for directory in sorted((ROOT / "results").glob(f"{FOREIGN_PREFIX}*")):
+        baseline = directory.name[len(FOREIGN_PREFIX):]
+        familiar = ROOT / "results" / baseline
+        if not (directory / prediction_file.PREDICTIONS_NAME).exists():
+            continue  # pragma: no cover — a directory without a run in it
+        if not (familiar / prediction_file.PREDICTIONS_NAME).exists():
+            continue  # pragma: no cover — a foreign arm whose own-page counterpart is not committed
+        here = _summary(directory, unfamiliar)
+        there = _summary(familiar, gold)
+        rows.append({
+            "baseline": baseline,
+            "own_accuracy": there.overall.accuracy,
+            "own_extracted": there.extracted,
+            "foreign_accuracy": here.overall.accuracy,
+            "foreign_extracted": here.extracted,
+            "documents": here.documents,
+            "failures": collections.Counter(
+                record.failure for record in
+                prediction_file.read(directory / prediction_file.PREDICTIONS_NAME)
+                if record.failure
+            ),
+        })
+    #: Declared baseline order rather than the directory listing's, for the reason the main
+    #: table gives: the controls are what make the interesting row readable, and alphabetical
+    #: would open on whichever name sorts first.
+    order = [baseline.name for baseline in BASELINES]
+    rows.sort(key=lambda row: order.index(row["baseline"]))
+    return rows or None
+
+
+def _summary(directory, gold: dict):
+    """One committed run, scored against gold rebuilt in memory."""
+    meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
+    records = prediction_file.read(directory / prediction_file.PREDICTIONS_NAME)
+    return summarise(
+        [
+            Scored(
+                prediction=record,
+                score=judge(
+                    gold[record.doc_id].invoice, record.parse(), doc_id=record.doc_id,
+                    tier=gold[record.doc_id].tier, template=gold[record.doc_id].template,
+                    failure=FailureClass(record.failure),
+                ),
+            )
+            for record in records
+        ],
+        run=meta,
+        expected=list(gold),
+    )
 
 
 #: The run the headline question is asked of: the one with a real, unlabelled error population.
@@ -516,6 +586,54 @@ internally consistent answer is invisible</strong>. The constant baseline sits a
 100&nbsp;% with recall 0&nbsp;%.</p>"""
 
 
+def foreign_section(rows: list[dict[str, object]] | None) -> str:
+    """M7's paired comparison, rendered from `foreign_study` rather than from memory."""
+    if not rows:  # pragma: no cover — a checkout without the foreign arms
+        return ""
+    documents = rows[0]["documents"]
+    body = "\n".join(
+        f'    <tr><th><code>{html.escape(str(row["baseline"]))}</code></th>'
+        f'<td class="num">{percent(row["own_accuracy"])}</td>'
+        f'<td class="num">{percent(row["foreign_accuracy"])}</td>'
+        f'<td class="num">{row["foreign_extracted"]} / {row["documents"]}</td></tr>'
+        for row in rows
+    )
+    failed = [row for row in rows if row["foreign_extracted"] == 0]
+    note = ""
+    if failed:
+        which = ", ".join(f'<code>{html.escape(str(row["baseline"]))}</code>' for row in failed)
+        classes = ", ".join(sorted({
+            f"<code>{html.escape(name)}</code>"
+            for row in failed for name in row["failures"]
+        }))
+        note = (
+            f"<p class=\"note\">{which} did not read the page badly &mdash; it could not "
+            f"<em>begin</em>. Not one of the {documents} documents produced an invoice the schema "
+            f"would accept, every one recorded as {classes}. The labels it matches are the whole "
+            "of what it was doing.</p>"
+        )
+    return f"""<h2>How much of a reading was the template?</h2>
+<p>The synthetic corpus varies what an invoice <em>means</em> and not how the page <em>says</em> it:
+three layouts, one vocabulary, one number format. So a second corpus prints the identical gold in
+three unfamiliar ones &mdash; other Polish labels for every field, other column orders, other number
+and date formats, and block orders that put the totals before the rows. Same seed, same invoices,
+document for document: a difference between the two columns is the <strong>page</strong>, because
+nothing else moved.</p>
+<table><thead><tr><th>baseline</th><th class="num">its own page</th><th class="num">an unfamiliar page</th><th class="num">read at all</th></tr></thead>
+<tbody>
+{body}
+</tbody></table>
+{note}
+<p class="note">The other two rows are the controls that make the first one mean something. The
+oracle is handed the gold and is unaffected, which says the corpus is scorable and its gold did not
+move; the constant baseline never looks at the page and scores <em>identically</em> on both, which
+is what a paired comparison should do to a reader that reads nothing.</p>
+<p class="note"><strong>This is not a real held-out set and does not claim to be.</strong> It holds
+the semantics fixed on purpose, so it answers one question and not the other: how much of a result
+was presentation. Real invoices also bring skew, stamps, scans and layouts nobody anticipated, and
+none of that is here.</p>"""
+
+
 def stripped_section(study: dict[str, object] | None) -> str:
     """The degenerate reading, rendered from `stripped_study` rather than from memory."""
     if study is None:  # pragma: no cover — a checkout without that run
@@ -655,6 +773,7 @@ def build() -> str:
         baseline_table=baseline_table(runs),
         detector_section=detector_section(detector_study(corpus)),
         stripped_section=stripped_section(stripped_study(corpus)),
+        foreign_section=foreign_section(foreign_study(corpus)),
         injection_section=injection_section(injection_study(corpus)),
         formatting_only=formatting_only_differences(corpus),
         opus_cost=OPUS_COST,
@@ -890,6 +1009,8 @@ footer {{
 {detector_section}
 
 {stripped_section}
+
+{foreign_section}
 
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no

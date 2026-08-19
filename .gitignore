@@ -15,6 +15,7 @@ dist/
 # records which corpus a result was computed on, so the bytes do not have to travel with it.
 data/synthetic/
 data/attacked/
+data/foreign/
 
 # `results/` is deliberately NOT ignored. The metric rules require the prediction files to be
 # committed: a report is recomputable from `predictions.jsonl` alone, which is what makes a number
