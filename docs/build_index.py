@@ -16,6 +16,8 @@ import pathlib
 import re
 import subprocess
 
+from doc_extract.attack import suite
+from doc_extract.attack.payloads import BY_NAME as PAYLOADS
 from doc_extract.eval import detector, fields
 from doc_extract.eval import predictions as prediction_file
 from doc_extract.eval.aggregate import Scored, summarise
@@ -23,7 +25,7 @@ from doc_extract.eval.baselines import BASELINES, BY_NAME
 from doc_extract.eval.format import DASH, rate
 from doc_extract.eval.scorer import judge
 from doc_extract.extract.result import FailureClass
-from doc_extract.schema import vocab
+from doc_extract.schema import invariants, vocab
 from doc_extract.schema.generate_vocab import XSD_PATH
 from doc_extract.schema.invariants import Severity
 from doc_extract.synth import render
@@ -158,6 +160,11 @@ def baselines(corpus: list) -> list[dict[str, object]]:
         if not predictions_path.exists():
             continue
         meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
+        #: M6's runs are over a different corpus — the same invoices with an injected string on
+        #: each page. Their accuracy belongs in the injection section, not in a table whose rows
+        #: are meant to be comparable because they describe the same documents.
+        if meta.corpus.get("attacked"):
+            continue
         seed = meta.corpus.get("corpus_seed")
         if seed != DEFAULT_SEED:
             raise SystemExit(
@@ -283,6 +290,72 @@ def detector_study(corpus: list) -> dict[str, object] | None:
     }
 
 
+#: The attacked run the injection section is computed from: the compliant control, which obeys every
+#: instruction printed on a page. Its attack success rate is 100 % by construction, and that is what
+#: makes it the right arm for this page's question — what the *defences* do about an attack that
+#: worked is a property of the defences, and does not need a model to have been fooled first.
+ATTACKED_RUN = "attack-gullible"
+
+
+def injection_study(corpus: list) -> dict[str, object] | None:
+    """M6's grid, recomputed here from the attacked run's committed prediction file.
+
+    The attacked corpus is not on disk in a clean checkout any more than the clean one is, and it
+    does not have to be: the suite's grid is a pure function of the base documents and of the
+    parameters the run's own provenance block records, so `suite.plan` rebuilds the gold of an
+    attacked document in memory.
+
+    What this can compute without the pages is the **arithmetic** half of the gate. Grounding needs
+    the rendered page, so the leak column lives in the committed `attack.md` — and the split is the
+    finding rather than a limitation: the payloads the arithmetic is silent on are exactly the two
+    that hand the reader a valid identifier, which then grounds because it is printed on the page.
+    """
+    directory = ROOT / "results" / ATTACKED_RUN
+    predictions_path = directory / prediction_file.PREDICTIONS_NAME
+    if not predictions_path.exists():  # pragma: no cover — a checkout without that run
+        return None
+
+    meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
+    planned = suite.plan(
+        per_cell=meta.corpus["per_cell"],
+        payloads=tuple(PAYLOADS[name] for name in meta.corpus["payloads"]),
+        placements=tuple(meta.corpus["placements"]),
+        base=corpus,
+    )
+    gold = {document.doc_id: document for document, _ in planned}
+    by_id = {assignment.doc_id: assignment for _, assignment in planned}
+
+    rows: dict[str, dict[str, object]] = {}
+    for record in prediction_file.read(predictions_path):
+        assignment = by_id[record.doc_id]
+        payload = PAYLOADS[assignment.payload]
+        predicted = record.parse()
+        row = rows.setdefault(payload.name, {
+            "goal": payload.goal, "documents": 0, "succeeded": 0, "flagged": 0,
+        })
+        row["documents"] += 1
+        row["succeeded"] += payload.achieved(
+            gold[record.doc_id].invoice, predicted, FailureClass(record.failure)
+        )
+        if predicted is not None and any(
+            violation.severity is Severity.HARD for violation in invariants.check(predicted)
+        ):
+            row["flagged"] += 1
+
+    attacking = [row for name, row in rows.items() if not PAYLOADS[name].harmless]
+    return {
+        "run": ATTACKED_RUN,
+        "rows": rows,
+        "documents": sum(int(row["documents"]) for row in attacking),
+        "succeeded": sum(int(row["succeeded"]) for row in attacking),
+        "invisible": sorted(
+            name for name, row in rows.items()
+            if not PAYLOADS[name].harmless and row["succeeded"] and not row["flagged"]
+        ),
+        "placements": len(tuple(meta.corpus["placements"])),
+    }
+
+
 def field_list(counts: collections.Counter, limit: int = 3) -> str:
     return ", ".join(
         f"<code>{html.escape(field)}</code>&nbsp;&times;&nbsp;{n}"
@@ -404,6 +477,48 @@ rules, because a metric identical across every variant is broken rather than sta
 baseline sits at prevalence 100&nbsp;% with recall 0&nbsp;%.</p>"""
 
 
+def injection_section(study: dict[str, object] | None) -> str:
+    """M6, rendered from `injection_study` rather than from memory."""
+    if study is None:  # pragma: no cover — a checkout without the attacked run
+        return "<p class=\"note\">No committed run over an attacked corpus.</p>"
+
+    rows: dict[str, dict[str, object]] = study["rows"]  # type: ignore[assignment]
+    body = "".join(
+        f'<tr><th><code>{html.escape(name)}</code></th>'
+        f'<td>{html.escape(str(row["goal"]))}</td>'
+        f'<td class="num">{row["succeeded"]} / {row["documents"]}</td>'
+        f'<td class="num">{row["flagged"]} / {row["documents"]}</td></tr>'
+        for name, row in rows.items()
+    )
+    invisible = ", ".join(f"<code>{html.escape(name)}</code>" for name in study["invisible"])
+    return f"""<p>Seven payloads &mdash; six that ask for something and one control that asks for
+nothing &mdash; printed in {study["placements"]} places on the page, including in white ink, where a
+human approving the invoice sees nothing and the text layer carries every word. The gold of an
+attacked document is the gold of the document it was made from, so the same scorer, detector and
+gate run over it unchanged.</p>
+<table>
+  <thead><tr><th>payload</th><th>asks for</th><th class="num">obeyed</th><th class="num">arithmetic fires</th></tr></thead>
+  <tbody>{body}</tbody>
+</table>
+<p class="note">The column that matters is the second one. It is computed against
+<code>{html.escape(str(study["run"]))}</code>, a control that obeys every instruction it finds on a
+page: its success rate is 100&nbsp;% by construction, which is what makes it the right arm for this
+question. What a <em>defence</em> does about an attack that worked is a property of the defence, and
+does not need a model to have been fooled first.</p>
+<p><strong>The two payloads the arithmetic never sees are {invisible}</strong> &mdash; and they are
+the two an attacker would actually run. Redirecting a payment or reissuing the invoice under another
+NIP does not break any identity: the attacker picks an account they control, so the check digits are
+valid, and the value is printed on the page, so grounding finds it too. Both of M5's signals were
+measured on a model's <em>errors</em>, where a wrong digit is a random digit. Neither transfers to an
+adversary who can compute a check digit, and the committed <code>attack.md</code> shows the routing
+gate accepting every one of those documents.</p>
+<p class="note">That is the milestone's result, and it is a negative one: the arithmetic gate is a
+defence against misreading, not against injection. Ordering the stages so a document can never
+choose them, deriving the fence marker from the text it wraps, and telling the model to transcribe
+rather than compute are what stand between the payload and the answer &mdash; and the honest way to
+report a structural defence is to attack it and publish the rate.</p>"""
+
+
 def build() -> str:
     facts = schema_facts()
     every_rule = rules()
@@ -474,6 +589,7 @@ def build() -> str:
         heuristic_list=", ".join(f"<code>{html.escape(r)}</code>" for r in heuristic),
         baseline_table=baseline_table(runs),
         detector_section=detector_section(detector_study(corpus)),
+        injection_section=injection_section(injection_study(corpus)),
         formatting_only=formatting_only_differences(corpus),
         opus_cost=OPUS_COST,
         baseline_count=len(runs),
@@ -655,7 +771,7 @@ footer {{
 </head>
 <body>
 <header>
-  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;4 of 7</p>
+  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;6 of 7</p>
   <h1>Poland's national e-invoice schema checks nothing an accountant would</h1>
   <p class="lead">FA(3) &mdash; mandatory since 2026 &mdash; is {xsd_bytes} bytes of XSD carrying
   {enumerations} enumerations and <strong>{assertions} assertions</strong>. It knows what shape an
@@ -699,7 +815,9 @@ footer {{
   hard the page is to <em>read</em>. With no errors left to find, the detector has nothing to detect
   on that run, so the headline question is answered on a second arm: the same corpus and the same
   pipeline, with a weaker model. Grounding, routing and the coverage&ndash;accuracy curve are the
-  rest of milestone 5; the injection suite is milestone 6 and is <em>not built</em>.
+  rest of milestone 5. Milestone 6 attacks the whole thing: seven payloads printed on the page,
+  one of them in white ink, and the finding is a negative one &mdash; the arithmetic gate stops the
+  attacks that lie about a total and is blind to the one that redirects a payment.
 </div>
 
 <h2>Does &ldquo;the arithmetic holds&rdquo; predict &ldquo;the fields are right&rdquo;?</h2>
@@ -816,6 +934,9 @@ the page prints and what the scorer's amount comparison was already defined to t
 quantity. A corpus that the strongest non-model reader finds hard and a frontier model finds trivial
 is measuring layout parsing, not reading.</p>
 
+<h2>The invoice as untrusted input</h2>
+{injection_section}
+
 <h2>What is not built yet</h2>
 <p>Stated plainly, because a portfolio page that reads as finished when it is not is worse than no
 page at all.</p>
@@ -824,7 +945,7 @@ page at all.</p>
     <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built</td></tr>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
-    <tr><th>M6 &mdash; prompt-injection suite and attack success rate</th><td class="num">not built</td></tr>
+    <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms</td></tr>
     <tr><th>M7 &mdash; real held-out set and the reported synthetic&harr;real gap</th><td class="num">not built</td></tr>
   </tbody>
 </table>

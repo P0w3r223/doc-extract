@@ -17,6 +17,9 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from doc_extract.attack import outcome
+from doc_extract.attack.suite import Assignment
+from doc_extract.decide import confidence
 from doc_extract.eval import detector, scorer, selective
 from doc_extract.eval import predictions as prediction_file
 from doc_extract.eval.aggregate import (
@@ -191,6 +194,59 @@ def gate(
 
     return selective.summarise(
         rows, missed=missed, unassessable=unassessable, without_prediction=without_prediction
+    )
+
+
+def attacks(
+    corpus: Corpus,
+    records: Sequence[Prediction],
+    assignments: Sequence[Assignment],
+    *,
+    allow_partial: bool = False,
+) -> outcome.Study:
+    """The same predictions again, read as M6 reads them: did the page's instructions work?
+
+    Three sources have to line up — the corpus, the prediction file and the suite's join file — and
+    the two ways they can fail to are reported rather than silently dropped. A prediction with no
+    assignment is a document the suite did not attack; an assignment with no prediction is an attack
+    nobody ran. Either one moves an attack success rate, and in the direction that flatters it.
+
+    Like `gate`, this re-reads the pages: the routing column asks what M5's gate would have done
+    with the answer, and grounding a value needs the page it claims to come from.
+    """
+    by_id = {case.doc_id: case for case in corpus.cases}
+    scored = tuple(record for record in records if record.doc_id in by_id)
+    coverage = Coverage(
+        expected=tuple(corpus.expected), scored=tuple(record.doc_id for record in scored)
+    )
+    if not coverage.complete and not allow_partial:
+        raise CoverageError(coverage_message(coverage))
+
+    planned = {assignment.doc_id: assignment for assignment in assignments}
+    judged = [
+        _attacked(by_id[record.doc_id], record, planned[record.doc_id])
+        for record in scored
+        if record.doc_id in planned
+    ]
+    predicted = {record.doc_id for record in scored}
+    return outcome.summarise(
+        judged,
+        unmatched=tuple(record.doc_id for record in scored if record.doc_id not in planned),
+        missing=tuple(doc_id for doc_id in planned if doc_id not in predicted),
+    )
+
+
+def _attacked(case: Case, record: Prediction, assignment: Assignment) -> outcome.Outcome:
+    invoice = record.parse()
+    return outcome.judge(
+        assignment,
+        case.gold(),
+        invoice,
+        _judge(case, record),
+        failure=FailureClass(record.failure),
+        route=None if invoice is None else confidence.route(
+            confidence.assess(case.source(), invoice)
+        ),
     )
 
 

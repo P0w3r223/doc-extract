@@ -7,7 +7,12 @@ went in without regenerating the twelve reports it changed, and nothing failed.
 
 So this asserts it. Gold is rebuilt in memory from the corpus seed, exactly as `docs/build_index.py`
 does, which is what lets the check run on a clean checkout where `data/synthetic/` is not committed.
-`gate.md` is the one report it cannot cover, because grounding needs the rendered pages.
+A run over M6's attacked corpus is rebuilt the same way and stays covered: the suite's grid is a
+pure function of the base corpus and of the parameters the run's own provenance block records, so
+`suite.plan` reproduces the gold of an attacked document without the corpus being on disk.
+
+`gate.md` and `attack.md` are the two reports this cannot cover, and for one reason: both carry a
+column that comes from grounding, and grounding needs the rendered pages.
 """
 
 from __future__ import annotations
@@ -16,6 +21,8 @@ import pathlib
 
 import pytest
 
+from doc_extract.attack import suite
+from doc_extract.attack.payloads import BY_NAME as PAYLOADS
 from doc_extract.eval import detector, detector_report, predictions, report
 from doc_extract.eval.aggregate import Scored, summarise
 from doc_extract.eval.scorer import judge
@@ -34,9 +41,41 @@ RUNS = sorted(
 
 
 @pytest.fixture(scope="module")
-def gold():
-    """The corpus's gold, from the seed rather than from disk. Slow once, then shared."""
-    return {document.doc_id: document for document in documents()}
+def golds():
+    """A run's gold, keyed by document id, from the seed rather than from disk.
+
+    Two shapes of corpus answer to the same call. A clean run is the base corpus; an attacked run is
+    the grid the suite planned over it, which is a pure function of the base documents and of the
+    `per_cell` / `payloads` / `placements` the run's provenance block records. Built once per
+    distinct set of parameters and shared, because rendering the base corpus is the slow part.
+    """
+    base = list(documents())
+    clean = {document.doc_id: document for document in base}
+    planned: dict[tuple, dict] = {}
+
+    def for_run(meta):
+        corpus = meta.corpus
+        if not corpus.get("attacked"):
+            return clean
+        key = (
+            corpus["per_cell"],
+            tuple(corpus["payloads"]),
+            tuple(corpus["placements"]),
+        )
+        if key not in planned:
+            per_cell, payload_names, placements = key
+            planned[key] = {
+                document.doc_id: document
+                for document, _ in suite.plan(
+                    per_cell=per_cell,
+                    payloads=tuple(PAYLOADS[name] for name in payload_names),
+                    placements=placements,
+                    base=base,
+                )
+            }
+        return planned[key]
+
+    return for_run
 
 
 def _read(name: str):
@@ -66,8 +105,9 @@ def _scored(records, gold):
 
 @pytest.mark.skipif(not RUNS, reason="no committed runs")
 @pytest.mark.parametrize("name", RUNS)
-def test_the_committed_score_report_is_what_the_renderer_produces(name, gold):
+def test_the_committed_score_report_is_what_the_renderer_produces(name, golds):
     directory, meta, records = _read(name)
+    gold = golds(meta)
     summary = summarise(_scored(records, gold), run=meta, expected=list(gold))
     rendered = report.render(summary, predictions=records)
 
@@ -80,9 +120,9 @@ def test_the_committed_score_report_is_what_the_renderer_produces(name, gold):
 
 @pytest.mark.skipif(not RUNS, reason="no committed runs")
 @pytest.mark.parametrize("name", RUNS)
-def test_the_committed_detector_report_is_what_the_renderer_produces(name, gold):
+def test_the_committed_detector_report_is_what_the_renderer_produces(name, golds):
     directory, meta, records = _read(name)
-    scored = {item.score.doc_id: item.score for item in _scored(records, gold)}
+    scored = {item.score.doc_id: item.score for item in _scored(records, golds(meta))}
 
     body = "\n\n---\n\n".join(
         detector_report.render(

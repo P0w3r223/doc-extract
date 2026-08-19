@@ -6,6 +6,8 @@
     python -m doc_extract.eval score  --run results/pattern
     python -m doc_extract.eval detect --run results/pattern
     python -m doc_extract.eval gate   --run results/pattern
+    python -m doc_extract.eval run --baseline gullible --corpus data/attacked --out results/x
+    python -m doc_extract.eval attack --run results/x
 
 `run` writes `predictions.jsonl`, `run.meta.json` and `report.md` into the output directory. `score`
 recomputes the report from a directory that already has the first two, which is what makes a paid
@@ -26,6 +28,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from doc_extract.attack import report as attack_report
+from doc_extract.attack import suite
+from doc_extract.attack.suite import SuiteError
 from doc_extract.eval import (
     dataset,
     detector_report,
@@ -56,6 +61,9 @@ DETECTOR_NAME = "detector.md"
 
 #: The routing gate and its coverage-accuracy curve, likewise.
 GATE_NAME = "gate.md"
+
+#: M6's attack success rate, likewise — written only for a run over an attacked corpus.
+ATTACK_NAME = "attack.md"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -106,11 +114,21 @@ def main(argv: list[str] | None = None) -> int:
                       help="override the corpus recorded in run.meta.json")
     gate.add_argument("--allow-partial", action="store_true")
 
+    attack = commands.add_parser(
+        "attack", help="measure the attack success rate over a run on an attacked corpus"
+    )
+    attack.add_argument("--run", type=Path, required=True, help="a directory written by `run`")
+    attack.add_argument("--corpus", type=Path, default=None,
+                        help="override the corpus recorded in run.meta.json")
+    attack.add_argument("--allow-partial", action="store_true")
+
     args = parser.parse_args(argv)
-    handlers = {"run": _run, "score": _score, "detect": _detect, "gate": _gate}
+    handlers = {
+        "run": _run, "score": _score, "detect": _detect, "gate": _gate, "attack": _attack,
+    }
     try:
         return handlers[args.command](args)
-    except (CorpusError, CoverageError) as error:
+    except (CorpusError, CoverageError, SuiteError) as error:
         print(f"error: {error}")
         return 2
 
@@ -219,6 +237,35 @@ def _gate(args: argparse.Namespace) -> int:
     print(f"  corpus  : {corpus.directory} ({len(corpus.cases)} documents)")
     print()
     for line in selective_report.summary_lines(curve):
+        print(f"  {line}")
+    print()
+    print(f"  report     : {path}")
+    return 0
+
+
+def _attack(args: argparse.Namespace) -> int:
+    """The attack success rate, from a committed prediction file and the suite that produced it.
+
+    Needs three artifacts and no model: the predictions, the corpus they were made on, and that
+    corpus's `attacks.jsonl`. The last is what makes this a *join* rather than an inference — which
+    payload was on which document is recorded when the document is built, not guessed afterwards
+    from what the model returned.
+    """
+    meta = predictions.read_meta(args.run / predictions.RUN_NAME)
+    records = predictions.read(args.run / predictions.PREDICTIONS_NAME)
+    corpus = dataset.load(args.corpus or Path(meta.corpus_dir))
+    assignments = suite.load_assignments(corpus.directory)
+
+    study = run.attacks(corpus, records, assignments, allow_partial=args.allow_partial)
+    path = args.run / ATTACK_NAME
+    path.write_bytes(
+        attack_report.render(study, run=meta, directory=args.run.as_posix()).encode("utf-8")
+    )
+
+    print(f"{meta.baseline} — {meta.model}")
+    print(f"  corpus  : {corpus.directory} ({len(corpus.cases)} documents)")
+    print()
+    for line in attack_report.summary_lines(study):
         print(f"  {line}")
     print()
     print(f"  report     : {path}")

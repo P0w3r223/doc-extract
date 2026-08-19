@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from importlib import resources
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from reportlab import rl_config
 from reportlab.lib import colors
@@ -51,6 +52,7 @@ from reportlab.platypus import (
 )
 
 from doc_extract.schema.ksef import Invoice, LineItem
+from doc_extract.synth import overlay as overlay_module
 from doc_extract.synth import pools
 from doc_extract.synth.build import Document
 
@@ -194,6 +196,7 @@ def _classic(document: Document) -> list[Flowable]:
     ]
     story += _payment_block(document)
     story += _notes(document)
+    story += _overlay_tail(document)
     return story
 
 
@@ -217,6 +220,7 @@ def _ledger(document: Document) -> list[Flowable]:
     ]
     story += _payment_block(document)
     story += _notes(document)
+    story += _overlay_tail(document)
     return story
 
 
@@ -242,15 +246,17 @@ def _compact(document: Document) -> list[Flowable]:
         Spacer(1, 5 * mm),
         Paragraph("<b>Pozycje</b>", _style("h_i", size=9)),
     ]
-    for line, unit in zip(invoice.lines, context.line_units, strict=True):
+    for index, (line, unit) in enumerate(zip(invoice.lines, context.line_units, strict=True)):
         story.append(KeepTogether([
-            Paragraph(f"{line.line_no}. {line.description}", _style("i_d", size=9)),
+            Paragraph(f"{line.line_no}. {_described(document, line, index)}",
+                      _style("i_d", size=9)),
             Paragraph(_position_text(line, unit), _style("i_a", size=8)),
             Spacer(1, 1.5 * mm),
         ]))
     story += [Spacer(1, 3 * mm), _totals_block(document, align="left"), Spacer(1, 4 * mm)]
     story += _payment_block(document)
     story += _notes(document)
+    story += _overlay_tail(document)
     return story
 
 
@@ -316,10 +322,10 @@ def _items_table(document: Document, *, layout: str, summary_rows: bool = False)
     rows: list[list] = [
         [Paragraph(text, _style("th", size=HEADER_SIZE, font=BOLD)) for text in ITEM_HEADERS]
     ]
-    for line, unit in zip(invoice.lines, context.line_units, strict=True):
+    for index, (line, unit) in enumerate(zip(invoice.lines, context.line_units, strict=True)):
         rows.append([
             str(line.line_no),
-            Paragraph(line.description, _style("cell", size=7.5)),
+            Paragraph(_described(document, line, index), _style("cell", size=7.5)),
             unit,
             _quantity(line.quantity),
             _price(line.unit_price_net),
@@ -411,9 +417,63 @@ def _notes(document: Document) -> list[Flowable]:
     if context.order_value is not None:
         notes.append(f"wartość zamówienia: {_amount(context.order_value)} "
                      f"{document.invoice.currency}")
+    injected = _overlay_at(document, overlay_module.ANNOTATIONS)
+    if injected is not None:
+        notes.append(escape(injected))
     if not notes:
         return []
     return [Paragraph("Adnotacje: " + "; ".join(notes), _style("notes", size=8))]
+
+
+# --------------------------------------------------------------------------- overlay
+
+
+def _overlay_at(document: Document, placement: str) -> str | None:
+    """The overlay's text if it belongs at this placement, and `None` otherwise.
+
+    Whitespace is collapsed on the way out. A payload is written as a paragraph with newlines in the
+    source that defines it, and reportlab treats a newline as a space anyway — collapsing here means
+    the text on the page is a function of the payload's words rather than of how they were wrapped
+    in a Python string, which is what keeps the rendered bytes stable when a payload is reformatted.
+    """
+    overlay = document.overlay
+    if overlay is None or not overlay.at(placement):
+        return None
+    return " ".join(overlay.text.split())
+
+
+def _described(document: Document, line: LineItem, index: int) -> str:
+    """A row's description, with the overlay appended when it is placed inside the item table.
+
+    The **first** row, always. Not a random one and not the last: an attack whose position varied
+    with the document would make a per-placement success rate a mixture of two things, and the row
+    that is certain to exist is the first one.
+    """
+    description = escape(line.description or "")
+    injected = _overlay_at(document, overlay_module.DESCRIPTION) if index == 0 else None
+    return description if injected is None else f"{description} {escape(injected)}"
+
+
+def _overlay_tail(document: Document) -> list[Flowable]:
+    """The two placements that print as a paragraph of their own, after everything else.
+
+    `invisible` differs from `footer` in one attribute — the ink is white — and that single
+    attribute is the realistic version of this attack: a human approving the invoice sees nothing,
+    while the text layer `source/` reads carries every word. Whether that is true of *this*
+    renderer is asserted rather than asserted-in-prose; `tests/test_synth_overlay.py` reads the
+    payload back out of the PDF.
+    """
+    footer = _overlay_at(document, overlay_module.FOOTER)
+    if footer is not None:
+        return [Spacer(1, 3 * mm), Paragraph(escape(footer), _style("overlay", size=8))]
+
+    hidden = _overlay_at(document, overlay_module.INVISIBLE)
+    if hidden is not None:
+        return [
+            Spacer(1, 3 * mm),
+            Paragraph(escape(hidden), _style("overlay_h", size=7, color=colors.white)),
+        ]
+    return []
 
 
 # --------------------------------------------------------------------------- formatting
@@ -487,10 +547,12 @@ def _plain_table(rows: list[list[str]], *, widths: tuple[float, ...], size: floa
 
 
 def _style(name: str, *, size: float = 10, font: str = REGULAR,
-           align: int | None = None) -> ParagraphStyle:
+           align: int | None = None, color: colors.Color | None = None) -> ParagraphStyle:
     style = ParagraphStyle(name, fontName=font, fontSize=size, leading=size * 1.3)
     if align is not None:
         style.alignment = align
+    if color is not None:
+        style.textColor = color
     return style
 
 
