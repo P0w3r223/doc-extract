@@ -20,9 +20,9 @@ from collections.abc import Iterable, Sequence
 
 from doc_extract.eval.aggregate import Report, Tally
 from doc_extract.eval.corrupt import KINDS
+from doc_extract.eval.format import DASH as _DASH
+from doc_extract.eval.format import rate as _rate
 from doc_extract.eval.predictions import Prediction
-
-_DASH = "—"
 
 
 def render(report: Report, *, predictions: Sequence[Prediction] = ()) -> str:
@@ -208,11 +208,6 @@ def _caveats(report: Report) -> str:
             "whole."
         )
     return "\n".join(lines)
-
-
-def _rate(value: float | None) -> str:
-    """A percentage, or a dash when there was no denominator. Never `0 %` for `None`."""
-    return _DASH if value is None else f"{value * 100:.1f} %"
 
 
 def _ratio(numerator: int, denominator: int) -> float | None:

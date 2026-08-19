@@ -5,6 +5,7 @@
     python -m doc_extract.eval run --baseline claude --model claude-haiku-4-5 --out results/haiku
     python -m doc_extract.eval score  --run results/pattern
     python -m doc_extract.eval detect --run results/pattern
+    python -m doc_extract.eval gate   --run results/pattern
 
 `run` writes `predictions.jsonl`, `run.meta.json` and `report.md` into the output directory. `score`
 recomputes the report from a directory that already has the first two, which is what makes a paid
@@ -25,7 +26,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from doc_extract.eval import dataset, detector_report, predictions, report, run
+from doc_extract.eval import (
+    dataset,
+    detector_report,
+    predictions,
+    report,
+    run,
+    selective_report,
+)
 from doc_extract.eval.aggregate import CoverageError
 from doc_extract.eval.baselines import BY_NAME
 from doc_extract.eval.corrupt import DEFAULT_RATE
@@ -45,6 +53,9 @@ DEFAULT_RESULTS = Path("results")
 
 #: The detector study, written beside the predictions it was computed from.
 DETECTOR_NAME = "detector.md"
+
+#: The routing gate and its coverage-accuracy curve, likewise.
+GATE_NAME = "gate.md"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -87,8 +98,16 @@ def main(argv: list[str] | None = None) -> int:
                         help="override the corpus recorded in run.meta.json")
     detect.add_argument("--allow-partial", action="store_true")
 
+    gate = commands.add_parser(
+        "gate", help="measure the routing gate as a coverage-accuracy curve"
+    )
+    gate.add_argument("--run", type=Path, required=True, help="a directory written by `run`")
+    gate.add_argument("--corpus", type=Path, default=None,
+                      help="override the corpus recorded in run.meta.json")
+    gate.add_argument("--allow-partial", action="store_true")
+
     args = parser.parse_args(argv)
-    handlers = {"run": _run, "score": _score, "detect": _detect}
+    handlers = {"run": _run, "score": _score, "detect": _detect, "gate": _gate}
     try:
         return handlers[args.command](args)
     except (CorpusError, CoverageError) as error:
@@ -175,6 +194,33 @@ def _detect(args: argparse.Namespace) -> int:
         for line in detector_report.summary_lines(study):
             print(f"  {line}")
         print()
+    print(f"  report     : {path}")
+    return 0
+
+
+def _gate(args: argparse.Namespace) -> int:
+    """The gate, measured. Re-reads the pages, because grounding a value needs the page.
+
+    Unlike `score` and `detect` this is not free of the corpus: a prediction file records what the
+    model said, not what it was looking at. The corpus's hashes are verified on the way in, so a
+    curve cannot quietly be computed against different bytes than the prediction was made from.
+    """
+    meta = predictions.read_meta(args.run / predictions.RUN_NAME)
+    records = predictions.read(args.run / predictions.PREDICTIONS_NAME)
+    corpus = dataset.load(args.corpus or Path(meta.corpus_dir))
+
+    curve = run.gate(corpus, records, allow_partial=args.allow_partial)
+    path = args.run / GATE_NAME
+    path.write_bytes(
+        selective_report.render(curve, run=meta, directory=args.run.as_posix()).encode("utf-8")
+    )
+
+    print(f"{meta.baseline} — {meta.model}")
+    print(f"  corpus  : {corpus.directory} ({len(corpus.cases)} documents)")
+    print()
+    for line in selective_report.summary_lines(curve):
+        print(f"  {line}")
+    print()
     print(f"  report     : {path}")
     return 0
 

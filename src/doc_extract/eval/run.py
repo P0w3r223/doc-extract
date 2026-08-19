@@ -17,7 +17,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from doc_extract.eval import detector, scorer
+from doc_extract.eval import detector, scorer, selective
 from doc_extract.eval import predictions as prediction_file
 from doc_extract.eval.aggregate import (
     Coverage,
@@ -151,6 +151,42 @@ def detect(
         ),
         severity=severity,
     )
+
+
+def gate(
+    corpus: Corpus,
+    records: Sequence[Prediction],
+    *,
+    allow_partial: bool = False,
+) -> selective.Curve:
+    """The routing gate, measured against gold as a coverage-accuracy curve.
+
+    The one function in this module that re-reads the pages: grounding a value needs the document
+    it came from, and a prediction file does not carry it. That is also why the corpus's hashes are
+    verified on the way — a curve computed against different bytes than the prediction was made
+    from would be measuring two documents at once.
+    """
+    by_id = {case.doc_id: case for case in corpus.cases}
+    scored = tuple(record for record in records if record.doc_id in by_id)
+    coverage = Coverage(
+        expected=tuple(corpus.expected), scored=tuple(record.doc_id for record in scored)
+    )
+    if not coverage.complete and not allow_partial:
+        raise CoverageError(coverage_message(coverage))
+
+    rows: list[selective.Judged] = []
+    missed = without_prediction = 0
+    for record in scored:
+        invoice = record.parse()
+        if invoice is None:
+            without_prediction += 1
+            continue
+        case = by_id[record.doc_id]
+        judged, lost = selective.judge(case.doc_id, case.gold(), invoice, case.source())
+        rows.extend(judged)
+        missed += lost
+
+    return selective.summarise(rows, missed=missed, without_prediction=without_prediction)
 
 
 def _judge(case: Case, record: Prediction) -> scorer.DocumentScore:
