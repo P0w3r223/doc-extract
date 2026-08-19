@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from doc_extract.eval.detector import Study
+from doc_extract.eval.detector import KindRecall, Study
 from doc_extract.eval.format import rate as _rate
 from doc_extract.eval.predictions import RunMeta
 
@@ -106,15 +106,24 @@ def _kinds(study: Study) -> str:
         "firing is attributable to it. `marginal` counts every document carrying the kind and is "
         "contaminated by whatever else landed beside it. Read the isolated column.",
         "",
+        "The last column says whether a zero was expected. **`not asked` is not a miss**: this is "
+        f"the `{study.severity}` half of the rule set, and a kind the *other* half owns was never "
+        "put to it. `declared invisible` is the finding — no rule at either severity can see it.",
+        "",
         "| kind | isolated | n | marginal | n | |",
         "|---|---:|---:|---:|---:|---|",
         *(
             f"| `{row.kind}` | {_rate(row.isolated_recall)} | {row.isolated_documents} | "
-            f"{_rate(row.marginal_recall)} | {row.marginal_documents} | "
-            f"{'declared invisible' if row.expected_invisible else ''} |"
+            f"{_rate(row.marginal_recall)} | {row.marginal_documents} | {_scope(row)} |"
             for row in study.kinds
         ),
     ])
+
+
+def _scope(row: KindRecall) -> str:
+    if row.expected_invisible:
+        return "declared invisible"
+    return "not asked" if row.out_of_scope else ""
 
 
 def _caveats(study: Study) -> str:

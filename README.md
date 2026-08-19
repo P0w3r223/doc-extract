@@ -95,10 +95,37 @@ shift lifts real figures out of the wrong column and every one of them grounds. 
 exactly 100 % — the formatter grows its precision rather than rounding, after an early version
 printed `100.0 %` in a row whose next column said two wrong values had been accepted.
 
-Two cautions the study prints beside its own numbers. The **heuristic rules have never fired on any
-run** — reported as a dash rather than pooled with the hard rules, and either the corpus needs a
-tier that exercises them or they need dropping. And a **confidently wrong but internally consistent
-answer is invisible**: `constant` sits at prevalence 100 % and recall 0 %.
+And a **confidently wrong but internally consistent answer is invisible**: `constant` sits at
+prevalence 100 % and recall 0 %.
+
+## The silence is the result: an answer with no table behind it
+
+The three `HEURISTIC` rules had fired zero times on every run through M6 — a metric identical across
+every variant, which this project's own rules call broken rather than stable. So they were given a
+population. `stripped` is the gold with every row and every rate block dropped: a header, a total,
+and nothing behind them.
+
+| | prevalence | precision | recall |
+|---|---:|---:|---:|
+| hard rules | 100 % | — (nothing fired) | **0 %** |
+| heuristic rules | 100 % | 100 % | **100 %** |
+
+Every arithmetic identity needs two figures to compare, and this answer offers one. The hard rules
+are therefore **silent on 108 documents that are wrong in 77 % of their fields** — not mistaken,
+unable to speak. The only rule that fires is the heuristic whose whole content is *no rule could
+run*, and it fires on all 108. Its score decomposes the same way: `value` **100 %** against `recall`
+22.8 % — nothing it said was wrong, and it barely said anything.
+
+**The gate accepts every one of them.** Coverage is measured over values a prediction asserted, so a
+reading that drops three quarters of the invoice routes 100 % to `accept` at 100 % accuracy with
+nothing leaked. That limit was disclosed when the curve was built; this is the arm that makes it
+concrete. `missed` is the only column that sees it.
+
+A misread year — `2025-08-05` for `2026-08-05` — is the tenth injected error kind, and gives the
+date rules a recall too: on `noisy`, the heuristic half reads precision 100 %, recall 11.1 %, zero
+false positives. The recall is low by construction, because that half owns one of ten kinds, so each
+kind now declares which severity is meant to catch it and the table prints `not asked` rather than
+letting a zero read as a miss.
 
 | | |
 |---|---|

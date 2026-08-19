@@ -67,8 +67,9 @@ src/doc_extract/
     predictions.py   # the committed JSONL: per-attempt usage, failure class, stop_reason
     dataset.py       # the corpus read back, with every artifact's hash verified on use
     pattern.py       # B2's regex reader — the one place allowed to know the corpus's own labels
-    corrupt.py       # B3's nine injected error kinds, two of them arithmetically invisible
-    baselines.py     # B0-B3, M6's compliant control, and the real model, behind one `LLMClient`
+    corrupt.py       # B3's ten injected error kinds; two invisible, one only a heuristic sees
+    baselines.py     # B0-B3, the degenerate reading, M6's control, and the real model, as one
+                     # `LLMClient` each
     detector.py      # M5 — the invariants scored as a binary classifier of "something is wrong"
     selective.py     # M5 — the gate measured against gold: the coverage-accuracy curve
     format.py        # how a rate is written; `100 %` means exactly 100 %, and `—` means no denominator
@@ -317,11 +318,49 @@ page carry adjacent words the value omitted? — which is not built.
 
 Two further cautions the study prints beside its own numbers:
 
-- **The heuristic rules have never fired**, on any run. Reported as `—`/0 %, not quietly pooled with
-  the hard rules. Either the corpus needs a tier that exercises them or they need dropping — a
-  metric identical across every variant is broken, not stable.
 - **A confidently wrong but internally consistent answer is invisible.** `constant` has prevalence
   100 % and recall 0 %: it answers one lawful invoice for every document and trips nothing.
+- **An answer that omits most of the invoice is invisible too, and worse.** See *The heuristic half*
+  below: the hard rules have nothing to compare, and the gate accepts everything that is left.
+
+## The heuristic half, and what it took to measure it
+
+Through M6 the three `HEURISTIC` rules had fired **zero times on every run**, reported as `—`/0 %
+rather than pooled with the hard rules. By this project's own metric rules that is broken and not
+stable — a number identical across every variant measures nothing — so M7 gave them a population
+instead of dropping them. Two arms, because the three rules divide into two claims:
+
+- **`year_misread`** — a tenth kind in `eval/corrupt.py`, the sale date's year off by one. It is
+  written to what `dates.issue_near_sale` already described in prose (`2025-08-05` for `2026-08-05`)
+  rather than to its code, so a rule that stopped matching its own docstring would show up as a
+  recall of zero. On `noisy`: the heuristic half now reads **precision 100 %, recall 11.1 %, zero
+  false positives**. The recall is low *by construction* — the heuristic half owns one of the ten
+  injected kinds — which is why `corrupt.CAUGHT_BY` now states per kind which severity is expected
+  to catch it, and the per-kind table prints `not asked` rather than leaving a zero to read as a
+  miss. A test asserts that mapping against the rule set instead of trusting it.
+- **`stripped`** — a baseline, not a corruption: the gold with every row and rate block dropped, so
+  the answer carries a header and a total and nothing behind them. It is the population for
+  `totals.gross_has_no_support`, and the result is the sharpest negative in the project:
+
+| | prevalence | precision | recall |
+|---|---:|---:|---:|
+| hard rules | 100 % | — (nothing fired) | **0 %** |
+| heuristic rules | 100 % | 100 % | **100 %** |
+
+  Every hard rule needs two figures to compare, and an answer with only the total gives them one. So
+  the arithmetic is **completely silent on 108 documents that are wrong in 77 % of their fields**,
+  and the one rule that can speak is the heuristic whose entire content is *no rule could run*.
+  Its `accuracy` of 22.8 % decomposes into `recall` 22.8 % and `value` **100 %** — the shape that
+  names the failure: nothing it said was wrong, and it barely said anything.
+
+  **And the gate accepts all of it.** Coverage is over values the prediction asserted, so `stripped`
+  routes 100 % of its answers to `accept` at 100 % accuracy with zero leaked. The limit was already
+  disclosed in M5 — no signal separates "correctly absent" from "silently dropped" — and this arm is
+  what makes it concrete rather than hypothetical. `Curve.missed` is the only number that says so.
+
+  Why a baseline and not a corruption kind: emptying `lines` inside `corrupt` would delete the row
+  an earlier corruption had already recorded an injection against, and the prediction file would
+  then report an error against a field no longer in the document.
 
 ## What the gate buys
 
@@ -417,7 +456,7 @@ Hence the second remote arm: a weaker model on the same corpus buys a real error
 changing the corpus and invalidating every committed run. **M7's real held-out set remains
 load-bearing** — it is the only place the question gets asked on documents nobody generated.
 
-545 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+569 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

@@ -232,6 +232,53 @@ def _is_remote(baseline: str) -> bool:
 STUDIED_RUN = "claude-haiku-4-5"
 
 
+def _study(corpus: list, predictions_path, severity: Severity) -> detector.Study:
+    """One committed prediction file, scored and then run past the rules at one severity.
+
+    Shared by the headline study and the degenerate-reading one below, because the *only* thing that
+    differs between them is which severity is asked — and a second copy of this loop would be a
+    second chance for the page to report a number the `detect` subcommand does not.
+    """
+    gold = {document.doc_id: document for document in corpus}
+    verdicts = []
+    for record in prediction_file.read(predictions_path):
+        document = gold[record.doc_id]
+        score = judge(
+            document.invoice, record.parse(), doc_id=record.doc_id,
+            tier=document.tier, template=document.template,
+            failure=FailureClass(record.failure),
+        )
+        verdicts.append(detector.verdict(score, record.parse(), severity=severity))
+    return detector.summarise(verdicts, severity=severity)
+
+
+#: The arm the silence section is computed from: the gold with its table dropped. Every hard rule
+#: needs two figures to compare and this reading offers one, so it is the population that shows the
+#: arithmetic being *unable to speak* rather than being wrong — and the one the three heuristic
+#: rules, which had never fired on any run, exist for.
+STRIPPED_RUN = "stripped"
+
+
+def stripped_study(corpus: list) -> dict[str, object] | None:
+    """Both severities over the degenerate reading, so the contrast is computed rather than typed."""
+    directory = ROOT / "results" / STRIPPED_RUN
+    predictions_path = directory / prediction_file.PREDICTIONS_NAME
+    if not predictions_path.exists():  # pragma: no cover — a checkout without that run
+        return None
+
+    hard = _study(corpus, predictions_path, Severity.HARD)
+    heuristic = _study(corpus, predictions_path, Severity.HEURISTIC)
+    return {
+        "judged": hard.counts.judged,
+        "prevalence": hard.counts.prevalence,
+        "hard_recall": hard.counts.recall,
+        "hard_precision": hard.counts.precision,
+        "heuristic_recall": heuristic.counts.recall,
+        "heuristic_precision": heuristic.counts.precision,
+        "heuristic_false_positive": heuristic.counts.false_positive,
+    }
+
+
 def detector_study(corpus: list) -> dict[str, object] | None:
     """The headline detector numbers, recomputed here from a committed prediction file.
 
@@ -244,18 +291,7 @@ def detector_study(corpus: list) -> dict[str, object] | None:
     if not predictions_path.exists():  # pragma: no cover — a checkout without that run
         return None
 
-    gold = {document.doc_id: document for document in corpus}
-    records = prediction_file.read(predictions_path)
-    verdicts = []
-    for record in records:
-        document = gold[record.doc_id]
-        score = judge(
-            document.invoice, record.parse(), doc_id=record.doc_id,
-            tier=document.tier, template=document.template,
-            failure=FailureClass(record.failure),
-        )
-        verdicts.append(detector.verdict(score, record.parse(), severity=Severity.HARD))
-    study = detector.summarise(verdicts, severity=Severity.HARD)
+    study = _study(corpus, predictions_path, Severity.HARD)
 
     caught = collections.Counter(
         field for row in study.verdicts
@@ -475,11 +511,35 @@ wraps across a page break. Not one arithmetic error escaped.</p>
 <p>That is the case for the grounding layer, arrived at by measurement rather than assumed: it
 covers exactly the fields the arithmetic cannot see, because a description the model invented is a
 value that resolves to no span on the page.</p>
-<p class="note">Two cautions the study prints beside its own numbers. The <strong>heuristic rules
-have never fired on any run</strong> &mdash; reported as a dash rather than pooled with the hard
-rules, because a metric identical across every variant is broken rather than stable. And a
-<strong>confidently wrong but internally consistent answer is invisible</strong>: the constant
-baseline sits at prevalence 100&nbsp;% with recall 0&nbsp;%.</p>"""
+<p class="note">A caution the study prints beside its own numbers: a <strong>confidently wrong but
+internally consistent answer is invisible</strong>. The constant baseline sits at prevalence
+100&nbsp;% with recall 0&nbsp;%.</p>"""
+
+
+def stripped_section(study: dict[str, object] | None) -> str:
+    """The degenerate reading, rendered from `stripped_study` rather than from memory."""
+    if study is None:  # pragma: no cover — a checkout without that run
+        return ""
+    return f"""<h2>When the arithmetic has nothing to say</h2>
+<p>Every identity here needs two figures to compare. An answer that keeps the total and drops the
+rows and the rate blocks offers one &mdash; so the hard rules are not <em>wrong</em> about it, they
+are <strong>unable to speak</strong>. The <code>stripped</code> baseline is exactly that reading, on
+all {study["judged"]} documents.</p>
+<table><thead><tr><th></th><th class="num">prevalence</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
+<tbody>
+    <tr><th>hard rules</th><td class="num">{percent(study["prevalence"])}</td><td class="num">{percent(study["hard_precision"])}</td><td class="num">{percent(study["hard_recall"])}</td></tr>
+    <tr><th>heuristic rules</th><td class="num">{percent(study["prevalence"])}</td><td class="num">{percent(study["heuristic_precision"])}</td><td class="num">{percent(study["heuristic_recall"])}</td></tr>
+</tbody></table>
+<p>The one rule that fires is the heuristic whose entire content is <em>no rule could run</em>, and
+it fires on every document, with {study["heuristic_false_positive"]} false positives. Those three
+heuristic rules had never fired on any earlier run &mdash; a metric identical across every variant,
+which this project's own rules call broken rather than stable. Giving them a population was the fix;
+dropping them was the alternative.</p>
+<p class="note"><strong>And the gate accepts all of it.</strong> Coverage is measured over the values
+a prediction asserted, so a reading that loses three quarters of the invoice routes everything to
+<code>accept</code>, at 100&nbsp;% accuracy, leaking nothing. No signal here separates &ldquo;correctly
+absent&rdquo; from &ldquo;silently dropped&rdquo;; the count of what was never asserted is the only
+column that sees it.</p>"""
 
 
 def injection_section(study: dict[str, object] | None) -> str:
@@ -594,6 +654,7 @@ def build() -> str:
         heuristic_list=", ".join(f"<code>{html.escape(r)}</code>" for r in heuristic),
         baseline_table=baseline_table(runs),
         detector_section=detector_section(detector_study(corpus)),
+        stripped_section=stripped_section(stripped_study(corpus)),
         injection_section=injection_section(injection_study(corpus)),
         formatting_only=formatting_only_differences(corpus),
         opus_cost=OPUS_COST,
@@ -827,6 +888,8 @@ footer {{
 
 <h2>Does &ldquo;the arithmetic holds&rdquo; predict &ldquo;the fields are right&rdquo;?</h2>
 {detector_section}
+
+{stripped_section}
 
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no
