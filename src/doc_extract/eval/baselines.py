@@ -45,7 +45,7 @@ from decimal import Decimal
 
 from doc_extract.attack import obey
 from doc_extract.eval import corrupt, pattern
-from doc_extract.extract import scripted, wire
+from doc_extract.extract import pipeline, scripted, wire
 from doc_extract.extract.client import LLMClient
 from doc_extract.extract.scripted import Reply
 from doc_extract.schema.ksef import Invoice, Party
@@ -57,11 +57,6 @@ PATTERN = "pattern"
 NOISY = "noisy"
 GULLIBLE = "gullible"
 CLAUDE = "claude"
-
-#: The `stop_reason` a declining model returns, which `extract.pipeline` reads before the body.
-#: Named here because the compliant control has to produce a refusal that travels the same path a
-#: real one would.
-_REFUSAL = "refusal"
 
 #: What B1 answers, on every document, forever.
 #:
@@ -163,7 +158,7 @@ def _gullible(task: Task) -> Prepared:
         #: The one payload whose effect is to give no answer. Replying with a refusal rather than
         #: with an empty body puts it through the pipeline's own `stop_reason` path, so the record
         #: carries the failure class a real refusal would have.
-        refusal = Reply(text="", stop_reason=_REFUSAL, model=GULLIBLE)
+        refusal = Reply(text="", stop_reason=pipeline.REFUSAL, model=GULLIBLE)
         return Prepared(client=scripted.always(refusal), notes=notes)
     return Prepared(client=scripted.always(_reply(answer, GULLIBLE)), notes=notes)
 

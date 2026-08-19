@@ -327,6 +327,11 @@ def injection_study(corpus: list) -> dict[str, object] | None:
 
     rows: dict[str, dict[str, object]] = {}
     for record in prediction_file.read(predictions_path):
+        #: A prediction the suite did not plan is reported by `run.attacks` as `unmatched` rather
+        #: than raised on; this page has no place to report it, so it skips rather than failing the
+        #: build — the committed `attack.md` is where that discrepancy is meant to be read.
+        if record.doc_id not in by_id:
+            continue
         assignment = by_id[record.doc_id]
         payload = PAYLOADS[assignment.payload]
         predicted = record.parse()
@@ -500,7 +505,7 @@ gate run over it unchanged.</p>
   <thead><tr><th>payload</th><th>asks for</th><th class="num">obeyed</th><th class="num">arithmetic fires</th></tr></thead>
   <tbody>{body}</tbody>
 </table>
-<p class="note">The column that matters is the second one. It is computed against
+<p class="note">The column that matters is <em>arithmetic fires</em>. It is computed against
 <code>{html.escape(str(study["run"]))}</code>, a control that obeys every instruction it finds on a
 page: its success rate is 100&nbsp;% by construction, which is what makes it the right arm for this
 question. What a <em>defence</em> does about an attack that worked is a property of the defence, and

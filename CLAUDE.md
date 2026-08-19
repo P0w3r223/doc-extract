@@ -164,7 +164,11 @@ results/<run>/       # committed: predictions.jsonl, run.meta.json, report.md, d
   which is the point: the manifest records which corpus a result was computed on.
 - **An attacked document keeps its gold.** M6 adds a string to a page and changes nothing else: an
   injected instruction does not alter what the invoice states, so the correct extraction is the one
-  it always was. That is what lets the scorer, the detector and the gate run over the attacked
+  it always was. One placement is the exception and the report says so: printed *inside* an item's
+  description cell, the payload becomes part of a scored field, so a reader that transcribes that
+  cell perfectly still differs from the gold there. That is why `unchanged` is not comparable
+  across placements, and why the success predicate for `line_injected` asks for a row **beyond**
+  the ones the page prints rather than for a mention of the injected phrase. That is what lets the scorer, the detector and the gate run over the attacked
   corpus unchanged, and it is why an attack success rate is one more reading of a prediction file
   rather than a second measurement pipeline.
 - **A payload that did not reach the page is a build failure.** `attack/suite.py` parses every
@@ -253,7 +257,12 @@ reproduce, and a detector study that had to re-run a paid model to be checked wo
    Two controls bracket the instrument on the identical corpus: `gullible` obeys every instruction it
    finds (**100 %**) and `oracle` obeys none (**0 %**). The result is a negative one and it is the
    milestone — see *What injection buys the attacker* below, and `docs/adr/0001_trust_boundary.md`
-   for the threat model, the four structural defences and the control that is missing.
+   for the threat model, the four structural defences and the control that is missing. **A remote
+   arm is deliberately deferred**: what the *defences* buy is answered by the compliant control, and
+   what a *particular model* does with an injected page is a different question, worth asking on
+   M7's real held-out set rather than twice on a synthetic one. It is also where `line_injected`'s
+   judge would first be exercised on a real transcription, which is the one it had to be rewritten
+   for.
 7. Real held-out set, the reported synthetic↔real gap, vision variant, site/README/ADRs.
 
 ## The headline answer, and what it is really measuring

@@ -52,9 +52,12 @@ REPAIR_MAX_TOKENS = 8192
 #: by field path so the ones that are cut are not systematically the same fields.
 MAX_REPORTED_ERRORS = 20
 
-#: `stop_reason` values that decide the outcome before the body is even read.
-_REFUSAL = "refusal"
-_TRUNCATED = "max_tokens"
+#: `stop_reason` values that decide the outcome before the body is even read. Public because a
+#: caller that needs to *produce* one — M6's compliant control answers a denial payload with a
+#: refusal — must use the same literal this function compares against, and two private copies of a
+#: protocol string are two things that can drift while every test still passes.
+REFUSAL = "refusal"
+TRUNCATED = "max_tokens"
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,9 +133,9 @@ def read(response: LLMResponse) -> tuple[Invoice | None, FailureClass, str]:
     first would report a JSON error where the real finding is that the model declined or ran out of
     room. The failure class has to name what actually happened, because M4 counts these.
     """
-    if response.stop_reason == _REFUSAL:
+    if response.stop_reason == REFUSAL:
         return None, FailureClass.REFUSED, "the model declined the request"
-    if response.stop_reason == _TRUNCATED:
+    if response.stop_reason == TRUNCATED:
         return None, FailureClass.TRUNCATED, (
             "generation stopped at the token ceiling, so the body is a prefix of an answer"
         )

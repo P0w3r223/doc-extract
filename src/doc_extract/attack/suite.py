@@ -36,6 +36,7 @@ attack success rate can be wrong in the flattering direction.
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -102,6 +103,23 @@ def plan(
     documents = list(base if base is not None else synth_corpus.documents())
     if not documents:
         raise SuiteError("the base corpus is empty; build it with `python -m doc_extract.synth`")
+
+    #: Both guards defend the same claim — that the slots of the grid are distinct invoices — and
+    #: both failures are silent rather than loud. A stride sharing a factor with the corpus size
+    #: walks a short cycle and revisits the same few documents; more slots than documents wraps.
+    #: Either leaves the paired design intact and the *variety* it is paired over gone, which is
+    #: exactly the kind of quiet weakening this package is not allowed to have.
+    slots = len(placements) * per_cell
+    if slots > len(documents):
+        raise SuiteError(
+            f"{slots} slots over a base corpus of {len(documents)}: the grid would reuse "
+            "documents. Lower --per-cell or generate a larger base corpus"
+        )
+    if math.gcd(_SPREAD, len(documents)) != 1:
+        raise SuiteError(
+            f"the stride {_SPREAD} shares a factor with a base corpus of {len(documents)} "
+            "documents, so the slots would cycle through a fraction of it; change --per-tier"
+        )
 
     planned: list[tuple[Document, Assignment]] = []
     for payload in payloads:
@@ -174,7 +192,7 @@ def generate(
         entries,
         _provenance(
             entries, per_cell=per_cell, payloads=payloads, placements=placements,
-            seed=seed, per_tier=per_tier,
+            seed=seed, per_tier=per_tier, verified=verify,
         ),
         keep=(ATTACKS_NAME,),
     )
@@ -210,6 +228,7 @@ def _provenance(
     placements: Sequence[str],
     seed: int,
     per_tier: int,
+    verified: bool,
 ) -> dict[str, Any]:
     """The base corpus's provenance block, plus what this suite did to it.
 
@@ -227,6 +246,11 @@ def _provenance(
         "per_cell": per_cell,
         "payloads": [payload.name for payload in payloads],
         "placements": list(placements),
+        #: Whether every payload was read back off its own page. A report computed from this corpus
+        #: states one thing or the opposite depending on this flag, which is why it is recorded
+        #: rather than assumed: an unverified corpus otherwise produces a report claiming a check
+        #: that never ran.
+        "verified": verified,
     }
 
 
