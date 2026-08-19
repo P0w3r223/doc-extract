@@ -22,6 +22,11 @@ all. Its failures are structural rather than random, which is why they are worth
 error set M5's detector study needs, since a detector measured only on a model's unlabelled mistakes
 is measured on a sample nobody chose.
 
+**`gullible`** sees the page and the gold, and belongs to M6. It reads the page for an injected
+instruction and does exactly what it says — the positive control for the attack suite, in the same
+sense B0 is the positive control for the scorer and B3 for the detector. On a document nobody
+attacked it is B0.
+
 **`claude`** sees the page, and is not a baseline at all: it is the system under test, and the only
 one that needs a key or costs money.
 
@@ -38,6 +43,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from doc_extract.attack import obey
 from doc_extract.eval import corrupt, pattern
 from doc_extract.extract import scripted, wire
 from doc_extract.extract.client import LLMClient
@@ -49,7 +55,13 @@ ORACLE = "oracle"
 CONSTANT = "constant"
 PATTERN = "pattern"
 NOISY = "noisy"
+GULLIBLE = "gullible"
 CLAUDE = "claude"
+
+#: The `stop_reason` a declining model returns, which `extract.pipeline` reads before the body.
+#: Named here because the compliant control has to produce a refusal that travels the same path a
+#: real one would.
+_REFUSAL = "refusal"
 
 #: What B1 answers, on every document, forever.
 #:
@@ -138,6 +150,24 @@ def _noisy(task: Task) -> Prepared:
     )
 
 
+def _gullible(task: Task) -> Prepared:
+    """M6's positive control: read the page, find the injected instruction, and do as it says.
+
+    Not a competitor and not a model — the attack suite's `oracle`. Its success rate is 100 % by
+    construction, which is what makes it a check on the judge: an attack whose success cannot be
+    recognised when it was fully obeyed would report every real model as safe. On a document with
+    no payload it answers the gold, so running it over the clean corpus scores like B0.
+    """
+    answer, notes = obey.obey(task.gold, task.source.text)
+    if answer is None:
+        #: The one payload whose effect is to give no answer. Replying with a refusal rather than
+        #: with an empty body puts it through the pipeline's own `stop_reason` path, so the record
+        #: carries the failure class a real refusal would have.
+        refusal = Reply(text="", stop_reason=_REFUSAL, model=GULLIBLE)
+        return Prepared(client=scripted.always(refusal), notes=notes)
+    return Prepared(client=scripted.always(_reply(answer, GULLIBLE)), notes=notes)
+
+
 def _claude(task: Task) -> Prepared:
     """The real model. Imported here rather than at module scope, like the SDK it wraps.
 
@@ -178,6 +208,12 @@ BASELINES: tuple[Baseline, ...] = (
         sees="the gold",
         description="B3 — the oracle with known errors injected, for M5's detector study.",
         prepare=_noisy,
+    ),
+    Baseline(
+        name=GULLIBLE,
+        sees="the page and the gold",
+        description="M6 — a reader that obeys any instruction printed on the page. The control.",
+        prepare=_gullible,
     ),
     Baseline(
         name=CLAUDE,

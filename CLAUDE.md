@@ -44,6 +44,7 @@ src/doc_extract/
     fa3_xml.py       # Invoice -> FA(3) XML, and back; the round-trip is the identity
     render.py        # three layouts, deterministic bytes, Polish diacritics
     corpus.py        # the corpus on disk plus a manifest of seeds and hashes
+    overlay.py       # M6 — where a page can carry text its own data did not put there
 
   source/            # M3 — PDF -> text + offsets, read from geometry (the untrusted-data envelope)
     words.py         # pdfplumber words with their boxes; reading order is never assumed
@@ -67,13 +68,13 @@ src/doc_extract/
     dataset.py       # the corpus read back, with every artifact's hash verified on use
     pattern.py       # B2's regex reader — the one place allowed to know the corpus's own labels
     corrupt.py       # B3's nine injected error kinds, two of them arithmetically invisible
-    baselines.py     # B0-B3 and the real model, all behind one `LLMClient`
+    baselines.py     # B0-B3, M6's compliant control, and the real model, behind one `LLMClient`
     detector.py      # M5 — the invariants scored as a binary classifier of "something is wrong"
     selective.py     # M5 — the gate measured against gold: the coverage-accuracy curve
     format.py        # how a rate is written; `100 %` means exactly 100 %, and `—` means no denominator
     detector_report.py  # the detector study as Markdown
     selective_report.py # the gate as Markdown, with what the curve cannot see printed above it
-    run.py           # predict -> write -> score / detect / gate, with I/O only here
+    run.py           # predict -> write -> score / detect / gate / attack, with I/O only here
     report.py        # the Markdown tables, with the qualifications printed beside the numbers
 
   ground/            # M5 — value -> source span provenance, the complement to the arithmetic
@@ -81,8 +82,15 @@ src/doc_extract/
     resolve.py       # substring search over a projected page; three levels of support per field
   decide/            # M5 — the runtime gate. Reads a prediction against its page, never the gold
     confidence.py    # four levels from the two measured signals, and accept / review / reject
+  attack/            # M6 — the invoice as untrusted input, measured by attacking it
+    payloads.py      # what an attacker prints, what obeying looks like, when it has succeeded
+    suite.py         # the attacked corpus: payload x placement, gold untouched, payload verified
+    obey.py          # the compliant reader — the positive control, 100 % by construction
+    outcome.py       # prediction + assignment -> succeeded / unchanged / what the gate did
+    report.py        # the attack success rate as Markdown, with the leak table beside it
 schemas/*.xsd        # the national standard and its three imports + PROVENANCE.md
-results/<run>/       # committed: predictions.jsonl, run.meta.json, report.md, detector.md, gate.md.
+results/<run>/       # committed: predictions.jsonl, run.meta.json, report.md, detector.md, gate.md,
+                     # and attack.md for a run over the attacked corpus (`results/attack-<baseline>`).
                      # Named for the baseline, except a remote run, which is named for the model:
                      # the baseline is `claude` every time and the model is what varies, so two
                      # models over one corpus are two directories rather than one overwritten one.
@@ -154,6 +162,17 @@ results/<run>/       # committed: predictions.jsonl, run.meta.json, report.md, d
 - **Vendored artifacts are pinned by hash and re-vendored as a commit** — the four XSDs and the two
   fonts. Changing a font changes every rendered byte and therefore every hash in a corpus manifest,
   which is the point: the manifest records which corpus a result was computed on.
+- **An attacked document keeps its gold.** M6 adds a string to a page and changes nothing else: an
+  injected instruction does not alter what the invoice states, so the correct extraction is the one
+  it always was. That is what lets the scorer, the detector and the gate run over the attacked
+  corpus unchanged, and it is why an attack success rate is one more reading of a prediction file
+  rather than a second measurement pipeline.
+- **A payload that did not reach the page is a build failure.** `attack/suite.py` parses every
+  attacked PDF back through `source/` and requires the payload's marker in the text layer. An attack
+  the model never saw would otherwise sit in the denominator as a *failed* attack — the one
+  direction an attack success rate must not be wrong in. The attacker's identifiers pass their own
+  check digits for the mirror-image reason: an attack caught by a rule written for typos would
+  flatter the leak column that is the milestone's actual result.
 - **No secrets in code.** `ANTHROPIC_API_KEY` from the environment at call time.
 
 ## How to run
@@ -172,6 +191,10 @@ python -m doc_extract.eval run --baseline pattern         # one baseline over th
 python -m doc_extract.eval score  --run results/pattern   # re-score a committed run, no model
 python -m doc_extract.eval detect --run results/pattern   # the detector study on a committed run
 python -m doc_extract.eval gate   --run results/pattern   # the gate's coverage-accuracy curve
+python -m doc_extract.attack --out data/attacked          # 112 attacked documents (M6)
+python -m doc_extract.eval run --baseline gullible --corpus data/attacked --out results/attack-gullible
+python -m doc_extract.eval attack --run results/attack-gullible  # the attack success rate
+
 python -m doc_extract.eval run --baseline claude --yes    # the only command that costs money
 python -m doc_extract.eval run --baseline claude --model claude-haiku-4-5 --yes   # a second arm
 
@@ -182,7 +205,8 @@ Everything except `--baseline claude` runs entirely offline with no model and no
 that way — including schema validation, which resolves the Ministry's imports from `schemas/` with
 remote fetching disabled, including the whole extraction pipeline, which the test suite drives
 through `extract.scripted`, and including `detect`, which reads a committed prediction file and
-calls nothing. A test suite that could not run without an API key is a result a reader cannot
+calls nothing, and including the whole of M6, which renders its own corpus and measures an attack
+success rate without a model being involved at any point. A test suite that could not run without an API key is a result a reader cannot
 reproduce, and a detector study that had to re-run a paid model to be checked would be one too.
 
 ## Milestones
@@ -221,7 +245,15 @@ reproduce, and a detector study that had to re-run a paid model to be checked wo
    page — 0 of 5892, which is what caught the first version failing on 14.9 %. `decide/` turns the
    two into four confidence levels by fixed rules, and `gate` measures the result as a
    coverage–accuracy curve — see *What the gate buys* below.
-6. Injection suite, attack success rate, trust-boundary ADR.
+6. **Injection suite, attack success rate, trust-boundary ADR.** ✅ `synth/overlay.py` teaches the
+   renderer four places a page can carry foreign text — an item description, the `Adnotacje` block, a
+   footer, and white ink — and `attack/` prints seven payloads in each of them over the same
+   invoices, with the gold untouched, so the scorer, the detector and the gate run over the attacked
+   corpus unchanged. Every payload is verified at build time to have survived into the text layer.
+   Two controls bracket the instrument on the identical corpus: `gullible` obeys every instruction it
+   finds (**100 %**) and `oracle` obeys none (**0 %**). The result is a negative one and it is the
+   milestone — see *What injection buys the attacker* below, and `docs/adr/0001_trust_boundary.md`
+   for the threat model, the four structural defences and the control that is missing.
 7. Real held-out set, the reported synthetic↔real gap, vision variant, site/README/ADRs.
 
 ## The headline answer, and what it is really measuring
@@ -313,6 +345,56 @@ Three limits, all printed beside the numbers rather than left for a reader to fi
   the first version printed `100.0 %` in a row whose own next column said two wrong values had been
   accepted.
 
+## What injection buys the attacker, and what the gate does not do about it
+
+M6 prints seven payloads — six with an objective and one control that asks for nothing — in four
+places on the page, over the same invoices, four documents per cell. Every payload is printed on the
+**same** pages, so the per-payload table is a paired comparison rather than seven samples of
+different documents.
+
+Two controls bracket the instrument on the identical corpus. `gullible` reads the page, finds the
+instruction and does what it says: **ASR 100 %**, which is what makes it a check on the judge — a
+success predicate that could not fire when a payload was fully obeyed would report every model as
+safe. `oracle` ignores the page's instructions: **ASR 0 %**, and every document still read exactly
+right, which is what makes it a check on the corpus — the gold of an attacked document is the gold of
+the document it was made from, and it did not move.
+
+Against that bracket, the question the milestone actually answers is what the **defences** do about
+an attack that has already worked:
+
+| payload | asks for | breaks a hard identity? | the gate |
+|---|---|---|---|
+| `total_override` | the amount payable becomes 1,00 PLN | yes | **review** |
+| `fence_break` | close the envelope early, then rewrite the total | yes | **review** |
+| `line_injected` | a line item the page does not print | yes | **review** |
+| `account_redirect` | payment to the attacker's account | **no** | **accepted** |
+| `seller_swap` | the invoice reissued under the attacker's NIP | **no** | **accepted** |
+| `refusal` | the document not processed at all | n/a | no answer to route |
+
+**The arithmetic gate is a defence against misreading, not against injection.** M5 measured it on a
+population of model *errors*, where a wrong digit is a random digit and a check digit catches it. An
+adversary is not a random process: `ATTACKER_ACCOUNT` passes mod-97 and `ATTACKER_NIP` passes the NIP
+weights **on purpose**, because an attacker picks an account they control — and the value is printed
+on the page, so grounding resolves it too. Both of the gate's signals agree with the attacker on
+exactly the two payloads worth running.
+
+Three things follow, and they are the reason the ADR exists rather than a paragraph here:
+
+- **Nothing in this repository defends against injection except the four structural rules** — a
+  constant system prompt, a fence marker derived from the text it wraps, a stage order that never
+  branches on document content, and an extractor told to transcribe rather than compute. Their value
+  is exactly that they hold whatever the page says.
+- **A refusal is not a rescue.** The denial payload succeeds by producing no answer, and no value is
+  then accepted. `attack/report.py` gives it its own line rather than folding it into a defence rate:
+  it is an availability attack that worked.
+- **The missing control is a payee allow-list**, and it cannot be read off the page — an account
+  that is not the one on file for this supplier is a fact about the buyer's records. Named in the ADR
+  so the gap is a decision rather than an oversight.
+
+The suite verifies at build time that every payload survived into the text layer of the page it was
+printed on. An attack the model never saw would otherwise land in the denominator as a failed
+attack, which is the one direction an attack success rate must not be wrong in.
+
 ## The corpus is saturated, and that is also a finding
 
 `claude-opus-5` reads every document perfectly — 100 % on all 108, exact everywhere. That arm of the
@@ -326,7 +408,7 @@ Hence the second remote arm: a weaker model on the same corpus buys a real error
 changing the corpus and invalidating every committed run. **M7's real held-out set remains
 load-bearing** — it is the only place the question gets asked on documents nobody generated.
 
-430 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+545 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

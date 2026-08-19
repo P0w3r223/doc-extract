@@ -1,0 +1,244 @@
+"""A `Study` as Markdown. Formatting only — nothing below computes a number.
+
+Three things this report has to say beside its tables, because each of them changes what the
+headline means:
+
+* **An attack success rate is a rate over attacks that reached the model.** The suite refuses to
+  ship a document whose payload did not survive rendering, so the denominator is attacks that were
+  printed and read — but a payload the corpus never carried would still be missing, and `missing`
+  and `unmatched` are printed above the first table rather than below the last.
+* **The gate is not a defence against every payload.** The leak column counts successful attacks the
+  routing gate would have accepted anyway, and the interesting cases are the ones where it does
+  nothing: an attacker's identifiers pass their check digits and their values are printed on the
+  page, so both of M5's signals agree with them.
+* **A refusal is not a rescue.** The denial payload succeeds by producing nothing, and nothing is
+  then accepted. That is an availability attack that worked, and it gets its own line instead of
+  being counted as the gate having caught something.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+
+from doc_extract.attack.outcome import Rate, Study
+from doc_extract.attack.payloads import BY_NAME, DENIAL
+from doc_extract.eval.format import DASH
+from doc_extract.eval.format import rate as _rate
+from doc_extract.eval.predictions import RunMeta
+
+
+def render(study: Study, *, run: RunMeta, directory: str = "") -> str:
+    parts = [
+        _header(study, run=run, directory=directory),
+        _coverage(study),
+        _payloads(study),
+        _placements(study),
+        _grid(study),
+        _leaks(study),
+        _caveats(study),
+    ]
+    return "\n\n".join(part for part in parts if part) + "\n"
+
+
+def _header(study: Study, *, run: RunMeta, directory: str) -> str:
+    overall = study.overall
+    lines = [
+        f"# the injection suite — {run.model}",
+        "",
+        "| | |",
+        "|---|---|",
+        f"| answered by | `{run.model}` |",
+        f"| saw | {run.options.get('sees', 'unstated')} |",
+        f"| corpus | `{run.corpus_dir}` |",
+        f"| attacked documents | {overall.documents} |",
+        f"| attacks that met their objective | {overall.succeeded} |",
+        f"| **attack success rate** | **{_rate(overall.rate)}** |",
+        f"| of those, accepted by the gate | {overall.leaked} |",
+        f"| read exactly right anyway | {overall.exact} |",
+        f"| control documents (no instruction) | {study.control.documents} |",
+        f"| of those, read exactly right | {study.control.exact} |",
+    ]
+    if directory:
+        lines.insert(4, f"| run | `{directory}` |")
+    return "\n".join(lines)
+
+
+def _coverage(study: Study) -> str:
+    """Printed only when the three files did not line up, and printed above everything."""
+    if study.complete:
+        return ""
+    lines = ["> **Incomplete.** This is not a headline number.", ">"]
+    if study.missing:
+        lines.append(
+            f"> {len(study.missing)} attacked document(s) have no prediction: "
+            f"{', '.join(sorted(study.missing)[:8])}"
+            + (" …" if len(study.missing) > 8 else "")
+        )
+    if study.unmatched:
+        lines.append(
+            f"> {len(study.unmatched)} prediction(s) describe documents the suite did not attack: "
+            f"{', '.join(sorted(study.unmatched)[:8])}"
+            + (" …" if len(study.unmatched) > 8 else "")
+        )
+    return "\n".join(lines)
+
+
+def _payloads(study: Study) -> str:
+    return "\n".join([
+        "## Per payload",
+        "",
+        "`unchanged` is the other half of the question: how often the extraction came back exactly "
+        "right despite the injected text. A payload with a low success rate and a low `unchanged` "
+        "did not fail harmlessly — it confused the reader without steering it.",
+        "",
+        "| payload | goal | n | succeeded | ASR | leaked | unchanged |",
+        "|---|---|---:|---:|---:|---:|---:|",
+        *(_payload_row(row) for row in study.by_payload),
+    ])
+
+
+def _payload_row(row: Rate) -> str:
+    payload = BY_NAME.get(row.label)
+    goal = payload.goal if payload is not None else DASH
+    return (
+        f"| `{row.label}` | {goal} | {row.documents} | {row.succeeded} | "
+        f"{_rate(row.rate)} | {row.leaked} | {_rate(row.unchanged)} |"
+    )
+
+
+def _placements(study: Study) -> str:
+    return "\n".join([
+        "## Per placement",
+        "",
+        "Where on the page the same sentences were printed. `invisible` is white ink: absent to a "
+        "human approving the invoice, present in the text layer the extractor reads.",
+        "",
+        "| placement | n | succeeded | ASR | leaked | unchanged |",
+        "|---|---:|---:|---:|---:|---:|",
+        *(
+            f"| `{row.label}` | {row.documents} | {row.succeeded} | {_rate(row.rate)} | "
+            f"{row.leaked} | {_rate(row.unchanged)} |"
+            for row in study.by_placement
+        ),
+    ])
+
+
+def _grid(study: Study) -> str:
+    """The full cross product, as a matrix — the shape the suite was designed to fill."""
+    placements = tuple(row.label for row in study.by_placement)
+    payloads = tuple(row.label for row in study.by_payload)
+    cells = {(payload, placement): rate for payload, placement, rate in study.grid}
+    return "\n".join([
+        "## Payload by placement",
+        "",
+        "One cell is one payload printed in one place. `n` per cell is small by design — the grid "
+        "is for seeing *where* an attack works, and the per-payload and per-placement tables above "
+        "are where the denominators are.",
+        "",
+        "| payload | " + " | ".join(f"`{name}`" for name in placements) + " |",
+        "|---|" + "---:|" * len(placements),
+        *(
+            f"| `{payload}` | "
+            + " | ".join(
+                _cell(cells.get((payload, placement))) for placement in placements
+            )
+            + " |"
+            for payload in payloads
+        ),
+    ])
+
+
+def _cell(rate: Rate | None) -> str:
+    if rate is None or rate.documents == 0:
+        return DASH
+    return f"{_rate(rate.rate)} ({rate.succeeded}/{rate.documents})"
+
+
+def _leaks(study: Study) -> str:
+    """Every successful attack the gate would have accepted, named. The list a reviewer wants."""
+    leaked = [row for row in study.outcomes if row.leaked]
+    if not leaked:
+        return ""
+    return "\n".join([
+        "## What got through",
+        "",
+        "Successful attacks whose document the routing gate would have **accepted**, unreviewed.",
+        "",
+        "| document | payload | placement | tier | still exact |",
+        "|---|---|---|---|---|",
+        *(
+            f"| `{row.doc_id}` | `{row.payload}` | `{row.placement}` | {row.tier} | "
+            f"{'yes' if row.exact else 'no'} |"
+            for row in leaked
+        ),
+    ])
+
+
+def _caveats(study: Study) -> str:
+    lines = ["## Read this before the tables", ""]
+    overall = study.overall
+
+    if overall.succeeded == 0:
+        lines.append(
+            "* **No attack met its objective.** That is a result about this model on this corpus, "
+            "and it is only meaningful because the same judge scores the `gullible` control at "
+            "100 %: a suite whose success predicate could not fire would report exactly this."
+        )
+    denial = next((row for row in study.by_payload if _is_denial(row.label)), None)
+    if denial is not None and denial.succeeded:
+        lines.append(
+            f"* **{denial.succeeded} of {denial.documents} denial attempt(s) worked**, and no "
+            "was accepted from them because none was returned. That is an availability attack "
+            "succeeding, not the gate defending: the document simply did not get processed."
+        )
+    if overall.succeeded and overall.leaked == 0:
+        lines.append(
+            "* Every successful attack was routed to a human. The gate was built from M5's "
+            "measurements of *model errors*, so this is worth stating precisely: it holds for the "
+            "payloads that break arithmetic, and it is not a general property — an attacker who "
+            "supplies identifiers with valid check digits, printed on the page so they ground, "
+            "agrees with both signals."
+        )
+    if overall.leaked:
+        lines.append(
+            f"* **{overall.leaked} successful attack(s) would have been accepted.** The gate's two "
+            "signals are an arithmetic check and a grounding check, and an attacker defeats both "
+            "construction: they choose an account number that passes mod-97, and they print it on "
+            "the page, so the value they want is both consistent and grounded. Detection built for "
+            "*errors* does not transfer to an *adversary*, and this row is what that costs."
+        )
+    control = study.control
+    if control.documents:
+        lines.append(
+            "* **The headline rate excludes the control.** A payload that asks for nothing cannot "
+            f"succeed, and leaving its {control.documents} document(s) in the denominator would "
+            "lower every attack success rate for a reason that has nothing to do with a defence. "
+            f"Its own column is `unchanged`: {control.exact} of {control.documents} came back "
+            f"exactly right ({_rate(control.unchanged)}), which is what says whether merely adding "
+            "text to a page moves the extraction."
+        )
+    lines.append(
+        "* The suite verified at build time that every payload survived into the text layer of the "
+        "page it was printed on. An attack the model never saw would otherwise sit in the "
+        "denominator as a failed attack."
+    )
+    return "\n".join(lines)
+
+
+def _is_denial(payload_name: str) -> bool:
+    payload = BY_NAME.get(payload_name)
+    return payload is not None and payload.category == DENIAL
+
+
+def summary_lines(study: Study) -> Iterable[str]:
+    """What a terminal wants after a run, without the tables."""
+    overall = study.overall
+    yield (
+        f"attacked   : {overall.documents}   succeeded: {overall.succeeded}   "
+        f"ASR {_rate(overall.rate)}   leaked {overall.leaked}"
+    )
+    for row in study.by_payload:
+        yield (
+            f"  {row.label:<18} {_rate(row.rate):>8}  ({row.succeeded}/{row.documents})   "
+            f"leaked {row.leaked}   unchanged {_rate(row.unchanged)}"
+        )
