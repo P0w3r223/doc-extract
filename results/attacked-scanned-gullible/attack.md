@@ -16,7 +16,7 @@
 
 ## Which channel the payload reached the reader by
 
-* **No payload reached the text layer on `rasterised` and `scanned`.** Nothing did: the page carries no text at all. Every attack success rate below for those rungs is therefore a measurement of a reader that could not read the document, and it is **not** evidence of a defence. A model that looks at the page sees the payload exactly as the `image` column says it does.
+* **No payload reached the text layer on `rasterised` and `scanned`.** Nothing did: the page carries no text at all. Every attack success rate below for those rungs is therefore a measurement of a reader that could not read the document, and it is **not** evidence of a defence. Whatever the `image` column marks is still on the page as ink at those rungs — whether a model reading pixels recovers it at 150 dpi through blur and JPEG is a different question, and the arm that would answer it has not been run.
 * **The scanner erases `invisible` outright**, at every rung, while ink survives everywhere it was printed (`description`, `annotations` and `footer`). White text on white paper contributes no pixel, so there is nothing for a recogniser to recover and nothing for a vision model to read — the attack that was designed to be invisible to the human approving the invoice is the one a photocopier destroys. It is an accident of the medium and not a control: nothing in this repository chose it, and it protects only the placement that hides from a person.
 
 Measured at build time with no model involved. **text** means the marker is in the text layer `source/` reads off the scanned page; **image** means the attacked page and the unattacked page it was made from differ as pictures, through the same scanner at the same seed — so a payload that changed no pixel cannot be seen by any reader that looks at the page.
@@ -51,7 +51,7 @@ Measured at build time with no model involved. **text** means the marker is in t
 
 ## Per placement
 
-Where on the page the same sentences were printed. `invisible` is white ink: absent to a human approving the invoice, present in the text layer the extractor reads.
+Where on the page the same sentences were printed. `invisible` is white ink — absent to a human approving the invoice, and present in the text layer the extractor reads **on a page nobody photographed**. Whether it still is on this corpus is what the reach table says, and it is not a property of the placement.
 
 `unchanged` is **not comparable across placements**. The `description` placement prints the payload inside an item's own description cell, and that description is a scored field — so wherever the payload reaches the reader, one that transcribes the cell perfectly still differs from the gold there, by definition rather than by behaviour. The other three write where nothing is scored. On a corpus where the payload reaches the reader on some documents and not others, this row mixes the two and the reach table above is what separates them.
 

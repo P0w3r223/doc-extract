@@ -20,6 +20,7 @@ from doc_extract.attack import suite
 from doc_extract.attack.payloads import BY_NAME as PAYLOADS
 from doc_extract.decide.confidence import Confidence
 from doc_extract.degrade import attacked as attacked_grid
+from doc_extract.degrade import attacked_report
 from doc_extract.degrade.corpus import documents as scanned_documents
 from doc_extract.degrade.rungs import BY_NAME as RUNGS_BY_NAME
 from doc_extract.degrade.rungs import TEMPLATES as RUNG_NAMES
@@ -764,20 +765,18 @@ def _reach_table() -> list[dict[str, object]] | None:
 
 
 def _channel(rows: list) -> str:
-    """What a cell says. Mixed answers are counted rather than averaged into a third thing."""
-    answers = {(row.in_text_layer, row.on_the_image) for row in rows}
-    if not answers:
-        return DASH  # pragma: no cover — every cell of the cross is filled
-    if len(answers) > 1:  # pragma: no cover — a placement behaves the same on every document
-        return "mixed"
-    in_text, on_image = answers.pop()
-    if in_text and on_image:
-        return "text&nbsp;+&nbsp;image"
-    if on_image:
-        return "image only"
-    if in_text:  # pragma: no cover — no rung keeps text of ink that left no mark
-        return "text only"
-    return "nobody"
+    """What a cell says, classified by the module that owns the rule and then dressed for HTML.
+
+    Deliberately not a second implementation. A page of derived figures is most exposed to exactly
+    that — a rule restated somewhere it can drift — so the decision comes from
+    `attacked_report.channel` and only the Markdown emphasis and the non-breaking space are undone
+    here.
+    """
+    said = attacked_report.channel(rows)
+    return {
+        attacked_report.BOTH: "text&nbsp;+&nbsp;image",
+        attacked_report.NOBODY: "nobody",
+    }.get(said, html.escape(said))
 
 
 def _first_seen(values) -> tuple[str, ...]:

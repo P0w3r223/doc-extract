@@ -279,7 +279,7 @@ letting a zero read as a miss.
 | `foreign/` | the same gold on three unfamiliar Polish layouts — how much of a reading was the template |
 | `degrade/`, `source/raster.py` | the same page photographed at three rungs of legibility, and the pixels a model is sent |
 | `degrade/attacked.py` | M6's grid photographed — which channel a payload still reaches a reader by |
-| tests | **718 passing**, ruff clean |
+| tests | **727 passing**, ruff clean |
 
 Milestone 7 has both held-out corpora, the vision path, a paid arm reading the scanned one as
 images, and the attacked corpus scanned. What it has **not** got is a paid arm over the *foreign*
@@ -361,6 +361,9 @@ and that is exactly the rung where the attacks worked — so the gate concentrat
 attacked-and-obeyed values into the bucket it calls high confidence. On M5's population of model
 errors the same gate turned 98.7 % into 99.96 %. The fix it points at is specific: grounding returns
 `UNGROUNDED` where it means *there was no text to look in*, and `decide/` cannot tell those apart.
+That is not built — but every `gate.md` computed over such a corpus now prints the share of its own
+denominator that sits on a page with no text at all (69.2 % here), so the curve can no longer be
+read as a property of the reader when most of it is a property of the page.
 
 ## What the baselines say, and what the model says
 

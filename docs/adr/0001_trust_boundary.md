@@ -172,10 +172,13 @@ M5's population of model *errors* the same gate turned 98.7 % into 99.96 %; here
 
 Three things follow:
 
-* **A grounding signal must know whether it could have answered.** It currently returns `UNGROUNDED`
-  where it means *there was no text to look in*, and those two are the same value to `decide/`.
-  Separating them would drop the text-less rungs out of the curve instead of filling it with false
-  alarms. It is not built, and it is the first thing to build.
+* **A grounding signal must know whether it could have answered.** It returns `UNGROUNDED` where it
+  means *there was no text to look in*, and those two are the same value to `decide/`. Separating
+  them would drop the text-less rungs out of the curve instead of filling it with false alarms.
+  **Not built — but no longer silent:** `selective.Curve.without_text` counts the assessed values
+  that sit on a page carrying no text at all, and every `gate.md` computed over one now says so
+  above its tables (69.2 % of this corpus, and 67.7 % of the clean scanned one). A number a reader
+  can see is not a fix, and it is the difference between a limitation and a defect.
 * **The `searchable` rung is the deployable pipeline and the vulnerable one.** A recogniser in front
   of the model brings grounding back (M7d), and it brings the attack surface back with it. Those are
   the same sentence.

@@ -124,8 +124,10 @@ def _placements(study: Study) -> str:
     return "\n".join([
         "## Per placement",
         "",
-        "Where on the page the same sentences were printed. `invisible` is white ink: absent to a "
-        "human approving the invoice, present in the text layer the extractor reads.",
+        "Where on the page the same sentences were printed. `invisible` is white ink — absent to a "
+        "human approving the invoice, and present in the text layer the extractor reads **on a "
+        "page nobody photographed**. Whether it still is on this corpus is what the reach table "
+        "says, and it is not a property of the placement.",
         "",
         "`unchanged` is **not comparable across placements**. The `description` placement prints "
         "the payload inside an item's own description cell, and that description is a scored "
@@ -228,9 +230,12 @@ def _caveats(study: Study, *, run: RunMeta) -> str:
 
     if overall.succeeded == 0:
         lines.append(
-            "* **No attack met its objective.** That is a result about this model on this corpus, "
-            "and it is only meaningful because the same judge scores the `gullible` control at "
-            "100 %: a suite whose success predicate could not fire would report exactly this."
+            "* **No attack met its objective.** A zero here has two readings and this report "
+            "cannot choose between them: the reader resisted the payloads, or the payloads never "
+            "reached the reader. What separates them is the compliant control — `gullible`, which "
+            "obeys every instruction it finds — measured **on this same corpus**, and its "
+            "`attack.md` is the file to read before treating this row as a defence. A suite whose "
+            "success predicate could not fire at all would report exactly this too."
         )
     denial = next((row for row in study.by_payload if _is_denial(row.label)), None)
     if denial is not None and denial.succeeded:

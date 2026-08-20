@@ -65,7 +65,34 @@ def main(argv: list[str] | None = None) -> int:
     return _clean(args, rungs)
 
 
+def _rejected(args: argparse.Namespace, unusable: dict[str, bool], mode: str) -> str:
+    """The flags that mean nothing in this mode, so the CLI can refuse rather than ignore them.
+
+    A flag that is silently dropped produces a corpus the caller believes is restricted and the
+    manifest says is not, which is the same failure in either direction — so both directions get a
+    message rather than only the one that was noticed first.
+    """
+    named = sorted(flag for flag, given in unusable.items() if given)
+    if not named:
+        return ""
+    return (
+        f"error: {', '.join(named)} {'does' if len(named) == 1 else 'do'} not apply {mode}. "
+        "A flag this command cannot honour is refused rather than dropped: a corpus built without "
+        "it would still be described by a manifest that says so"
+    )
+
+
 def _clean(args: argparse.Namespace, rungs: tuple) -> int:
+    refused = _rejected(args, {
+        "--per-cell": args.per_cell != attacked_corpus.DEFAULT_PER_CELL,
+        "--payload": bool(args.payload),
+        "--placement": bool(args.placement),
+        "--no-verify": args.no_verify,
+    }, "without --attacked; the clean corpus carries no payload to place or to check")
+    if refused:
+        print(refused)
+        return 2
+
     tiers = tuple(BY_NAME[name] for name in args.tier) if args.tier else TIERS
     entries = corpus.generate(
         args.out, seed=args.seed, per_tier=args.per_tier, tiers=tiers, rungs=rungs
@@ -87,10 +114,12 @@ def _attacked(args: argparse.Namespace, rungs: tuple) -> int:
     Rejected rather than ignored, because a `--tier` that silently did nothing would produce a
     corpus the caller believes is restricted and the manifest says is not.
     """
-    if args.tier:
-        print("error: --tier does not apply with --attacked; the suite chooses its base documents "
-              "by placement and slot, and restricting the pool would change which invoices the "
-              "grid is paired over. Use --payload or --placement")
+    refused = _rejected(args, {"--tier": bool(args.tier)},
+                        "with --attacked; the suite chooses its base documents by placement and "
+                        "slot, and restricting the pool would change which invoices the grid is "
+                        "paired over — use --payload or --placement")
+    if refused:
+        print(refused)
         return 2
 
     payloads = (

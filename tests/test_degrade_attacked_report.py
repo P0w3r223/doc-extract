@@ -12,6 +12,7 @@ import pytest
 
 from doc_extract.degrade import attacked_report
 from doc_extract.degrade.attacked import Reach
+from doc_extract.eval.format import DASH
 
 
 def _reach(placement: str, rung: str, *, text: bool, image: bool) -> Reach:
@@ -65,6 +66,36 @@ def test_the_erased_placement_is_named_and_the_surviving_ones_are_too() -> None:
 
     assert "erases `invisible` outright" in body
     assert "`footer`" in body
+
+
+#: A placement erased at one rung and surviving at another. Not what today's corpus produces — the
+#: scanner is all-or-nothing about white ink — which is exactly why it needs a fixture: the sentence
+#: says "at every rung", and a version computed from *any* rung would name this placement in both
+#: halves of it.
+PARTLY_ERASED = [
+    _reach("footer", "searchable", text=True, image=True),
+    _reach("footer", "rasterised", text=False, image=False),
+    _reach("annotations", "searchable", text=True, image=True),
+    _reach("annotations", "rasterised", text=False, image=True),
+]
+
+
+def test_a_placement_erased_at_only_one_rung_is_claimed_by_neither_half() -> None:
+    body = attacked_report.render(PARTLY_ERASED)
+
+    assert "erases" not in body, "erased at one rung is not erased at every rung"
+    assert f"| `footer` | {attacked_report.BOTH} | {attacked_report.NOBODY} |" in body
+
+
+def test_a_cell_whose_documents_disagree_is_reported_as_mixed() -> None:
+    """Resolving it would hide that something other than the placement is deciding."""
+    disagreeing = [
+        _reach("footer", "scanned", text=False, image=True),
+        _reach("footer", "scanned", text=False, image=False),
+    ]
+
+    assert attacked_report.channel(disagreeing).startswith(attacked_report.MIXED)
+    assert attacked_report.channel([]) == DASH
 
 
 def test_neither_sentence_is_printed_where_it_would_be_false() -> None:
