@@ -224,7 +224,7 @@ def test_the_gate_cannot_see_what_a_reading_never_asserted(built):
     corpus, records, _, meta = _run(built, "stripped")
     curve = run.gate(corpus, records)
 
-    assert curve.missed > curve.asserted, "most of the invoice is gone, and only `missed` says so"
+    assert curve.missed > curve.assessed, "most of the invoice is gone, and only `missed` says so"
     assert curve.wrong == 0, "every value it did assert is correct — which is the trap"
     assert all(point.leaked == 0 for point in curve.points)
     assert str(curve.missed) in selective_report.render(curve, run=meta)
@@ -248,7 +248,7 @@ def test_the_gate_refuses_a_subset_nobody_declared(built):
     with pytest.raises(CoverageError, match="scored 1 of the 2 documents"):
         run.gate(corpus, records[:1])
 
-    assert run.gate(corpus, records[:1], allow_partial=True).asserted >= 0
+    assert run.gate(corpus, records[:1], allow_partial=True).assessed >= 0
 
 
 def test_the_gate_reports_everything_it_cannot_judge(built):
@@ -264,7 +264,7 @@ def test_the_gate_reports_everything_it_cannot_judge(built):
     assert curve.without_prediction == 0
     assert curve.missed == 0
     assert curve.unassessable > 0, "`kind` is asserted on every document and never groundable"
-    assert curve.points[-1].total == curve.asserted
+    assert curve.points[-1].total == curve.assessed
 
 
 def test_the_gate_accepts_a_perfect_reading_and_lets_nothing_leak(built):

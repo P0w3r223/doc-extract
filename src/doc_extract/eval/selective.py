@@ -62,17 +62,29 @@ class Excluded:
     model's silence, `unassessable` is a question grounding declines on principle, and
     `without_text` is a question it could not put because the page had no text. A single "excluded"
     total would make a scanned run look like a talkative model with an odd schema.
+
+    **Each of the two asserted exclusions carries its own wrong count**, because the count alone is
+    disclosure and the error content is the finding. A curve that says *3792 values are outside this
+    denominator* has been honest about the size of its blind spot; one that also says *307 of them
+    are wrong* has been honest about what is in it. Without the second number the report reads as a
+    run with a third of the errors it actually made, which is the exclusion this project's own
+    metric rules exist to forbid, one level down.
     """
 
     missed: int = 0
     unassessable: int = 0
     without_text: int = 0
+    #: Of `unassessable` and `without_text` respectively, how many disagree with the gold.
+    wrong_unassessable: int = 0
+    wrong_without_text: int = 0
 
     def __add__(self, other: Excluded) -> Excluded:
         return Excluded(
             missed=self.missed + other.missed,
             unassessable=self.unassessable + other.unassessable,
             without_text=self.without_text + other.without_text,
+            wrong_unassessable=self.wrong_unassessable + other.wrong_unassessable,
+            wrong_without_text=self.wrong_without_text + other.wrong_without_text,
         )
 
 
@@ -151,14 +163,46 @@ class Curve:
     #: with*. A run where this is most of the corpus has a curve over the remainder, and the report
     #: says which remainder.
     without_text: int = 0
+    #: Of the two exclusions above, how many values actually disagree with the gold. Reported so a
+    #: blind spot is described by its contents and not only by its size.
+    wrong_unassessable: int = 0
+    wrong_without_text: int = 0
 
     @property
-    def asserted(self) -> int:
+    def assessed(self) -> int:
+        """The curve's denominator: values this gate could form an opinion about.
+
+        Named `assessed` and not `asserted`, which is what it was called while the two were the
+        same number. Once a value can leave the curve for want of a page to search, a field named
+        for what the *model* did that in fact counts what the *gate* could do is a label that
+        makes a report state two different totals.
+        """
         return len(self.judged)
 
     @property
     def wrong(self) -> int:
+        """Wrong values **inside** the curve. Not the run's total — see `wrong_everywhere`."""
         return sum(1 for row in self.judged if row.wrong)
+
+    @property
+    def offered(self) -> int:
+        """Every value the prediction asserted, assessed or not. The honest total."""
+        return self.assessed + self.unassessable + self.without_text
+
+    @property
+    def wrong_everywhere(self) -> int:
+        return self.wrong + self.wrong_unassessable + self.wrong_without_text
+
+    @property
+    def ungated_accuracy(self) -> float | None:
+        """Accuracy of not gating at all: accept every value the reader asserted.
+
+        The comparison the curve stops being able to make once values leave it. Its `none` row
+        means *accept everything this gate could assess*, which on a corpus of scans is a minority
+        of the answer — so a reader asking "is the gate worth it" needs this number beside that
+        row, and computing it here is what stops the question being settled by prose.
+        """
+        return _ratio(self.offered - self.wrong_everywhere, self.offered)
 
 
 def judge(
@@ -177,12 +221,14 @@ def judge(
     named = _named(prediction)
     rows: list[Judged] = []
     missed = unassessable = without_text = 0
+    wrong_unassessable = wrong_without_text = 0
     seen: set[tuple[str, str]] = set()
 
     for result in compare(gold, prediction):
         if result.outcome is MISSED:
             missed += 1
             continue
+        wrong = result.outcome in WRONG
         identity = (result.field, result.key)
         if identity in seen:
             #: `scorer._spurious_duplicates` emits a repeated row's values under the key it
@@ -190,6 +236,7 @@ def judge(
             #: belongs to a *different* value. Grading an invented row on the real one's grounding
             #: would let a fabricated duplicate inherit its confidence.
             unassessable += 1
+            wrong_unassessable += wrong
             continue
         seen.add(identity)
 
@@ -197,18 +244,21 @@ def judge(
         if assessment is None or not assessment.assessed:
             #: Split by *why* grounding stayed silent, because the two are different findings: a
             #: page with no text layer excludes every value on it, and pooling that with `kind`
-            #: would report a scanner as a schema quirk.
+            #: would report a scanner as a schema quirk. Each keeps its own wrong count, so the
+            #: report can say what is inside the blind spot and not only how big it is.
             if assessment is not None and assessment.support is Support.NO_TEXT:
                 without_text += 1
+                wrong_without_text += wrong
             else:
                 unassessable += 1
+                wrong_unassessable += wrong
             continue
         rows.append(Judged(
             doc_id=doc_id,
             field=result.field,
             key=result.key,
             confidence=_confidence(assessment),
-            wrong=result.outcome in WRONG,
+            wrong=wrong,
             ungrounded=assessment.suspicious,
             #: Recomputed rather than read off the assessment on purpose: `confidence` attaches a
             #: `rule:` reason only when grounding already said `GROUNDED`, so reading the reasons
@@ -216,7 +266,8 @@ def judge(
             accused=result.field in named,
         ))
     return tuple(rows), Excluded(
-        missed=missed, unassessable=unassessable, without_text=without_text
+        missed=missed, unassessable=unassessable, without_text=without_text,
+        wrong_unassessable=wrong_unassessable, wrong_without_text=wrong_without_text,
     )
 
 
@@ -242,6 +293,8 @@ def summarise(
     unassessable: int = 0,
     without_prediction: int,
     without_text: int = 0,
+    wrong_unassessable: int = 0,
+    wrong_without_text: int = 0,
 ) -> Curve:
     """Rows into a curve and two signal scorecards. Pure: it never re-reads a page."""
     rows = tuple(judged)
@@ -257,6 +310,8 @@ def summarise(
         unassessable=unassessable,
         without_prediction=without_prediction,
         without_text=without_text,
+        wrong_unassessable=wrong_unassessable,
+        wrong_without_text=wrong_without_text,
     )
 
 

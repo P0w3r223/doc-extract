@@ -5,11 +5,13 @@
 | run | `results/noisy` |
 | answered by | `noisy` |
 | saw | the gold |
-| values asserted | 5849 |
+| values asserted | 6630 |
 | of which wrong | 105 |
-| gold values never asserted | 44 |
-| asserted but not assessable | 781 |
+| assessed below | 5849 |
+| of those, wrong | 105 |
+| asserted but not assessable | 781 (wrong: 0) |
 | asserted on a page with no text | 0 |
+| gold values never asserted | 44 |
 | documents with no invoice | 0 |
 
 ## The two signals, scored apart
@@ -36,5 +38,5 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 ## Read this before the tables
 
 * **Coverage is over the values the model asserted, not over the document.** A field it left `null` cannot be grounded, so it carries no confidence and sits outside every denominator above. 44 gold value(s) were never asserted at all, and no signal here can see them — a model that answered less would score better on this curve.
-* 781 asserted value(s) are **outside the curve** because grounding declines to ask about them: `kind` is an FA(3) code the page never prints, and a non-numeric rate is an exemption code each issuer abbreviates their own way. They are values a model can get wrong, and nothing above measures whether it did.
+* 781 asserted value(s) are **outside the curve** because grounding declines to ask about them: `kind` is an FA(3) code the page never prints, and a non-numeric rate is an exemption code each issuer abbreviates their own way. 0 of them are wrong, and nothing in the tables above counts those.
 * The confidence levels are produced by fixed rules over the two signals, not by weights fitted to this corpus. That is why there are four of them and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.

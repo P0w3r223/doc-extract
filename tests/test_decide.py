@@ -194,7 +194,7 @@ def test_values_the_model_never_asserted_stay_out_of_the_curve():
     """A model that answered less would otherwise score better. `missed` is reported instead."""
     curve = summarise(_rows((Confidence.HIGH, False)), missed=40, without_prediction=2)
 
-    assert curve.asserted == 1
+    assert curve.assessed == 1
     assert curve.missed == 40
     assert curve.without_prediction == 2
     assert curve.points[0].total == 1, "the denominator is what was asserted"
@@ -218,6 +218,54 @@ def test_a_curve_that_dropped_values_for_want_of_a_page_says_so_above_its_tables
     silent = summarise(rows, missed=0, without_prediction=0)
     assert silent.without_text == 0
     assert "no text layer at all" not in selective_report.render(silent, run=_meta())
+
+
+def test_an_exclusion_reports_the_wrong_values_inside_it_and_not_only_its_size():
+    """Disclosing a blind spot's size is not disclosing its contents.
+
+    The regression this guards: with the excluded values merely counted, a run whose curve showed
+    145 wrong values had 307 more sitting in the population the gate cannot see, and every table
+    in the file agreed that the run had made 145 mistakes.
+    """
+    curve = summarise(
+        _rows((Confidence.HIGH, False), (Confidence.NONE, True)),
+        missed=0, without_prediction=0,
+        unassessable=3, wrong_unassessable=2, without_text=10, wrong_without_text=7,
+    )
+
+    assert curve.wrong == 1, "the curve's own count is unchanged"
+    assert curve.offered == 15 and curve.wrong_everywhere == 10
+
+    body = selective_report.render(curve, run=_meta())
+    assert "| values asserted | 15 |" in body
+    assert "| of which wrong | 10 |" in body
+    assert "10 (wrong: 7)" in body and "3 (wrong: 2)" in body
+
+
+def test_the_gate_is_compared_against_not_gating_at_all_and_the_verdict_is_counted():
+    """The comparison the curve stops being able to make once values leave it.
+
+    Its `none` row accepts everything the gate could *assess*; not gating accepts everything the
+    reader *asserted*. Where most of a corpus is excluded those are different policies, and a
+    verdict typed rather than counted would survive the day the ordering flips — which is how this
+    project came to print *the gate inverts* through the change that stopped it inverting.
+    """
+    #: One wrong value inside the curve, none outside it: gating is the worse policy here, and the
+    #: report has to say so about its own gate.
+    worse = summarise(
+        _rows((Confidence.HIGH, True), (Confidence.NONE, False)),
+        missed=0, without_prediction=0, without_text=98, wrong_without_text=0,
+    )
+    assert worse.ungated_accuracy == 99 / 100
+    assert "still less accurate than not gating at all" in selective_report.render(
+        worse, run=_meta()
+    )
+
+    better = summarise(
+        _rows((Confidence.HIGH, False), (Confidence.NONE, True)),
+        missed=0, without_prediction=0, without_text=8, wrong_without_text=8,
+    )
+    assert "more accurate than not gating at all" in selective_report.render(better, run=_meta())
 
 
 def _meta() -> RunMeta:

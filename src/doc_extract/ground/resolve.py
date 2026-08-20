@@ -99,8 +99,9 @@ class Support(StrEnum):
     ABSENT = "absent"
     #: The field is a code the page does not print. Not answerable, so not answered.
     NOT_PRINTED = "not_printed"
-    #: The **page** carries no text at all, so there was nothing to search. Says nothing about the
-    #: value: a correct one and a fabricated one are equally unfindable on a page made of pixels.
+    #: The **document** carries no text at all, so there was nothing to search. Says nothing about
+    #: the value: a correct one and a fabricated one are equally unfindable on a page of pixels.
+    #: The unit is the document and not the page, and the two can differ — see `_Page.readable`.
     NO_TEXT = "no_text"
 
 
@@ -225,8 +226,15 @@ class _Page:
         A rung with no text layer yields no words, so no lines, so `source/document.py` assembles
         the empty string — but the test is `strip()` rather than emptiness, because the separators
         this layer joins with (a tab between cells, a newline between lines) are exactly what a
-        page reduced to whitespace would come back as, and accusing every value on it of not being
-        found there would be the same mistake in a rarer shape.
+        document reduced to whitespace would come back as, and accusing every value on it of not
+        being found there would be the same mistake in a rarer shape.
+
+        **The unit is the whole document, and that is a known limit.** `SourceDocument` spans
+        pages, so a document with one scanned insert among readable pages is `readable` here, and
+        every value that belonged on the insert would get the `UNGROUNDED` this verdict exists to
+        prevent. No corpus in this project can produce that — a rung is applied to a document
+        entire — but a real held-out set can. Narrowing it needs a claim about which page a value
+        *should* be on, which is the geometric check M5 named and did not build.
         """
         return bool(self._source.strip())
 

@@ -7,9 +7,11 @@
 | saw | the page |
 | values asserted | 0 |
 | of which wrong | 0 |
-| gold values never asserted | 0 |
+| assessed below | 0 |
+| of those, wrong | 0 |
 | asserted but not assessable | 0 |
 | asserted on a page with no text | 0 |
+| gold values never asserted | 0 |
 | documents with no invoice | 108 |
 
 ## The two signals, scored apart

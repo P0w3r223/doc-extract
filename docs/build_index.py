@@ -821,7 +821,12 @@ def _gate_curve(predictions_path) -> dict[str, object] | None:
     return {
         "coverage": top.coverage, "accuracy": top.accuracy, "leaked": top.leaked,
         "all_accuracy": everything.accuracy, "all_leaked": everything.leaked,
-        "assessed": curve.asserted, "without_text": curve.without_text,
+        "assessed": curve.assessed, "without_text": curve.without_text,
+        #: The comparison the curve stops being able to make: its `none` row accepts everything the
+        #: gate could *assess*, and not gating accepts everything the reader *asserted*. Where most
+        #: of a corpus leaves the curve those are different policies, and only the second one is
+        #: the alternative a defender is choosing between.
+        "offered": curve.offered, "ungated": curve.ungated_accuracy,
     }
 
 
@@ -1057,7 +1062,17 @@ def _grounding_on_a_model(grounding: dict) -> str:
     #: that changes cannot leave this paragraph describing the old one.
     silent = [rung for rung, counts in rows.items() if counts["unasked"] and not counts.total()
               - counts["unasked"]]
-    where = _and_list([f"<code>{html.escape(rung)}</code>" for rung in silent])
+    #: Guarded rather than interpolated blindly: an empty list would render "On  it does not
+    #: answer", a false sentence on the page whose point in this change is that verdicts are
+    #: counted rather than typed.
+    absence = (
+        f"On {_and_list([f'<code>{html.escape(rung)}</code>' for rung in silent])} it does not "
+        "answer: every value falls in the last column, and the row is empty because "
+        "<strong>the signal is absent there rather than weak</strong>. That is the honest shape, "
+        "and it is also"
+        if silent else
+        "Every rung here had text to search, so no row is empty &mdash; which is also"
+    )
     return f"""<p>And the mirror of it, on a population of real mistakes: <code>{name}</code>
 reading the same pages as images.</p>
 <table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th><th class="num">could not ask</th></tr></thead>
@@ -1067,9 +1082,7 @@ reading the same pages as images.</p>
 <p class="note">Read the first row against the other two. Where a text layer survives, grounding is
 at its <em>most</em> precise measurement anywhere in this project &mdash; it catches almost every
 wrong value and raises no false alarm at all, on a real population of vision errors rather than an
-injected one. On {where} it does not answer: every value falls in the last column, and the row is
-empty because <strong>the signal is absent there rather than weak</strong>. That is the honest
-shape, and it is also the reason the confusion cells are worth printing per rung instead of pooled
+injected one. {absence} the reason the confusion cells are worth printing per rung instead of pooled
 &mdash; pooled over the whole corpus, this signal once looked barely precise at all, which was a
 measurement of the missing text layer wearing the reader's name. <strong>The gate does not survive
 a scan; it
@@ -1374,33 +1387,34 @@ def _selectivity(curve: object) -> str:
             'doc_extract.degrade --attacked</code>.</p>'
         )
     row: dict[str, object] = curve  # type: ignore[assignment]
-    top, everything = row["accuracy"], row["all_accuracy"]
-    inverted = top is not None and everything is not None and top < everything
+    top, ungated = row["accuracy"], row["ungated"]
+    #: Against *not gating at all*, which is the alternative a defender actually has — not against
+    #: the `none` row, which accepts everything the gate could assess and is therefore a different
+    #: set of values once most of a corpus has left the curve.
+    costly = top is not None and ungated is not None and top < ungated
     verdict = (
-        "<strong>And the gate inverts: its own bucket is the less accurate one.</strong>"
-        if inverted else
-        "<strong>And the gate is selective again</strong> &mdash; more accurate on less work, "
+        "<strong>And gating still costs accuracy here.</strong>"
+        if costly else
+        "<strong>And gating buys accuracy here</strong> &mdash; more accurate on less work, "
         "which is what a gate is for."
     )
-    history = (
-        "" if inverted else
-        " It was not, until grounding learned to say <em>I could not ask</em>. While a value on a "
-        "page with no text came back as <code>UNGROUNDED</code>, the only values that could reach "
-        "the confident bucket were those on the rung that kept a text layer &mdash; which is "
-        "exactly the rung where the attacks worked &mdash; so the gate collected the "
-        "attacked-and-obeyed values into the bucket it called high confidence, and auto-accepting "
-        "that bucket scored <em>worse</em> than accepting everything. The inversion was the "
-        "instrument, and fixing the instrument was the milestone after this one."
+    mechanism = (
+        " The gate's signal exists only on the rung that kept a text layer, which is exactly the "
+        "rung where the attacks worked &mdash; so its confident bucket is concentrated on the "
+        "attacked documents. On a population of model <em>errors</em> the same gate raises "
+        "accuracy instead."
+        if costly else ""
     )
     return f"""{CORPUS_DEPENDENT}
-<p>{verdict} Accepting only the high-confidence values covers {rate(row["coverage"])} of what this
-pipeline could assess at {rate(row["accuracy"])} accuracy and lets {row["leaked"]} wrong values
-through; accepting <em>everything</em> is {rate(row["all_accuracy"])} accurate and leaks
-{row["all_leaked"]}.{history}</p>
-<p class="note">Both figures are over the {row["assessed"]} values the gate could form an opinion
-about. The other {row["without_text"]} sit on a page with no text layer, and it has
-<strong>no signal on them at all</strong> &mdash; not a low one. That is the cost a scan actually
-imposes here, and it is a property of the page rather than of the reader.</p>
+<p>{verdict} Auto-accepting only the high-confidence values is {rate(row["accuracy"])} accurate and
+lets {row["leaked"]} wrong values through, while <strong>not gating at all</strong> &mdash;
+accepting every one of the {row["offered"]} values the reader asserted &mdash; is
+{rate(row["ungated"])}.{mechanism}</p>
+<p class="note">The curve's own bottom row is a different comparison: it accepts everything the gate
+could <em>assess</em>, {row["assessed"]} values, at {rate(row["all_accuracy"])}. The other
+{row["without_text"]} sit on a page with no text layer, where the gate has <strong>no signal at all
+</strong> &mdash; not a low one. It used to call them ungrounded, which is how a scan came to look
+like a reader's mistake; saying so removed the false alarms and did not bring the signal back.</p>
 {CORPUS_DEPENDENT_END}"""
 
 

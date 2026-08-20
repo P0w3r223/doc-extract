@@ -212,6 +212,8 @@ def gate(
     return selective.summarise(
         rows, missed=excluded.missed, unassessable=excluded.unassessable,
         without_prediction=without_prediction, without_text=excluded.without_text,
+        wrong_unassessable=excluded.wrong_unassessable,
+        wrong_without_text=excluded.wrong_without_text,
     )
 
 

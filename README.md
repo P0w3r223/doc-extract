@@ -52,11 +52,12 @@ while the regex baseline drops to 0 % on every rung that loses the text layer. T
 has no model arm.
 
 The scanner is then pointed at the attacked corpus, and that produced the sharpest negative in the
-project *and* its correction. On an attacked scan the routing gate's high-confidence bucket came out
-**less** accurate than answering everything — and taking that apart showed the fault was in the
-instrument: grounding said *not on the page* where it meant *there was no page text to search*.
-Given a third verdict for that, the gate is selective again, **3989 false alarms against a perfect
-reading disappear**, and not one leaked value moves. See *Now photograph the attacked page* below.
+project: **on an attacked scan, auto-accepting the gate's high-confidence values is less accurate
+than not gating at all**, because its signal exists only on the rung a payload survives. Taking that
+apart also found a defect underneath it — grounding said *not on the page* where it meant *there was
+no page text to search* — and a third verdict for that removed **3989 false alarms against a perfect
+reading** without moving a single leaked value. The finding narrowed; it did not go away. See *Now
+photograph the attacked page* below.
 
 ## Does "the arithmetic holds" predict "the fields are right"?
 
@@ -296,7 +297,7 @@ letting a zero read as a miss.
 | `foreign/` | the same gold on three unfamiliar Polish layouts — how much of a reading was the template |
 | `degrade/`, `source/raster.py` | the same page photographed at three rungs of legibility, and the pixels a model is sent |
 | `degrade/attacked.py` | M6's grid photographed — which channel a payload still reaches a reader by |
-| tests | **741 passing**, ruff clean |
+| tests | **744 passing**, ruff clean |
 
 Milestone 7 has both held-out corpora, the vision path, paid arms reading the scanned corpus and the
 attacked scan as images. What it has **not** got is a paid arm over the *foreign* corpus — a
@@ -399,14 +400,22 @@ that kept a text layer, and that is exactly the rung where the attacks worked �
 concentrated the attacked-and-obeyed values into the bucket it called high confidence. On M5's
 population of model errors the same gate turned 98.7 % into 99.96 %; here it was anti-selective.
 
-**That was the instrument, not the gate.** Grounding now answers `NO_TEXT` where it means *there was
-nothing to look in*, such a value is routed to review rather than accepted, and both columns on the
-right are over the same 2697 values of the 8745 asserted — which is what makes them comparable. The
-gate behaves as a gate again: more accurate on less work. **Not one leaked value moved**, because
-fixing a measurement defends nothing; what it removes is the earlier reading that routing makes an
-attacked scan *worse*, which was never a fact about the pipeline. Every `gate.md` computed over such
-a corpus prints the share of what the model asserted that sits on a page with no text at all
-(69.2 % here), and on those the gate has **no signal whatever** — which is still the thing to fix.
+Grounding now answers `NO_TEXT` where it means *there was nothing to look in*, such a value is
+routed to review rather than accepted, and both columns on the right are over the same 2697 values
+of the 9894 asserted — which is what makes them comparable. **Not one leaked value moved**, because
+fixing a measurement defends nothing.
+
+**And the operational finding survives the fix.** The `none` row accepts everything the gate could
+*assess*, which here is a quarter of the answer; the policy you actually choose against is **not
+gating at all** — all 9894 asserted values, 66 wrong, **99.3 %**, against **99.0 %** for
+auto-accepting the confident bucket. So gating an attacked scan still costs accuracy, for the
+original reason: the gate's signal exists only on the rung a payload survives, so its confident
+bucket is concentrated on the attacked documents. What the third verdict removed is the false alarms
+and a denominator that measured the page under the reader's name — not the concentration. The report
+computes that comparison itself and prints the verdict, so it is not a claim in prose. Every
+`gate.md` over such a corpus also prints the share of asserted values sitting on a page with no text
+(61.1 % here) and how many of them are wrong; on those the gate has **no signal whatever**, which is
+still the thing to fix.
 
 ## What the baselines say, and what the model says
 
