@@ -268,7 +268,6 @@ def foreign_study(corpus: list) -> list[dict[str, object]] | None:
         rows.append({
             "baseline": baseline,
             "own_accuracy": there.overall.accuracy,
-            "own_extracted": there.extracted,
             "foreign_accuracy": here.overall.accuracy,
             "foreign_extracted": here.extracted,
             "documents": here.documents,
@@ -278,12 +277,22 @@ def foreign_study(corpus: list) -> list[dict[str, object]] | None:
                 if record.failure
             ),
         })
-    #: Declared baseline order rather than the directory listing's, for the reason the main
-    #: table gives: the controls are what make the interesting row readable, and alphabetical
-    #: would open on whichever name sorts first.
-    order = [baseline.name for baseline in BASELINES]
-    rows.sort(key=lambda row: order.index(row["baseline"]))
+    rows.sort(key=_row_order)
     return rows or None
+
+
+def _row_order(row: dict) -> tuple[int, str]:
+    """Declared baseline order, with the models after the controls that make them readable.
+
+    Alphabetical would open a held-out table on whichever name sorts first. Indexing straight into
+    the baseline list would have been enough while every run was a baseline — but a remote run's
+    directory is named for the *model*, because the baseline is `claude` every time and the model
+    is what varies, so the first paid arm over a held-out corpus raised `ValueError` here. A model
+    row is not a control and belongs below them, which is where an unknown name now goes.
+    """
+    order = [baseline.name for baseline in BASELINES]
+    name = str(row["baseline"])
+    return (order.index(name), "") if name in order else (len(order), name)
 
 
 def _summary(directory, gold: dict):
@@ -334,6 +343,10 @@ def _study(corpus: list, predictions_path, severity: Severity) -> detector.Study
 #: How a run over M7's scanned corpus is named, on the same convention the foreign one uses.
 SCANNED_PREFIX = "scanned-"
 
+#: The fence around the one block of this page that cannot be built without a corpus on disk.
+CORPUS_DEPENDENT = "<!-- corpus-dependent: begin -->"
+CORPUS_DEPENDENT_END = "<!-- corpus-dependent: end -->"
+
 #: The rungs, in the order the page should read them: most legible first. Imported rather than
 #: written out, so a rung added to the package appears here instead of being silently dropped.
 RUNG_ORDER: tuple[str, ...] = RUNG_NAMES
@@ -374,8 +387,7 @@ def scanned_study(corpus: list) -> list[dict[str, object]] | None:
                 name: by_rung[name].accuracy for name in RUNG_ORDER if name in by_rung
             },
         })
-    order = [baseline.name for baseline in BASELINES]
-    rows.sort(key=lambda row: order.index(row["baseline"]))
+    rows.sort(key=_row_order)
     return rows or None
 
 
@@ -753,7 +765,12 @@ def scanned_section(rows: list[dict[str, object]] | None, grounding: dict | None
             for name, counts in grounding.items()
         )
         total = sum(counts["ungrounded"] for counts in grounding.values())
-        gate = f"""<p><strong>The column above is not the finding. What a scan does to the
+        #: Fenced by a comment because this is the one block on the page that needs a corpus on
+        #: disk, so it is the one block `tests/test_site_committed.py` has to forgive when it
+        #: checks the committed page against the generator. A fence the test can key on beats a
+        #: pattern over prose that a rewording would silently widen.
+        gate = f"""{CORPUS_DEPENDENT}
+<p><strong>The column above is not the finding. What a scan does to the
 <em>gate</em> is.</strong> Run the oracle &mdash; a perfect reading, nothing wrong anywhere &mdash;
 over the scanned corpus, and grounding raises {total} false alarms:</p>
 <table><thead><tr><th>rung</th><th class="num">grounded</th><th class="num">ungrounded</th></tr></thead>
@@ -764,7 +781,8 @@ over the scanned corpus, and grounding raises {total} false alarms:</p>
 does not degrade &mdash; it inverts, and it inverts <em>silently</em>: an ungrounded correct value
 looks exactly like an ungrounded fabricated one. Of the two signals the routing gate is built on,
 only the arithmetic survives a scan &mdash; and that is the one an adversary can satisfy on
-purpose.</p>"""
+purpose.</p>
+{CORPUS_DEPENDENT_END}"""
     return f"""<h2>When the page is a picture</h2>
 <p>Every document measured so far arrived with a text layer <code>reportlab</code> wrote: exact,
 complete, in the order the values were drawn. That is the last unearned advantage in the corpus. An
@@ -1313,7 +1331,7 @@ manifest also records the reportlab version and the font digests, because every 
 depends on them.</p>
 
 <footer>
-  <p><a href="{repo}">Source on GitHub</a> &middot; built from
+  <p><a href="{repo}">Source on GitHub</a> &middot; built from the tree after
   <code>{commit}</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium

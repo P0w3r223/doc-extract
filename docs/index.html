@@ -307,11 +307,13 @@ layer and changes nothing else, and one is what a supplier emails at 150&nbsp;dp
     <tr><th><code>oracle</code></th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
     <tr><th><code>constant</code></th><td class="num">3.0&nbsp;%</td><td class="num">3.1&nbsp;%</td><td class="num">2.9&nbsp;%</td><td class="num">2.9&nbsp;%</td></tr>
     <tr><th><code>pattern</code></th><td class="num">86.3&nbsp;%</td><td class="num">79.7&nbsp;%</td><td class="num">0.0&nbsp;%</td><td class="num">0.0&nbsp;%</td></tr>
+    <tr><th><code>claude-haiku-4-5</code></th><td class="num">97.8&nbsp;%</td><td class="num">92.0&nbsp;%</td><td class="num">82.8&nbsp;%</td><td class="num">91.6&nbsp;%</td></tr>
 </tbody></table>
 <p class="note">The control is exact rather than approximate: the fitted reader's predictions on the
 rung that keeps a text layer are identical, field for field, to its predictions on the clean corpus.
 That is what makes the other two columns a measurement of the missing text layer and not of the
 damage to the image.</p>
+<!-- corpus-dependent: begin -->
 <p><strong>The column above is not the finding. What a scan does to the
 <em>gate</em> is.</strong> Run the oracle &mdash; a perfect reading, nothing wrong anywhere &mdash;
 over the scanned corpus, and grounding raises 3989 false alarms:</p>
@@ -326,6 +328,7 @@ does not degrade &mdash; it inverts, and it inverts <em>silently</em>: an ungrou
 looks exactly like an ungrounded fabricated one. Of the two signals the routing gate is built on,
 only the arithmetic survives a scan &mdash; and that is the one an adversary can satisfy on
 purpose.</p>
+<!-- corpus-dependent: end -->
 
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no
@@ -498,8 +501,8 @@ manifest also records the reportlab version and the font digests, because every 
 depends on them.</p>
 
 <footer>
-  <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from
-  <code>1f266ed</code> &middot; part of a
+  <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
+  <code>f3e7c09</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

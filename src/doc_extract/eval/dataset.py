@@ -69,22 +69,30 @@ class Case:
         """The ground truth, read back out of the FA(3) document the corpus shipped."""
         return fa3_xml.gold_from_xml(self._verified(self.xml_path, self.xml_sha256).decode("utf-8"))
 
-    def source(self) -> SourceDocument:
-        """The page, as text with a span per word and per cell. No model, no network."""
-        return source_document.read(self._verified(self.pdf_path, self.pdf_sha256))
+    def pdf_bytes(self) -> bytes:
+        """The page's bytes, verified against the manifest. The one place either reader starts."""
+        return self._verified(self.pdf_path, self.pdf_sha256)
 
-    def images(self) -> tuple[PageImage, ...]:
+    def source(self, data: bytes | None = None) -> SourceDocument:
+        """The page, as text with a span per word and per cell. No model, no network.
+
+        `data` lets a caller that already holds the verified bytes hand them back rather than have
+        the file read and hashed a second time — which a vision run, needing both readings of one
+        page, otherwise would.
+        """
+        return source_document.read(self.pdf_bytes() if data is None else data)
+
+    def images(self, data: bytes | None = None) -> tuple[PageImage, ...]:
         """The page as pictures of itself, one per printed page, ready to send to a model.
 
         Rasterised from the same verified bytes `source()` reads, so a vision arm and a text arm are
         demonstrably looking at the same document rather than at two files that happen to share a
         name. PNG rather than JPEG: the corpus already carries whatever damage it is meant to carry,
-        and a second lossy encoding on the way out would add damage no rung asked for.
+        and a second lossy encoding on the way out would add damage no rung asked for — at the cost
+        of an upload several times the size of the JPEG already inside the page.
         """
-        data = self._verified(self.pdf_path, self.pdf_sha256)
-        return tuple(
-            PageImage(media_type="image/png", data=_png(page)) for page in raster.for_vision(data)
-        )
+        pages = raster.for_vision(self.pdf_bytes() if data is None else data)
+        return tuple(PageImage(media_type="image/png", data=_png(page)) for page in pages)
 
     def _verified(self, path: Path, expected: str) -> bytes:
         try:

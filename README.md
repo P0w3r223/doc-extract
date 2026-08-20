@@ -27,7 +27,7 @@ unenforced.** Checking those rules is therefore real work, not a re-run of valid
 exists. The vendored schema is in `schemas/` with its provenance and SHA-256, so the claim is
 checkable rather than asserted.
 
-## Status — milestones 1–6 of 7
+## Status — milestones 1–6 of 7, and most of the seventh
 
 The domain layer, the corpus generator, the extraction pipeline and the scorer are complete, and the
 real model has been run through the identical path. Everything except that one command runs with no
@@ -141,8 +141,9 @@ difference between the two columns is the **page**, because nothing else moved.
 
 `pattern` did not read the page badly — it could not *begin*. Not one of the 108 documents produced
 an invoice the schema would accept, every one recorded as `schema_invalid`. Of the eleven fields its
-regexes fill on its own page it fills **three** here — four on the third of the corpus whose dialect
-happens to print ISO dates, which is the only place a date survives at all. **The labels it matches were the whole of what it
+regexes fill on its own page it fills **three** here — five on the third whose dialect prints ISO
+dates *and* heads its page `Faktura nr …`, a shape one of B2's patterns happens to match. Every
+other field it reads is keyed on a label, and no foreign page carries one. **The labels it matches were the whole of what it
 was doing** — which is the bound this corpus exists to put on the strongest thing in the project
 that is not a language model.
 
@@ -177,8 +178,9 @@ emails — 150 dpi, off-square, grainy, JPEG at a quality nobody chose.
 
 `pattern`'s 36 `searchable` predictions are identical to its predictions on the clean corpus, field
 for field — which is what makes the other two columns a measurement of the missing text layer rather
-than of the damage to the image. 72 of 108 documents produce no invoice at all: `schema_invalid`,
-every one.
+than of the damage to the image. 72 of the 108 carry no text layer and not one of them produces an
+invoice; two more fail on `searchable` for the same reason they fail on the clean page, so 74
+`schema_invalid` in all.
 
 **The result that matters is not that column, though. It is what a scan does to the gate.** Run the
 `oracle` — a *perfect* reading, nothing wrong anywhere — over the scanned corpus and grounding
@@ -214,9 +216,14 @@ letting a zero read as a miss.
 | `eval/` | 22 scored fields matched **by key, not position**; coverage asserted; predictions committed |
 | `ground/`, `decide/` | value → source span, then four confidence levels and a route |
 | `attack/` | 7 payloads × 4 placements over the same invoices, and the attack success rate |
-| tests | **545 passing**, ruff clean |
+| `foreign/` | the same gold on three unfamiliar Polish layouts — how much of a reading was the template |
+| `degrade/`, `source/raster.py` | the same page photographed at three rungs of legibility, and the pixels a model is sent |
+| tests | **658 passing**, ruff clean |
 
-Milestone 7 is **not built**: a real held-out set and the reported synthetic↔real gap.
+What milestone 7 has **not** got is a paid arm over either held-out corpus. The two corpora, the
+vision request path and the offline baselines over both are built and reported above; the models'
+own numbers on them — and therefore the synthetic↔real gap as a figure rather than as a method —
+are the open item.
 
 ## What an attacker gets, and what the gate does about it
 
@@ -348,9 +355,11 @@ Every tier is rendered in all three layouts, so a per-tier result can never be a
 in disguise. The corpus is a function of one integer: the seed is in the manifest, the bytes are
 reproducible, and nothing is committed.
 
-**What the synthetic corpus does not have** is real-world visual chaos — skew, stamps, poor scans,
-layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
-costs, and the gap will be reported whichever way it comes out.
+**What the synthetic corpus does not have** is a page nobody in this repository designed. Two of
+the three things that used to be missing are measured now, on held-out corpora of their own: an
+unfamiliar layout (`foreign/`) and a poor scan (`degrade/`), each varying one thing so that a drop
+is attributable to it. What is still absent is a genuinely real invoice — a stamp, a signature, a
+fold, a layout no template anticipated because no template wrote it.
 
 ## Four design decisions worth stating up front
 
