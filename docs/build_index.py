@@ -437,16 +437,26 @@ def grounding_on_a_scan(corpus: list) -> dict[str, object] | None:
         document.doc_id: _with_template(document, rung.name)
         for document, rung in scanned_documents()
     }
-    models = sorted(
-        directory for directory in (ROOT / "results").glob(f"{SCANNED_PREFIX}*")
+    arms = {
+        directory: _grounding_by_rung(directory, cases, gold)
+        for directory in sorted((ROOT / "results").glob(f"{SCANNED_PREFIX}*"))
         if directory.name[len(SCANNED_PREFIX):] not in {entry.name for entry in BASELINES}
         and (directory / prediction_file.PREDICTIONS_NAME).exists()
-    )
+    }
+    #: The arm with the most wrong values, not the first one on disk. A precision of 100 % over a
+    #: single mistake is an anecdote; the point of this table is what the signal does against a
+    #: *population* of them, so the model that made one is the one worth printing. Alphabetical
+    #: order happened to pick the right arm here, which is exactly why it should not decide.
+    best = max(arms, key=lambda directory: _wrong_values(arms[directory]), default=None)
     return {
         "control": _grounding_by_rung(control, cases, gold),
-        "model": models[0].name[len(SCANNED_PREFIX):] if models else None,
-        "model_rows": _grounding_by_rung(models[0], cases, gold) if models else None,
+        "model": best.name[len(SCANNED_PREFIX):] if best else None,
+        "model_rows": arms[best] if best else None,
     }
+
+
+def _wrong_values(rows: dict[str, collections.Counter]) -> int:
+    return sum(counts["TP"] + counts["FN"] for counts in rows.values())
 
 
 def _grounding_by_rung(directory, cases: dict, gold: dict) -> dict[str, collections.Counter]:

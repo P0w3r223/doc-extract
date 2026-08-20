@@ -308,12 +308,13 @@ layer and changes nothing else, and one is what a supplier emails at 150&nbsp;dp
     <tr><th><code>constant</code></th><td class="num">3.0&nbsp;%</td><td class="num">3.1&nbsp;%</td><td class="num">2.9&nbsp;%</td><td class="num">2.9&nbsp;%</td></tr>
     <tr><th><code>pattern</code></th><td class="num">86.3&nbsp;%</td><td class="num">79.7&nbsp;%</td><td class="num">0.0&nbsp;%</td><td class="num">0.0&nbsp;%</td></tr>
     <tr><th><code>claude-haiku-4-5</code></th><td class="num">97.8&nbsp;%</td><td class="num">92.0&nbsp;%</td><td class="num">82.8&nbsp;%</td><td class="num">91.6&nbsp;%</td></tr>
+    <tr><th><code>claude-opus-5</code></th><td class="num">100&nbsp;%</td><td class="num">99.9&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
 </tbody></table>
 <p class="note">The control is exact rather than approximate: the fitted reader's predictions on the
 rung that keeps a text layer are identical, field for field, to its predictions on the clean corpus.
 That is what makes the other two columns a measurement of the missing text layer and not of the
 damage to the image.</p>
-<p class="note">For <code>claude-haiku-4-5</code>, <em>its own page</em> is that model reading the clean corpus as <strong>text</strong>, so the drop across the row is two changes at once — the page became a picture and the reader started looking at pixels. The column that isolates the modality alone is <code>searchable</code>: the same information is available there as in the text arm, and it is read as an image.</p>
+<p class="note">For <code>claude-haiku-4-5</code>, <code>claude-opus-5</code>, <em>its own page</em> is that model reading the clean corpus as <strong>text</strong>, so the drop across the row is two changes at once — the page became a picture and the reader started looking at pixels. The column that isolates the modality alone is <code>searchable</code>: the same information is available there as in the text arm, and it is read as an image.</p>
 <p class="note">One figure above is not a legibility result: <code>claude-haiku-4-5</code> on <code>rasterised</code> (1 document) ran out of output tokens mid-answer. A truncated document contributes every one of its fields as <em>missed</em>, which is enough to move a rung's accuracy by several points on its own — and running out of room while transcribing a long table from an image is a cost of the modality rather than of the rung.</p>
 <!-- corpus-dependent: begin -->
 <p><strong>The column above is not the finding. What a scan does to the
@@ -518,7 +519,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>88e3b90</code> &middot; part of a
+  <code>ce12805</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

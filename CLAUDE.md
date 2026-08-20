@@ -291,11 +291,13 @@ re-run a paid model to be checked would be one too.
    answers how much of it was the text layer, and what a scan does to the gate (*What a scan
    costs* below). The vision path is built and tested offline — one pipeline, one repair loop,
    one failure taxonomy, with the modality chosen by the request rather than by a second code
-   path, and it has been **run against a real model**: `claude-haiku-4-5` reads the scanned corpus
-   as images at 88.7 % against 97.8 % for the same model on the clean page as text, and the gate's
-   grounding signal turns out to survive an OCR even though it does not survive a scan. Still open:
-   a paid arm over the *foreign* corpus, which is a separate spend and a separate question, and the
-   synthetic↔real gap as an artifact of its own rather than as three sections.
+   path, and it has been **run against two real models**: `claude-opus-5` reads the scanned corpus
+   as images at 99.98 % and `claude-haiku-4-5` at 88.7 %, against 100 % and 97.8 % for the same two
+   on the clean page as text. So a scan costs a frontier model essentially nothing and a small one
+   nine points — and the gate's grounding signal turns out to survive an OCR even though it does not
+   survive a scan. Still open: a paid arm over the *foreign* corpus, which is a separate spend and a
+   separate question, and the synthetic↔real gap as an artifact of its own rather than as three
+   sections.
 
 ## The headline answer, and what it is really measuring
 
@@ -430,15 +432,22 @@ already showed that is the one an adversary can satisfy on purpose.
 
 ### What a model reads off it, and what the gate can still tell it
 
-`claude-haiku-4-5` over the same corpus, each page sent as an image, everything else unchanged:
+Two models over the same corpus, each page sent as an image, everything else unchanged:
 
 | | text, clean page | image, scanned page |
 |---|---:|---:|
-| accuracy | 97.8 % | **88.7 %** |
-| value accuracy | 98.9 % | 92.1 % |
-| every field right | 65 / 108 | 10 / 108 |
+| `claude-opus-5` | 100 % | **99.98 %** |
+| `claude-haiku-4-5` | 97.8 % | **88.7 %** |
 
-Per rung: 92.0 %, 82.8 %, 91.6 %. The middle figure is **not a legibility result** — one document
+**A scan costs the frontier model one wrong value in 6066 and the small one nine points.**
+`claude-opus-5` reads a 150 dpi off-square grainy JPEG as well as it reads the clean text layer:
+107 of 108 exact, no repairs, no failures, and the single wrong value is caught by a hard rule. That
+is the M4 result again on a harder page — legibility is not what makes this task difficult for a
+frontier model, which is why `pattern` going 86.3 % → 0 % across the same rungs is the more
+informative row.
+
+The haiku arm is the one with a population to look at. Per rung: 92.0 %, 82.8 %, 91.6 %. The middle
+figure is **not a legibility result** — one document
 ran out of output tokens mid-answer and contributed 180 missed fields on its own, which is a cost of
 transcribing a long table from an image rather than of the rung. Set it aside and the three read
 92.0 / 90.7 / 91.6 %: **the rung barely matters to a reader that looks at the page**, the exact
@@ -459,6 +468,12 @@ one. The other two flag everything, so their recall is 100 % by vacuity. **The g
 a scan; it survives an OCR**, and that is a usable engineering conclusion rather than a negative
 result: a recogniser in front of the model brings the signal back. It is also why the `searchable`
 rung is a control and not a curiosity — it is the pipeline anyone would actually deploy.
+
+**The coverage is paid whether or not the model needed watching.** `claude-opus-5` gets one value
+wrong in the whole corpus and still reaches only **32.3 %** high-confidence coverage — the oracle's
+own figure, because only the `searchable` third can ground at all — against 89.7 % for the same gate
+on a clean page. Two thirds of a nearly perfect reading is routed to review by a signal that had
+nothing to say about it.
 
 The vision path is what is left when the text layer is gone, and it is one pipeline rather than two:
 `images` on the request chooses the modality, and the schema, the repair loop with its own budget,
@@ -604,10 +619,16 @@ The diagnosis is that M2's tiers vary the *semantics* of an invoice — grosz ro
 reverse charge, multiple pages — and not the *legibility* of the page. That is hard for a parser
 (`pattern` reaches 86.3 %) and not hard at all for a frontier model reading a clean PDF text layer.
 Hence the second remote arm: a weaker model on the same corpus buys a real error population without
-changing the corpus and invalidating every committed run. **M7's real held-out set remains
-load-bearing** — it is the only place the question gets asked on documents nobody generated.
+changing the corpus and invalidating every committed run.
 
-658 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+**M7 tested that diagnosis and it held.** Making the page *illegible* — 150 dpi, off-square, grainy,
+no text layer — moved `claude-opus-5` from 100 % to 99.98 % while moving `pattern` from 86.3 % to
+0 %. Legibility is not the axis a frontier model is short on. Making the page *unfamiliar* is a
+different matter and is the one M7 could not put a model against: the foreign corpus has no paid arm
+yet. **A real held-out set remains load-bearing** — it is the only place the question gets asked on
+documents nobody generated.
+
+662 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

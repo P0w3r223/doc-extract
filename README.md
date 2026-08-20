@@ -44,9 +44,10 @@ at all for a language model given a clean PDF text layer.
 So the corpus is saturated, and the headline question cannot be asked of *that* run: with no errors,
 the detector has nothing to detect. What it does establish is that the gate never blocks correct
 work — **0 false positives on 108 correct documents**. The question itself is answered on a second
-arm: the same corpus, the same pipeline, a weaker model. Milestone 7 adds two more corpora that
-un-saturate it without touching the gold — the same invoices printed in an unfamiliar vocabulary,
-and the same page photographed — and a third arm that reads the photographs as pixels.
+arm: the same corpus, the same pipeline, a weaker model. Milestone 7 adds two more corpora that vary
+the page without touching the gold — the same invoices printed in an unfamiliar vocabulary, and the
+same page photographed — and reads the photographs as pixels. **Only one of the two un-saturates it:**
+the regex baseline goes to 0 % on both, and `claude-opus-5` reads a 150 dpi scan at 99.98 %.
 
 ## Does "the arithmetic holds" predict "the fields are right"?
 
@@ -208,18 +209,25 @@ exactly two blocks — the trust boundary and the layout description — and a t
 shared rather than merely alike, because a gap measured across two independently written prompts
 would be partly a gap between prompts.
 
-`claude-haiku-4-5`, same gold, same 108 invoices:
+Two models, same gold, same 108 invoices, one thing changed:
 
 | | text, clean page | image, scanned page |
 |---|---:|---:|
-| accuracy | 97.8 % | **88.7 %** |
-| value accuracy | 98.9 % | 92.1 % |
-| every field right | 65 / 108 | 10 / 108 |
+| `claude-opus-5` | 100 % | **99.98 %** |
+| `claude-haiku-4-5` | 97.8 % | **88.7 %** |
 
-Per rung it scores 92.0 %, 82.8 % and 91.6 %, and the middle figure is not a legibility result: one
-document ran out of output tokens mid-answer and contributed 180 missed fields by itself. Set it
-aside and the three rungs read **92.0 / 90.7 / 91.6 %**. So the rung barely matters to a reader that
-looks at the page — the exact mirror of the baseline table above, where it decides everything.
+**A scan costs the frontier model one wrong value in 6066 and costs the small one nine points.** The
+page is 150 dpi, off-square, grainy and JPEG'd, and `claude-opus-5` reads it as well as it reads the
+clean text layer — 107 of 108 documents exact, no repairs, no failures. That is a result about the
+corpus as much as about the model, and it is the same result M4 got on the clean one: **legibility
+is not what makes this task hard for a frontier model.** The regex baseline goes from 86.3 % to 0 %
+across the same three rungs.
+
+The haiku arm is the one with a population of mistakes to look at. Per rung it scores 92.0 %, 82.8 %
+and 91.6 %, and the middle figure is not a legibility result: one document ran out of output tokens
+mid-answer and contributed 180 missed fields by itself. Set it aside and the three rungs read
+**92.0 / 90.7 / 91.6 %** — so the rung barely matters to a reader that looks at the page, the exact
+mirror of the baseline table above, where it decides everything.
 
 The gate is the interesting half. Split the same run's grounding by whether the page kept a text
 layer:
@@ -235,6 +243,11 @@ project** — 136 of 137 wrong values caught, not one false alarm, on a real vis
 Where there is none it flags everything, so the recall is 100 % by vacuity and the precision
 collapses. **The gate does not survive a scan; it survives an OCR** — which is a usable conclusion
 rather than a negative one. Put a recogniser in front of the model and the signal comes back.
+
+And the cost is paid whether or not the model needed watching. `claude-opus-5` gets one value wrong
+in the whole corpus — the hard rules catch that one — yet its high-confidence coverage is **32.3 %**
+against the 89.7 % the same gate reaches on a clean page. Two thirds of a nearly perfect reading is
+routed to review because the page it came from cannot be searched.
 
 A misread year — `2025-08-05` for `2026-08-05` — is the tenth injected error kind, and gives the
 date rules a recall too: on `noisy`, the heuristic half reads precision 100 %, recall 5.6 %, zero
@@ -257,7 +270,7 @@ letting a zero read as a miss.
 | `attack/` | 7 payloads × 4 placements over the same invoices, and the attack success rate |
 | `foreign/` | the same gold on three unfamiliar Polish layouts — how much of a reading was the template |
 | `degrade/`, `source/raster.py` | the same page photographed at three rungs of legibility, and the pixels a model is sent |
-| tests | **658 passing**, ruff clean |
+| tests | **662 passing**, ruff clean |
 
 Milestone 7 has both held-out corpora, the vision path, and a paid arm reading the scanned one as
 images. What it has **not** got is a paid arm over the *foreign* corpus — a separate spend and a
