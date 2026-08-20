@@ -155,7 +155,45 @@ different, it is still solvable.
 
 **It is not a real held-out set and does not claim to be.** It holds the semantics fixed on purpose,
 which is what lets it attribute a drop to presentation and nothing else; real invoices also bring
-skew, stamps, scans and layouts nobody anticipated, and none of that is here.
+stamps, layouts nobody anticipated, and — the next section — scans.
+
+## When the page is a picture
+
+Every document measured up to here arrived with a text layer reportlab wrote: exact, complete, in
+the order the values were drawn. That is the last unearned advantage in the corpus. An invoice in a
+real inbox is frequently a *photograph* of an invoice — printed, put on a platen slightly crooked,
+emailed back as a JPEG inside a PDF — and there is no text layer at all.
+
+So a third corpus prints the same gold in the same layout and then **scans** it, at three rungs that
+each isolate one thing: `searchable` keeps a text layer (a scan whose OCR is assumed perfect),
+`rasterised` removes the text layer and changes nothing else, and `scanned` is what a supplier
+emails — 150 dpi, off-square, grainy, JPEG at a quality nobody chose.
+
+| baseline | its own page | `searchable` | `rasterised` | `scanned` |
+|---|---:|---:|---:|---:|
+| `oracle` | 100 % | 100 % | 100 % | 100 % |
+| `constant` | 3.0 % | 3.1 % | 2.9 % | 2.9 % |
+| `pattern` | **86.3 %** | **79.7 %** | **0.0 %** | **0.0 %** |
+
+`pattern`'s 36 `searchable` predictions are identical to its predictions on the clean corpus, field
+for field — which is what makes the other two columns a measurement of the missing text layer rather
+than of the damage to the image. 72 of 108 documents produce no invoice at all: `schema_invalid`,
+every one.
+
+**The result that matters is not that column, though. It is what a scan does to the gate.** Run the
+`oracle` — a *perfect* reading, nothing wrong anywhere — over the scanned corpus and grounding
+raises **3989 false alarms on 5892 asserted values**. The split is total:
+
+| rung | grounded | ungrounded |
+|---|---:|---:|
+| `searchable` | 1903 | 0 |
+| `rasterised` | 0 | 2010 |
+| `scanned` | 0 | 1979 |
+
+Grounding resolves a value to a span of page text, and there is no page text. It does not degrade;
+it inverts — every value looks fabricated, so high-confidence coverage falls to **32.3 %** on a
+reading that is entirely correct. Of the gate's two signals, **only the arithmetic survives a scan**,
+and that is the signal M6 already showed an adversary can satisfy on purpose.
 
 A misread year — `2025-08-05` for `2026-08-05` — is the tenth injected error kind, and gives the
 date rules a recall too: on `noisy`, the heuristic half reads precision 100 %, recall 5.6 %, zero

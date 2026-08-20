@@ -16,6 +16,7 @@ dist/
 data/synthetic/
 data/attacked/
 data/foreign/
+data/scanned/
 
 # `results/` is deliberately NOT ignored. The metric rules require the prediction files to be
 # committed: a report is recomputable from `predictions.jsonl` alone, which is what makes a number

@@ -56,6 +56,32 @@ rather than a request to the model:
 objectives and one control — in four places on the page, including in white ink, and reports the
 attack success rate per payload and per placement, crossed with what the routing gate did about it.
 
+### The same boundary when the document is a picture
+
+M7 added a reader for pages that carry no text layer, where the document reaches the model as one
+image per page. Rules 1, 3 and 4 are unchanged and unchanged in the same code — one pipeline, one
+stage order, one instruction not to compute. **Rule 2 has no counterpart, and that is a real
+difference rather than an omission.** There is no fence, because there is nothing to fence: an image
+is a content block of its own, beside the text block that carries the instruction, and the page's
+pixels cannot occupy the instruction slot because they are not in it. The separation is the
+protocol's rather than this project's.
+
+Which way that cuts is worth being exact about, because it is not simply weaker:
+
+* **Structurally it is stronger.** A text fence is a convention inside one string and its integrity
+  rests on the marker being underivable; an image block is a different field on the wire, and no
+  arrangement of pixels turns it into text the API will read as an instruction.
+* **What is lost is the ability to say where the document ends.** The text prompt can name its
+  delimiters, so the model is told exactly which bytes are data. The image prompt can only say that
+  the pages are data, which is a statement about all of them rather than a boundary in them.
+* **A payload printed on the page is still a payload.** Nothing here defends against instructions
+  the model *reads*; the four rules never did. M6's result — that the arithmetic gate is a defence
+  against misreading and not against injection — carries over unchanged, and one thing gets worse:
+  grounding, the gate's other signal, needs page text to resolve a value against, so on a scanned
+  document it does not merely weaken. It returns *ungrounded* for every value, correct or not.
+  **The attack suite has not been run over the scanned corpus**, so the size of that effect on an
+  attacked scan is unmeasured, and the direction is not in doubt.
+
 ## Consequences
 
 ### What the measurement says
@@ -96,6 +122,10 @@ rules above, whose value is that they hold regardless of what the page says.
 * **The suite measures placements, not adaptivity.** Every payload is a fixed string; none of them
   responds to a failed attempt. An adaptive attacker is a different threat model and a different
   suite.
+* **The attacked corpus has not been scanned.** Both halves exist — `attack/` prints payloads on a
+  page and `degrade/` photographs one — and composing them is a build step nobody has run. It is
+  the case where one of the gate's two signals is known in advance to be useless, so the result
+  would not be a surprise; it would be a number where there is currently an argument.
 
 ### Costs accepted
 

@@ -27,6 +27,7 @@ requires it. The key is read by the SDK from the environment at call time and ne
 
 from __future__ import annotations
 
+import base64
 from typing import Any
 
 from doc_extract.extract.client import LLMError, LLMRequest, LLMResponse, Usage
@@ -64,7 +65,7 @@ class AnthropicClient:
                     #: that cannot vary — which this project does not do.
                     "cache_control": {"type": "ephemeral"},
                 }],
-                messages=[{"role": "user", "content": request.user}],
+                messages=[{"role": "user", "content": _content(request)}],
                 output_config=output_config,
             )
         except Exception as error:
@@ -81,6 +82,32 @@ class AnthropicClient:
             usage=usage_of(message.usage),
             model=message.model,
         )
+
+
+def _content(request: LLMRequest) -> str | list[dict[str, Any]]:
+    """The user turn: a plain string when there is no image, and blocks when there is.
+
+    The instruction goes **first** and the pages after it, which is the same order the text path
+    uses and is the one the trust boundary is written for: the turn says what is about to arrive
+    before it arrives. A string is kept for the text path rather than wrapped in a single text block
+    so that a request this project has always sent goes on being byte-identical on the wire.
+    """
+    if not request.images:
+        return request.user
+    return [
+        {"type": "text", "text": request.user},
+        *(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": image.media_type,
+                    "data": base64.b64encode(image.data).decode("ascii"),
+                },
+            }
+            for image in request.images
+        ),
+    ]
 
 
 def _build_client() -> Any:

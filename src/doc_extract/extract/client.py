@@ -56,6 +56,20 @@ class Usage:
 
 
 @dataclass(frozen=True, slots=True)
+class PageImage:
+    """One page of a document, as the bytes of an image and the type they are encoded in.
+
+    M7's scanned corpus has documents with no text layer at all, where the only reader left is one
+    that looks at the page. Carried beside `user` rather than encoded into it, because an image is
+    a content block of its own on the wire and flattening it into the text would be inventing a
+    representation the API does not have.
+    """
+
+    media_type: str
+    data: bytes
+
+
+@dataclass(frozen=True, slots=True)
 class LLMRequest:
     """One call. Deliberately without a sampling temperature.
 
@@ -63,6 +77,10 @@ class LLMRequest:
     and Sonnet models, so a field for one would be a field that makes every request fail. Output
     variability is controlled by `effort` and by the prompt, and reproducibility comes from the
     schema and the invariants rather than from a sampler setting that never guaranteed it anyway.
+
+    `images` is empty on every text request, which is what keeps the two paths one code path: a
+    client that ignores it answers a vision request exactly as it answers a text one, and the
+    scripted model does.
     """
 
     model: str
@@ -71,6 +89,7 @@ class LLMRequest:
     schema: Mapping[str, object]
     max_tokens: int
     effort: str | None = None
+    images: tuple[PageImage, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

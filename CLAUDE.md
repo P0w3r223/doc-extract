@@ -51,6 +51,7 @@ src/doc_extract/
     layout.py        # lines by vertical overlap, cells by a gap measured in em, not points
     document.py      # the canonical text plus a span per word and per cell; tab = column break
     envelope.py      # the fence around untrusted text, with a marker derived from the text
+    raster.py        # M7 — the page as pixels, for a reader with no text layer to read
   extract/           # M3 — source document -> Invoice, or a named failure
     client.py        # LLMRequest / LLMResponse / Usage / the one-method LLMClient protocol
     wire.py          # the JSON schema the model answers in, and Invoice -> that shape
@@ -87,6 +88,11 @@ src/doc_extract/
     dialect.py       # three Polish label sets, number formats and column orders, as data
     render.py        # three unfamiliar layouts; imports nothing from `synth/render.py`
     corpus.py        # M2's documents reassigned to a foreign layout — the gold does not move
+  degrade/           # M7 — the same page, seen through a scanner
+    rungs.py         # three rungs of legibility, as data; one of them keeps a text layer
+    optics.py        # skew, blur, grain, JPEG — pure functions over one image, all seeded
+    page.py          # rasterise, damage, rewrap; the OCR text layer re-emitted invisibly
+    corpus.py        # M2's documents scanned — same gold, same layout, a different picture
   attack/            # M6 — the invoice as untrusted input, measured by attacking it
     payloads.py      # what an attacker prints, what obeying looks like, when it has succeeded
     suite.py         # the attacked corpus: payload x placement, gold untouched, payload verified
@@ -96,8 +102,9 @@ src/doc_extract/
 schemas/*.xsd        # the national standard and its three imports + PROVENANCE.md
 results/<run>/       # committed: predictions.jsonl, run.meta.json, report.md, detector.md, gate.md,
                      # and attack.md for a run over the attacked corpus (`results/attack-<baseline>`).
-                     # A run over the foreign corpus is `results/foreign-<baseline>`, and the prefix
-                     # is what pairs it with the same baseline's run over the synthetic one.
+                     # A run over the foreign corpus is `results/foreign-<baseline>` and one over
+                     # the scanned corpus is `results/scanned-<baseline>`; the prefix is what pairs
+                     # either with the same baseline's run over the synthetic one.
                      # Named for the baseline, except a remote run, which is named for the model:
                      # the baseline is `claude` every time and the model is what varies, so two
                      # models over one corpus are two directories rather than one overwritten one.
@@ -196,7 +203,7 @@ ruff check .
 
 python -m doc_extract.synth --out data/synthetic          # build the corpus (not committed)
 python -m doc_extract.schema.generate_vocab --check       # vocab.py vs the vendored XSD
-python docs/build_index.py                                # regenerate the site from the repository
+python docs/build_index.py                                # the site; reads data/scanned if built
 
 python -m doc_extract.eval run --baseline pattern         # one baseline over the corpus, offline
 python -m doc_extract.eval score  --run results/pattern   # re-score a committed run, no model
@@ -204,12 +211,15 @@ python -m doc_extract.eval detect --run results/pattern   # the detector study o
 python -m doc_extract.eval gate   --run results/pattern   # the gate's coverage-accuracy curve
 python -m doc_extract.foreign --out data/foreign          # the same gold, printed elsewhere (M7)
 python -m doc_extract.eval run --baseline pattern --corpus data/foreign --out results/foreign-pattern
+python -m doc_extract.degrade --out data/scanned          # the same page, photographed (M7)
+python -m doc_extract.eval run --baseline pattern --corpus data/scanned --out results/scanned-pattern
 python -m doc_extract.attack --out data/attacked          # 112 attacked documents (M6)
 python -m doc_extract.eval run --baseline gullible --corpus data/attacked --out results/attack-gullible
 python -m doc_extract.eval attack --run results/attack-gullible  # the attack success rate
 
 python -m doc_extract.eval run --baseline claude --yes    # the only command that costs money
 python -m doc_extract.eval run --baseline claude --model claude-haiku-4-5 --yes   # a second arm
+python -m doc_extract.eval run --baseline claude --corpus data/scanned --vision --yes  # reads pixels
 
 .venv/Scripts/python -m pip install -e ".[llm]"           # only needed to call a real model
 ```
@@ -219,8 +229,11 @@ that way — including schema validation, which resolves the Ministry's imports 
 remote fetching disabled, including the whole extraction pipeline, which the test suite drives
 through `extract.scripted`, and including `detect`, which reads a committed prediction file and
 calls nothing, and including the whole of M6, which renders its own corpus and measures an attack
-success rate without a model being involved at any point. A test suite that could not run without an API key is a result a reader cannot
-reproduce, and a detector study that had to re-run a paid model to be checked would be one too.
+success rate without a model being involved at any point, and including the whole of M7 — the
+scanned corpus is rasterised locally by `pypdfium2`, and the vision path is asserted end to end
+through `extract.scripted` with the images never leaving the process. A test suite that could not
+run without an API key is a result a reader cannot reproduce, and a detector study that had to
+re-run a paid model to be checked would be one too.
 
 ## Milestones
 
@@ -274,8 +287,12 @@ reproduce, and a detector study that had to re-run a paid model to be checked wo
    for.
 7. **Held-out set, the reported gap, vision variant, site/README/ADRs.** In progress. The
    heuristic rules have a population and a number (*The heuristic half* above); `foreign/`
-   answers how much of a reading was the template (*How much of a reading* above). Still open:
-   the degraded/scanned corpus and the vision path, then the paid arms and the reported gap.
+   answers how much of a reading was the template (*How much of a reading* above); `degrade/`
+   answers how much of it was the text layer, and what a scan does to the gate (*What a scan
+   costs* below). The vision path is built and tested offline — one pipeline, one repair loop,
+   one failure taxonomy, with the modality chosen by the request rather than by a second code
+   path. Still open: the paid arms over both held-out corpora, and the reported gap as its own
+   artifact.
 
 ## The headline answer, and what it is really measuring
 
@@ -369,6 +386,50 @@ Three things make that number trustworthy rather than merely dramatic, and each 
 **It is not a real held-out set and the docs say so wherever the number appears.** Holding the
 semantics fixed is what buys the attribution to presentation; it is also what leaves skew, stamps,
 scans and unanticipated layouts unmeasured.
+
+## What a scan costs, and what it costs the gate (M7)
+
+`degrade/` prints M2's **identical gold in M2's identical layout** and then photographs the page.
+Three rungs, each isolating one thing: `searchable` keeps a text layer (a scan whose OCR is assumed
+perfect — the ceiling for that pipeline), `rasterised` removes the text layer and changes nothing
+else, `scanned` is what a supplier emails at 150 dpi. Same seed, document for document, so a
+difference is the **legibility of the page** — the third and last thing M7 varies one at a time.
+
+| baseline | its own page | `searchable` | `rasterised` | `scanned` |
+|---|---:|---:|---:|---:|
+| `oracle` | 100 % | 100 % | 100 % | 100 % |
+| `constant` | 3.0 % | 3.1 % | 2.9 % | 2.9 % |
+| `pattern` | **86.3 %** | **79.7 %** | **0.0 %** | **0.0 %** |
+
+The control is exact rather than approximate: `pattern`'s 36 `searchable` predictions are
+**identical field for field** to its predictions on the clean corpus, which is what makes the other
+two columns a measurement of the missing text layer and not of the damage to the image. 72 of 108
+documents produce no invoice at all, every one `schema_invalid`.
+
+**But the column is not the finding. What a scan does to the gate is.** Run `oracle` — a *perfect*
+reading, nothing wrong anywhere — over the scanned corpus:
+
+| rung | grounded | ungrounded |
+|---|---:|---:|
+| `searchable` | 1903 | 0 |
+| `rasterised` | 0 | 2010 |
+| `scanned` | 0 | 1979 |
+
+Grounding resolves a value to a span of page text and there is none, so it returns `UNGROUNDED` for
+every value on both text-less rungs: **3989 false alarms out of 5892 asserted values, on a reading
+with nothing wrong in it**, and high-confidence coverage of 32.3 %. It does not degrade — it
+inverts, and it inverts *silently*, since an ungrounded correct value is indistinguishable from an
+ungrounded fabricated one. Of the gate's two signals only the arithmetic survives a scan, and M6
+already showed that is the one an adversary can satisfy on purpose.
+
+The vision path is what is left when the text layer is gone, and it is one pipeline rather than two:
+`images` on the request chooses the modality, and the schema, the repair loop with its own budget,
+the failure taxonomy and the usage accounting are the same objects. The two system prompts differ in
+exactly two blocks — the trust boundary and the layout description — and `SHARED_BLOCKS` is asserted
+to be shared rather than merely alike, because a text↔image gap measured across two independently
+written prompts would be partly a measurement of the prompts. The image path has **no fence**, and
+`docs/adr/0001_trust_boundary.md` carries why that is structurally stronger and informationally
+weaker rather than a lapse.
 
 ## The heuristic half, and what it took to measure it
 
@@ -508,7 +569,7 @@ Hence the second remote arm: a weaker model on the same corpus buys a real error
 changing the corpus and invalidating every committed run. **M7's real held-out set remains
 load-bearing** — it is the only place the question gets asked on documents nobody generated.
 
-602 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+655 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

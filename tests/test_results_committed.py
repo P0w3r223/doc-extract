@@ -29,12 +29,14 @@ import pytest
 
 from doc_extract.attack import suite
 from doc_extract.attack.payloads import BY_NAME as PAYLOADS
+from doc_extract.degrade.corpus import documents as scanned_documents
 from doc_extract.eval import detector, detector_report, predictions, report
 from doc_extract.eval.aggregate import Scored, summarise
 from doc_extract.eval.scorer import judge
 from doc_extract.extract.result import FailureClass
 from doc_extract.foreign.corpus import documents as foreign_documents
 from doc_extract.schema.invariants import Severity
+from doc_extract.synth.build import Document
 from doc_extract.synth.corpus import DEFAULT_SEED, documents
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -45,6 +47,18 @@ RUNS = sorted(
     for directory in RESULTS.iterdir()
     if (directory / predictions.PREDICTIONS_NAME).exists()
 ) if RESULTS.is_dir() else []
+
+
+def _with_template(document: Document, template: str) -> Document:
+    return Document(
+        doc_id=document.doc_id,
+        tier=document.tier,
+        template=template,
+        seed=document.seed,
+        invoice=document.invoice,
+        context=document.context,
+        overlay=document.overlay,
+    )
 
 
 @pytest.fixture(scope="module")
@@ -63,6 +77,13 @@ def golds():
     #: synthetic assignment produced a report whose per-layout table named three layouts that page
     #: was never printed in, which is exactly the drift this module exists to catch.
     unfamiliar = {document.doc_id: document for document in foreign_documents()}
+    #: M7's scanned corpus does the same along the other axis: `template` there is the rung of
+    #: legibility the page went through, and rebuilding one of its runs from M2's assignment would
+    #: name three layouts instead of three scanners.
+    scanned = {
+        document.doc_id: _with_template(document, rung.name)
+        for document, rung in scanned_documents()
+    }
     planned: dict[tuple, list] = {}
 
     def grid(meta) -> list:
@@ -82,7 +103,7 @@ def golds():
     def for_run(meta):
         if meta.corpus.get("attacked"):
             return {document.doc_id: document for document, _ in grid(meta)}
-        return unfamiliar if meta.corpus.get("renderer") == "foreign" else clean
+        return {"foreign": unfamiliar, "scanned": scanned}.get(meta.corpus.get("renderer"), clean)
 
     for_run.assignments = lambda meta: {
         assignment.doc_id: assignment for _, assignment in grid(meta)
