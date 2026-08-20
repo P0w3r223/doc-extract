@@ -149,6 +149,22 @@ def test_a_page_with_no_text_is_answered_no_text_and_never_ungrounded(rendered):
     assert {g.support for g in asked} == {Support.NO_TEXT, Support.NOT_PRINTED}
 
 
+def test_a_document_of_nothing_but_separators_is_still_a_document_with_no_text(rendered):
+    """`readable` tests `strip()` rather than emptiness, and this is the branch that needs it.
+
+    `source/document.py` joins cells with a tab and lines with a newline, so a document reduced to
+    whitespace is the shape the separators leave behind. An emptiness test would call it searchable
+    and hand every value on it an `UNGROUNDED` it had not earned — the same defect in a rarer form,
+    which is exactly the kind that survives a fix aimed at the common one.
+    """
+    whitespace = source_document.SourceDocument(text="\t\n\n", words=(), cells=(), pages=1)
+    assert whitespace.text and not whitespace.text.strip()
+
+    supports = {g.support for g in resolve(whitespace, rendered.cases[0].gold())}
+    assert Support.UNGROUNDED not in supports
+    assert Support.NO_TEXT in supports
+
+
 def test_a_code_the_page_never_prints_stays_not_printed_even_when_there_is_no_page(rendered):
     """The two exclusions are orthogonal, and the order in `_ground` is what keeps them so.
 

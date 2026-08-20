@@ -348,9 +348,7 @@ reading the same pages as images.</p>
 <p class="note">Read the first row against the other two. Where a text layer survives, grounding is
 at its <em>most</em> precise measurement anywhere in this project &mdash; it catches almost every
 wrong value and raises no false alarm at all, on a real population of vision errors rather than an
-injected one. On <code>rasterised</code> and <code>scanned</code> it does not answer: every value falls in the last column, and the row is
-empty because <strong>the signal is absent there rather than weak</strong>. That is the honest
-shape, and it is also the reason the confusion cells are worth printing per rung instead of pooled
+injected one. On <code>rasterised</code> and <code>scanned</code> it does not answer: every value falls in the last column, and the row is empty because <strong>the signal is absent there rather than weak</strong>. That is the honest shape, and it is also the reason the confusion cells are worth printing per rung instead of pooled
 &mdash; pooled over the whole corpus, this signal once looked barely precise at all, which was a
 measurement of the missing text layer wearing the reader's name. <strong>The gate does not survive
 a scan; it
@@ -541,14 +539,15 @@ the compliant control every time and the model above not once, which is a fact a
 rather than about the payload. The structural defences are still what the case rests on, because
 they are what holds when the reader is not this one.</p>
 <!-- corpus-dependent: begin -->
-<p><strong>And the gate is selective again</strong> &mdash; more accurate on less work, which is what a gate is for. Accepting only the high-confidence values covers 65.3 % of what this
-pipeline could assess at 99.0 % accuracy and lets 18 wrong values
-through; accepting <em>everything</em> is 97.6 % accurate and leaks
-66. It was not, until grounding learned to say <em>I could not ask</em>. While a value on a page with no text came back as <code>UNGROUNDED</code>, the only values that could reach the confident bucket were those on the rung that kept a text layer &mdash; which is exactly the rung where the attacks worked &mdash; so the gate collected the attacked-and-obeyed values into the bucket it called high confidence, and auto-accepting that bucket scored <em>worse</em> than accepting everything. The inversion was the instrument, and fixing the instrument was the milestone after this one.</p>
-<p class="note">Both figures are over the 2697 values the gate could form an opinion
-about. The other 6048 sit on a page with no text layer, and it has
-<strong>no signal on them at all</strong> &mdash; not a low one. That is the cost a scan actually
-imposes here, and it is a property of the page rather than of the reader.</p>
+<p><strong>And gating still costs accuracy here.</strong> Auto-accepting only the high-confidence values is 99.0 % accurate and
+lets 18 wrong values through, while <strong>not gating at all</strong> &mdash;
+accepting every one of the 9894 values the reader asserted &mdash; is
+99.3 %. The gate's signal exists only on the rung that kept a text layer, which is exactly the rung where the attacks worked &mdash; so its confident bucket is concentrated on the attacked documents. On a population of model <em>errors</em> the same gate raises accuracy instead.</p>
+<p class="note">The curve's own bottom row is a different comparison: it accepts everything the gate
+could <em>assess</em>, 2697 values, at 97.6 %. The other
+6048 sit on a page with no text layer, where the gate has <strong>no signal at all
+</strong> &mdash; not a low one. It used to call them ungrounded, which is how a scan came to look
+like a reader's mistake; saying so removed the false alarms and did not bring the signal back.</p>
 <!-- corpus-dependent: end -->
 
 <h2>What is not built yet</h2>
@@ -591,7 +590,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>851f901</code> &middot; part of a
+  <code>d8f9004</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

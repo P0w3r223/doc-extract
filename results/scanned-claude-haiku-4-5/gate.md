@@ -5,11 +5,13 @@
 | run | `results/scanned-claude-haiku-4-5` |
 | answered by | `claude-haiku-4-5` |
 | saw | the page |
-| values asserted | 1903 |
-| of which wrong | 145 |
+| values asserted | 6454 |
+| of which wrong | 485 |
+| assessed below | 1903 |
+| of those, wrong | 145 |
+| asserted but not assessable | 759 (wrong: 33) |
+| asserted on a page with no text | 3792 (wrong: 307) |
 | gold values never asserted | 41 |
-| asserted but not assessable | 759 |
-| asserted on a page with no text | 3792 |
 | documents with no invoice | 1 |
 
 ## The two signals, scored apart
@@ -36,7 +38,8 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 ## Read this before the tables
 
 * **Coverage is over the values the model asserted, not over the document.** A field it left `null` cannot be grounded, so it carries no confidence and sits outside every denominator above. 41 gold value(s) were never asserted at all, and no signal here can see them — a model that answered less would score better on this curve.
-* 759 asserted value(s) are **outside the curve** because grounding declines to ask about them: `kind` is an FA(3) code the page never prints, and a non-numeric rate is an exemption code each issuer abbreviates their own way. They are values a model can get wrong, and nothing above measures whether it did.
+* 759 asserted value(s) are **outside the curve** because grounding declines to ask about them: `kind` is an FA(3) code the page never prints, and a non-numeric rate is an exemption code each issuer abbreviates their own way. 33 of them are wrong, and nothing in the tables above counts those.
 * 1 document(s) produced no invoice, so none of their fields was assessed. The pipeline had already refused them.
-* **3792 of the 5695 asserted value(s) (66.6 %) sit on a page with no text layer at all, and are outside the curve.** Grounding resolves a value against page text and there is none, so it answers `NO_TEXT` — *I could not ask* — rather than `UNGROUNDED`, which would have claimed the value is missing from the page. They are routed `review` and carry no confidence, so every figure above is over the 1903 value(s) this pipeline could actually assess. **The gate has no signal at all on the rest**, and that is a statement about the page rather than about the reader: a recogniser in front of the model brings the signal back.
+* **3792 of the 6454 asserted value(s) (58.8 %) sit on a page with no text layer at all, and are outside the curve.** Grounding resolves a value against page text and there is none, so it answers `NO_TEXT` — *I could not ask* — rather than `UNGROUNDED`, which would have claimed the value is missing from the page. They are routed `review` and carry no confidence, so every figure above is over the 1903 value(s) this pipeline could actually assess, and 307 wrong value(s) sit in the excluded set where nothing measures them. **The gate has no signal at all on those**, and that is a statement about the page rather than about the reader: a recogniser in front of the model brings the signal back.
+* **Against the ungated policy.** Accepting every asserted value — the 1903 below plus the 4551 excluded from them — is 92.5 % accurate. The `high` row is 99.5 %, so on this corpus auto-accepting the gate's confident bucket is **more accurate than not gating at all**, which is what a gate is for. The `none` row is *not* that comparison: it accepts everything the gate could assess, which is a different set.
 * The confidence levels are produced by fixed rules over the two signals, not by weights fitted to this corpus. That is why there are four of them and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.

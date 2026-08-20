@@ -19,7 +19,7 @@ from collections.abc import Iterable
 from doc_extract.decide.confidence import ROUTES
 from doc_extract.eval.format import rate as _rate
 from doc_extract.eval.predictions import RunMeta
-from doc_extract.eval.selective import Curve
+from doc_extract.eval.selective import LEVELS, Curve
 
 
 def render(curve: Curve, *, run: RunMeta, directory: str = "") -> str:
@@ -33,6 +33,8 @@ def render(curve: Curve, *, run: RunMeta, directory: str = "") -> str:
 
 
 def _header(curve: Curve, *, run: RunMeta, directory: str) -> str:
+    declined = _with_wrong(curve.unassessable, curve.wrong_unassessable)
+    textless = _with_wrong(curve.without_text, curve.wrong_without_text)
     lines = [
         f"# the gate — {run.model}",
         "",
@@ -40,16 +42,51 @@ def _header(curve: Curve, *, run: RunMeta, directory: str) -> str:
         "|---|---|",
         f"| answered by | `{run.model}` |",
         f"| saw | {run.options.get('sees', 'unstated')} |",
-        f"| values asserted | {curve.asserted} |",
-        f"| of which wrong | {curve.wrong} |",
+        f"| values asserted | {curve.offered} |",
+        f"| of which wrong | {curve.wrong_everywhere} |",
+        f"| assessed below | {curve.assessed} |",
+        f"| of those, wrong | {curve.wrong} |",
+        f"| asserted but not assessable | {declined} |",
+        f"| asserted on a page with no text | {textless} |",
         f"| gold values never asserted | {curve.missed} |",
-        f"| asserted but not assessable | {curve.unassessable} |",
-        f"| asserted on a page with no text | {curve.without_text} |",
         f"| documents with no invoice | {curve.without_prediction} |",
     ]
     if directory:
         lines.insert(4, f"| run | `{directory}` |")
     return "\n".join(lines)
+
+
+def _ungated(curve: Curve) -> str:
+    """The comparison the curve stops being able to make, and the verdict it implies.
+
+    The `none` row means *accept everything this gate could assess*. Where most of a corpus left
+    the curve that is no longer the policy a reader is choosing against — not gating at all means
+    accepting the excluded values too. So the honest baseline is computed over everything the model
+    asserted, and the verdict is read off the comparison rather than written into it: the sentence
+    that said the gate had stopped helping outlived the change that fixed it, once already.
+    """
+    top = next((point for point in curve.points if point.level is LEVELS[0]), None)
+    ungated = curve.ungated_accuracy
+    if top is None or top.accuracy is None or ungated is None:  # pragma: no cover — empty curve
+        return "* No accepted values, so there is no gated policy to compare against."
+    verdict = (
+        "**still less accurate than not gating at all**, because its signal exists only where the "
+        "page kept text and the excluded values are largely right"
+        if top.accuracy < ungated else
+        "**more accurate than not gating at all**, which is what a gate is for"
+    )
+    return (
+        f"* **Against the ungated policy.** Accepting every asserted value — the {curve.assessed} "
+        f"below plus the {curve.offered - curve.assessed} excluded from them — is "
+        f"{_rate(ungated)} accurate. The `high` row is {_rate(top.accuracy)}, so on this corpus "
+        f"auto-accepting the gate's confident bucket is {verdict}. The `none` row is *not* that "
+        "comparison: it accepts everything the gate could assess, which is a different set."
+    )
+
+
+def _with_wrong(total: int, wrong: int) -> str:
+    """A count, and what is inside it. The size of a blind spot is not its contents."""
+    return f"{total} (wrong: {wrong})" if total else str(total)
 
 
 def _signals(curve: Curve) -> str:
@@ -105,8 +142,9 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
         lines.append(
             f"* {curve.unassessable} asserted value(s) are **outside the curve** because grounding "
             "declines to ask about them: `kind` is an FA(3) code the page never prints, and a "
-            "non-numeric rate is an exemption code each issuer abbreviates their own way. They are "
-            "values a model can get wrong, and nothing above measures whether it did."
+            "non-numeric rate is an exemption code each issuer abbreviates their own way. "
+            f"{curve.wrong_unassessable} of them are wrong, and nothing in the tables above "
+            "counts those."
         )
     if curve.without_prediction:
         lines.append(
@@ -114,18 +152,20 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
             "fields was assessed. The pipeline had already refused them."
         )
     if curve.without_text:
-        offered = curve.asserted + curve.without_text
-        share = curve.without_text / offered if offered else None
+        share = curve.without_text / curve.offered if curve.offered else None
         lines.append(
-            f"* **{curve.without_text} of the {offered} asserted value(s) ({_rate(share)}) sit on "
-            "a page with no text layer at all, and are outside the curve.** Grounding resolves a "
-            "value against page text and there is none, so it answers `NO_TEXT` — *I could not "
-            "ask* — rather than `UNGROUNDED`, which would have claimed the value is missing from "
-            "the page. They are routed `review` and carry no confidence, so every figure above is "
-            f"over the {curve.asserted} value(s) this pipeline could actually assess. **The gate "
-            "has no signal at all on the rest**, and that is a statement about the page rather "
-            "than about the reader: a recogniser in front of the model brings the signal back."
+            f"* **{curve.without_text} of the {curve.offered} asserted value(s) ({_rate(share)}) "
+            "sit on a page with no text layer at all, and are outside the curve.** Grounding "
+            "resolves a value against page text and there is none, so it answers `NO_TEXT` — *I "
+            "could not ask* — rather than `UNGROUNDED`, which would have claimed the value is "
+            "missing from the page. They are routed `review` and carry no confidence, so every "
+            f"figure above is over the {curve.assessed} value(s) this pipeline could actually "
+            f"assess, and {curve.wrong_without_text} wrong value(s) sit in the excluded set where "
+            "nothing measures them. **The gate has no signal at all on those**, and that is a "
+            "statement about the page rather than about the reader: a recogniser in front of the "
+            "model brings the signal back."
         )
+        lines.append(_ungated(curve))
     if curve.wrong == 0:
         lines.append(
             "* **Nothing asserted was wrong**, so the gate had nothing to catch. Accuracy is 100 % "
@@ -163,7 +203,10 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
 
 def summary_lines(curve: Curve) -> Iterable[str]:
     """What a terminal wants after a run, without the tables."""
-    yield f"asserted   : {curve.asserted}   wrong: {curve.wrong}   never asserted: {curve.missed}"
+    yield (
+        f"asserted   : {curve.offered}   wrong: {curve.wrong_everywhere}   "
+        f"assessed: {curve.assessed}   never asserted: {curve.missed}"
+    )
     for signal in curve.signals:
         yield (
             f"  {signal.name:<11} precision {_rate(signal.precision)}   "

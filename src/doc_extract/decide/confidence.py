@@ -172,7 +172,7 @@ def _unassessed(grounding: Grounding) -> Assessment:
 
     Carries no confidence in every case, so none of these reaches the curve. The route differs, and
     `UNASSESSED_ROUTES` carries why: neither route is a judgement that the value is right, and the
-    reasons record which of the two claims was made.
+    reason token records which of the three verdicts produced it.
     """
     return Assessment(
         field=grounding.field,
