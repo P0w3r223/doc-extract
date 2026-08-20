@@ -132,8 +132,12 @@ _RATE_LABELS = {
 }
 
 
-def _register_fonts() -> None:
+def register_fonts() -> None:
     """DejaVu carries the Polish diacritics; the fonts reportlab ships with do not.
+
+    Public because `degrade/` draws a text layer with these metrics over a page it did not print,
+    and a cross-package call to a private helper reads as a mistake rather than as the dependency
+    it is. `foreign/` deliberately registers its own, which is what keeps *that* package separable.
 
     Twelve of the eighteen accented Polish letters are missing from the bundled Vera family, so an
     invoice set in it would silently drop them — a corpus with no `ą` or `ł` would be easier to
@@ -155,7 +159,7 @@ class Rendered:
 
 def render(document: Document) -> Rendered:
     """The document as a PDF, in whichever of the three layouts it was assigned."""
-    _register_fonts()
+    register_fonts()
     builder = {"classic": _classic, "ledger": _ledger, "compact": _compact}[document.template]
     margin = MARGINS[document.template] * mm
 

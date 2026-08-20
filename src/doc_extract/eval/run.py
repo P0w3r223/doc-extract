@@ -79,9 +79,11 @@ def _predict(
     vision: bool = False,
 ) -> Iterator[Prediction]:
     for case in corpus.cases:
-        #: Read once. `Case.source()` verifies the PDF's hash and re-parses its geometry, and doing
-        #: that twice per document would double the cost of the one part of a run that is slow.
-        source = case.source()
+        #: Read once, and hashed once. Both readings of a page — its text and its pixels — start
+        #: from the same verified bytes, so a vision run does not open and re-hash every PDF twice
+        #: to get them.
+        data = case.pdf_bytes()
+        source = case.source(data)
         prepared = baseline.prepare(Task(
             doc_id=case.doc_id,
             gold=case.gold(),
@@ -90,7 +92,7 @@ def _predict(
             options=dict(options or {}),
         ))
         extraction = pipeline.extract(
-            source, prepared.client, config=config, images=case.images() if vision else ()
+            source, prepared.client, config=config, images=case.images(data) if vision else ()
         )
         record = prediction_file.record(
             extraction,

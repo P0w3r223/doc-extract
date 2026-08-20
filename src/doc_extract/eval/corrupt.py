@@ -302,18 +302,36 @@ def corrupt(
         if applied is None:
             continue
         changed, injection = applied
-        if injection.field in {recorded.field for recorded in injections}:
+        if any(_collides(injection.field, recorded.field) for recorded in injections):
             #: A second corruption of a field an earlier one already recorded is dropped, because
             #: the record would then be false: the earlier note's `after` is not what the document
             #: says any more, and the prediction file would credit a rule's catch to a change the
-            #: document no longer carries. `year_misread` and `date_shifted` are the only pair this
-            #: can apply to, which is why the order above resolves it in the heuristic's favour.
-            #: Discarded *after* calling, so the RNG stream stays the one the ordering describes
-            #: and adding this guard changed no other document.
+            #: document no longer carries. Discarded *after* calling, so the RNG stream stays the
+            #: one the ordering describes.
             continue
         invoice = changed
         injections.append(injection)
     return invoice, tuple(injections)
+
+
+def _collides(field: str, recorded: str) -> bool:
+    """Whether writing `field` would falsify a note already recorded against `recorded`.
+
+    Equality is not enough, because a field path and its parent are different strings and the same
+    value. `rate_swapped` names `rate_totals[zw]` and `vat_cent` names `rate_totals[zw].vat`: the
+    swap rewrites the block the cent was recorded against, and the note's `after` then describes a
+    figure the document does not carry. The first version of this guard compared the two strings and
+    let exactly that through — invisible on the committed runs, where `DEFAULT_RATE` never put both
+    kinds on one document, and reachable from the CLI's own `--rate`.
+
+    Containment in either direction, because neither is privileged: a parent written after a child
+    erases the child's record, and a child written after a parent contradicts it.
+    """
+    return (
+        field == recorded
+        or field.startswith(f"{recorded}.")
+        or recorded.startswith(f"{field}.")
+    )
 
 
 # --------------------------------------------------------------------------- small surgery

@@ -69,7 +69,7 @@ def scan(data: bytes, rung: Rung, *, seed: int) -> Scan:
     rng = random.Random(seed)
     #: The text layer is measured with the same font the page was set in, so the metrics have to be
     #: loaded even when this is called on a PDF this project did not render.
-    synth_render._register_fonts()
+    synth_render.register_fonts()
     sizes = raster.page_sizes(data)
     images = raster.pages(data, dpi=rung.dpi)
     words = read_words(data) if rung.text_layer else ()

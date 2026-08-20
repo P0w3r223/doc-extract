@@ -18,6 +18,13 @@ from doc_extract.eval import corrupt
 from doc_extract.schema import invariants
 from doc_extract.schema.checksums import is_valid_iban, is_valid_nip
 from doc_extract.schema.invariants import Severity
+from doc_extract.synth import corpus as synth_corpus
+from doc_extract.synth.tiers import BY_NAME as TIERS
+
+
+def _plain(value: Decimal) -> str:
+    """The form a note writes an amount in, so a comparison is against the note and not a repr."""
+    return format(value, "f")
 
 ALWAYS = 1.0
 
@@ -41,26 +48,59 @@ def test_a_rate_of_zero_is_the_oracle(invoice):
 
 
 def test_a_rate_of_one_fires_every_kind_that_can_still_be_recorded_truthfully(invoice):
-    """Ten kinds, nine records: `year_misread` and `date_shifted` write the same field.
+    """Ten kinds, eight records: two of them would write over a field already recorded.
 
-    Only the first of the pair can be recorded honestly — the second's note would name a `before`
-    the document no longer carries, and the prediction file would then attribute a rule's catch to
-    a change that is not in it. So the contract is not "ten fired" but "one injection per field",
-    and this says which pair that costs and which way the order resolves it.
+    `year_misread` and `date_shifted` both write `sale_date`, and on this one-rate-block fixture
+    `rate_swapped` rewrites the very block `vat_cent` was recorded against. The loser of each pair
+    is dropped rather than allowed to falsify the other's note. So the contract is not "ten fired"
+    but "one injection per field", and this says what that costs and which way the order resolves
+    it — a document with two rate blocks keeps both, which the regression below uses.
     """
     _, injections = corrupt.corrupt(invoice, random.Random(1), rate=ALWAYS)
     fired = {injection.kind for injection in injections}
 
-    assert fired == set(corrupt.KINDS) - {"date_shifted"}
+    assert fired == set(corrupt.KINDS) - {"date_shifted", "rate_swapped"}
     assert "year_misread" in fired, "the heuristic half's only kind must not lose the collision"
 
 
-def test_no_two_injections_on_one_document_claim_the_same_field(invoice):
-    """The guard's actual contract, asserted where a new colliding kind would trip it."""
+def test_no_injection_writes_over_a_field_another_one_recorded(invoice):
+    """The guard's actual contract, and it is containment rather than equality.
+
+    A field path and its parent are two strings and one value: `rate_swapped` names
+    `rate_totals[zw]` while `vat_cent` names `rate_totals[zw].vat`, and the swap rewrites the block
+    the cent was recorded against. Comparing the strings for equality let exactly that through, so
+    this asserts the relation the record depends on instead of the one that is easy to check.
+    """
     _, injections = corrupt.corrupt(invoice, random.Random(1), rate=ALWAYS)
     fields = [injection.field for injection in injections]
 
-    assert len(fields) == len(set(fields)), fields
+    overlapping = [
+        (one, other)
+        for index, one in enumerate(fields)
+        for other in fields[index + 1:]
+        if one == other or one.startswith(f"{other}.") or other.startswith(f"{one}.")
+    ]
+    assert not overlapping, overlapping
+
+
+def test_a_nested_field_does_not_survive_a_corruption_of_the_block_it_sits_in():
+    """The regression, on a document that actually has two rate blocks to collide over.
+
+    Driven off an invoice from the corpus rather than the fixture, because the collision needs a
+    rate block whose net and VAT differ *and* a second one for `vat_cent` to pick — which is the
+    shape `mixed_rates` has and the single-block fixture does not.
+    """
+    document = next(
+        doc for doc in synth_corpus.documents(per_tier=1, tiers=(TIERS["mixed_rates"],))
+    )
+    corrupted, injections = corrupt.corrupt(document.invoice, random.Random(1), rate=ALWAYS)
+
+    blocks = {total.rate: total for total in corrupted.rate_totals}
+    for injection in injections:
+        if not injection.field.endswith("].vat"):
+            continue
+        rate = injection.field.split("[", 1)[1].split("]", 1)[0]
+        assert _plain(blocks[rate].vat) == injection.after, injection.note
 
 
 def test_every_corruption_still_produces_a_lawful_invoice(invoice):

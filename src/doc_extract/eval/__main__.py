@@ -90,7 +90,9 @@ def main(argv: list[str] | None = None) -> int:
                         help=f"corruption rate for the noisy oracle (default: {DEFAULT_RATE})")
     runner.add_argument("--vision", action="store_true",
                         help="send each page as an image instead of as text — the only reader a "
-                             "scanned document leaves")
+                             "scanned document leaves. Every page travels as a PNG on every "
+                             "attempt, repairs included, so a remote run costs more than the same "
+                             "corpus read as text")
     runner.add_argument("--quiet", action="store_true", help="no per-document line")
     runner.add_argument("--yes", action="store_true",
                         help="confirm a baseline that calls a paid API over the network")

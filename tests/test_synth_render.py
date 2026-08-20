@@ -223,7 +223,7 @@ def test_every_fixed_content_column_fits_the_widest_value_it_could_ever_hold():
     today, so `0 EX` — in the catalogue, in no tier — fails here instead of in a rendered corpus
     nobody re-reads.
     """
-    render._register_fonts()
+    render.register_fonts()
     fixed = {
         2: {item.unit for item in pools.CATALOGUE},
         render.PRICE_COLUMN: {render._price(Decimal("9999.12345678"))},
@@ -247,7 +247,7 @@ def test_the_description_column_fits_the_longest_word_in_the_catalogue():
     amount is lost, so the arithmetic still checks out; only the description silently stops being
     recoverable. Narrowing this column to make room for another is therefore not free.
     """
-    render._register_fonts()
+    render.register_fonts()
     too_narrow = [
         f"{layout}: {word!r} needs {over + widths[render.DESCRIPTION_COLUMN]:.1f} mm"
         for layout, widths in render.ITEM_COLUMNS.items()
@@ -265,7 +265,7 @@ def test_every_header_wraps_inside_its_own_column():
     strings they overran exactly as an oversized value does — and a fused header is just as bad for
     a source layer trying to name columns.
     """
-    render._register_fonts()
+    render.register_fonts()
     too_wide = []
     for layout, widths in render.ITEM_COLUMNS.items():
         for index, header in enumerate(render.ITEM_HEADERS):
@@ -283,7 +283,7 @@ def test_no_cell_in_the_corpus_overruns_its_column():
     tier that starts drawing larger amounts is a silent layout change, and the manifest would
     record a new hash without anyone knowing why.
     """
-    render._register_fonts()
+    render.register_fonts()
     too_wide = []
     for document in documents():
         if document.template not in render.ITEM_COLUMNS:

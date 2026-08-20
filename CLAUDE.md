@@ -366,9 +366,11 @@ the **page**, because nothing else moved.
 | `pattern` | **86.3 %** | **0.0 %** | **0 / 108** |
 
 `pattern` did not read badly — it could not *begin*: 108 of 108 `schema_invalid`. It fills three of
-the eleven wire fields it fills on its own page — four on the `statement` third, whose dialect
-prints ISO dates and is the only place a date survives. The labels it matches were the whole of what
-it was doing.
+the eleven wire fields it fills on its own page — five on the `statement` third, whose dialect
+prints ISO dates *and* heads the page `Faktura nr …`, which `pattern._TITLE` matches by shape rather
+than by label. Everything else it reads is keyed on a literal, and no foreign page carries one; note
+that a pattern matching a *shape* is not something `FITTED_LABELS` can be disjoint from, which is
+why the `statement` column is the one to read the disjointness claim against.
 
 Three things make that number trustworthy rather than merely dramatic, and each is a test:
 
@@ -403,8 +405,9 @@ difference is the **legibility of the page** — the third and last thing M7 var
 
 The control is exact rather than approximate: `pattern`'s 36 `searchable` predictions are
 **identical field for field** to its predictions on the clean corpus, which is what makes the other
-two columns a measurement of the missing text layer and not of the damage to the image. 72 of 108
-documents produce no invoice at all, every one `schema_invalid`.
+two columns a measurement of the missing text layer and not of the damage to the image. 72 of the
+108 carry no text layer and not one of them produces an invoice; two more fail on `searchable` for
+the reason they fail on the clean page, so 74 `schema_invalid` in all.
 
 **But the column is not the finding. What a scan does to the gate is.** Run `oracle` — a *perfect*
 reading, nothing wrong anywhere — over the scanned corpus:
@@ -569,7 +572,7 @@ Hence the second remote arm: a weaker model on the same corpus buys a real error
 changing the corpus and invalidating every committed run. **M7's real held-out set remains
 load-bearing** — it is the only place the question gets asked on documents nobody generated.
 
-655 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+658 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`
