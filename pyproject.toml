@@ -17,6 +17,13 @@ dependencies = [
     # `manifest.meta.json` records the exact version each corpus was built with.
     "reportlab>=5.0,<6",
     "pdfplumber>=0.11",  # reads the text layer back, with the offsets grounding needs
+    # M7's scanned corpus and the vision path. Both arrive as transitive dependencies of
+    # `pdfplumber` and are named here anyway, because this project imports them directly and a
+    # dependency held only by somebody else's requirement is one an upgrade there can remove. They
+    # are also the two libraries every `pdf_sha256` in `data/scanned` is a function of, which is why
+    # `degrade/corpus.py` records their versions in the manifest beside the fonts'.
+    "pypdfium2>=4",      # renders a page to pixels; pure wheels, no system libraries
+    "pillow>=10",        # the scanner's optics, and the PNG a page is sent to a model as
 ]
 
 [project.optional-dependencies]

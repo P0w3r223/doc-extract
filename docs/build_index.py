@@ -18,7 +18,9 @@ import subprocess
 
 from doc_extract.attack import suite
 from doc_extract.attack.payloads import BY_NAME as PAYLOADS
-from doc_extract.eval import detector, fields
+from doc_extract.degrade.corpus import documents as scanned_documents
+from doc_extract.degrade.rungs import TEMPLATES as RUNG_NAMES
+from doc_extract.eval import dataset, detector, fields
 from doc_extract.eval import predictions as prediction_file
 from doc_extract.eval.aggregate import Scored, summarise
 from doc_extract.eval.baselines import BASELINES, BY_NAME
@@ -26,11 +28,17 @@ from doc_extract.eval.format import DASH, rate
 from doc_extract.eval.scorer import judge
 from doc_extract.extract.result import FailureClass
 from doc_extract.foreign.corpus import documents as foreign_documents
+from doc_extract.ground.resolve import resolve as ground
 from doc_extract.schema import invariants, vocab
 from doc_extract.schema.generate_vocab import XSD_PATH
 from doc_extract.schema.invariants import Severity
 from doc_extract.synth import render
-from doc_extract.synth.corpus import DEFAULT_PER_TIER, DEFAULT_SEED, documents
+from doc_extract.synth.corpus import (
+    DEFAULT_PER_TIER,
+    DEFAULT_SEED,
+    MANIFEST_NAME,
+    documents,
+)
 from doc_extract.synth.tiers import TIERS
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -162,10 +170,11 @@ def baselines(corpus: list) -> list[dict[str, object]]:
             continue
         meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
         #: M6's and M7's runs are over different corpora — the same invoices with an injected
-        #: string on each page, and the same invoices printed by another renderer. Their accuracy
-        #: belongs in the section that explains what the page did to it, not in a table whose rows
-        #: are comparable *because* they describe the same documents rendered the same way.
-        if meta.corpus.get("attacked") or meta.corpus.get("renderer") == "foreign":
+        #: string on each page, the same invoices printed by another renderer, and the same
+        #: invoices photographed. Their accuracy belongs in the section that explains what the page
+        #: did to it, not in a table whose rows are comparable *because* they describe the same
+        #: documents rendered the same way.
+        if meta.corpus.get("attacked") or meta.corpus.get("renderer") in ("foreign", "scanned"):
             continue
         seed = meta.corpus.get("corpus_seed")
         if seed != DEFAULT_SEED:
@@ -320,6 +329,90 @@ def _study(corpus: list, predictions_path, severity: Severity) -> detector.Study
         )
         verdicts.append(detector.verdict(score, record.parse(), severity=severity))
     return detector.summarise(verdicts, severity=severity)
+
+
+#: How a run over M7's scanned corpus is named, on the same convention the foreign one uses.
+SCANNED_PREFIX = "scanned-"
+
+#: The rungs, in the order the page should read them: most legible first. Imported rather than
+#: written out, so a rung added to the package appears here instead of being silently dropped.
+RUNG_ORDER: tuple[str, ...] = RUNG_NAMES
+
+#: Which committed run the grounding split is read off. The oracle, because the whole force of that
+#: number is that the reading it is computed on is *perfect* — a signal raising 3989 alarms on a
+#: model's mistakes would be doing its job.
+SCANNED_CONTROL = f"{SCANNED_PREFIX}oracle"
+
+
+def scanned_study(corpus: list) -> list[dict[str, object]] | None:
+    """Each baseline on its own page and on each rung of legibility, paired by name.
+
+    Scored from committed prediction files against gold rebuilt from the seed, exactly as the
+    foreign study is — the manifest's `template` on this corpus is the rung, so the per-rung
+    breakdown is a column of the score rather than a second computation.
+    """
+    gold = {document.doc_id: document for document in corpus}
+    scanned = {
+        document.doc_id: _with_template(document, rung.name)
+        for document, rung in scanned_documents()
+    }
+
+    rows = []
+    for directory in sorted((ROOT / "results").glob(f"{SCANNED_PREFIX}*")):
+        baseline = directory.name[len(SCANNED_PREFIX):]
+        familiar = ROOT / "results" / baseline
+        if not (directory / prediction_file.PREDICTIONS_NAME).exists():
+            continue  # pragma: no cover — a directory without a run in it
+        if not (familiar / prediction_file.PREDICTIONS_NAME).exists():
+            continue  # pragma: no cover — a scanned arm whose own-page counterpart is not committed
+        here = _summary(directory, scanned)
+        by_rung = dict(here.by_template)
+        rows.append({
+            "baseline": baseline,
+            "own_accuracy": _summary(familiar, gold).overall.accuracy,
+            "rungs": {
+                name: by_rung[name].accuracy for name in RUNG_ORDER if name in by_rung
+            },
+        })
+    order = [baseline.name for baseline in BASELINES]
+    rows.sort(key=lambda row: order.index(row["baseline"]))
+    return rows or None
+
+
+def _with_template(document, template: str):
+    return type(document)(
+        doc_id=document.doc_id, tier=document.tier, template=template, seed=document.seed,
+        invoice=document.invoice, context=document.context, overlay=document.overlay,
+    )
+
+
+def grounding_on_a_scan() -> dict[str, dict[str, int]] | None:
+    """How many values ground per rung, on a reading that is right everywhere.
+
+    The one figure on this page that needs a corpus on disk: grounding resolves a value against the
+    page's *text*, and there is no way to know what a page says without the page. `data/scanned` is
+    one command away (`python -m doc_extract.degrade`) and is not committed, so a checkout without
+    it renders this section without its second table rather than with an invented one.
+    """
+    directory = ROOT / "results" / SCANNED_CONTROL
+    corpus_dir = ROOT / "data" / "scanned"
+    if not (directory / prediction_file.PREDICTIONS_NAME).exists():
+        return None  # pragma: no cover — a checkout without that run
+    if not (corpus_dir / MANIFEST_NAME).exists():
+        return None  # pragma: no cover — the corpus has not been built here
+
+    cases = {case.doc_id: case for case in dataset.load(corpus_dir).cases}
+    counts: dict[str, dict[str, int]] = {name: {"grounded": 0, "ungrounded": 0} for name in RUNG_ORDER}
+    for record in prediction_file.read(directory / prediction_file.PREDICTIONS_NAME):
+        invoice = record.parse()
+        case = cases[record.doc_id]
+        if invoice is None:  # pragma: no cover — the oracle answers every document
+            continue
+        for row in ground(case.source(), invoice):
+            if not row.measured:
+                continue
+            counts[case.template]["ungrounded" if row.suspicious else "grounded"] += 1
+    return counts
 
 
 #: The arm the silence section is computed from: the gold with its table dropped. Every hard rule
@@ -637,6 +730,59 @@ was presentation. Real invoices also bring skew, stamps, scans and layouts nobod
 none of that is here.</p>"""
 
 
+def scanned_section(rows: list[dict[str, object]] | None, grounding: dict | None) -> str:
+    """M7's other paired comparison: the same page, photographed."""
+    if not rows:  # pragma: no cover — a checkout without the scanned arms
+        return ""
+    head = "".join(f'<th class="num">{html.escape(name)}</th>' for name in RUNG_ORDER)
+    body = "\n".join(
+        f'    <tr><th><code>{html.escape(str(row["baseline"]))}</code></th>'
+        f'<td class="num">{percent(row["own_accuracy"])}</td>'
+        + "".join(
+            f'<td class="num">{percent(row["rungs"].get(name))}</td>' for name in RUNG_ORDER
+        )
+        + "</tr>"
+        for row in rows
+    )
+    gate = ""
+    if grounding:
+        cells = "\n".join(
+            f'    <tr><th><code>{html.escape(name)}</code></th>'
+            f'<td class="num">{counts["grounded"]}</td>'
+            f'<td class="num">{counts["ungrounded"]}</td></tr>'
+            for name, counts in grounding.items()
+        )
+        total = sum(counts["ungrounded"] for counts in grounding.values())
+        gate = f"""<p><strong>The column above is not the finding. What a scan does to the
+<em>gate</em> is.</strong> Run the oracle &mdash; a perfect reading, nothing wrong anywhere &mdash;
+over the scanned corpus, and grounding raises {total} false alarms:</p>
+<table><thead><tr><th>rung</th><th class="num">grounded</th><th class="num">ungrounded</th></tr></thead>
+<tbody>
+{cells}
+</tbody></table>
+<p class="note">Grounding resolves a value to a span of page text, and there is no page text. It
+does not degrade &mdash; it inverts, and it inverts <em>silently</em>: an ungrounded correct value
+looks exactly like an ungrounded fabricated one. Of the two signals the routing gate is built on,
+only the arithmetic survives a scan &mdash; and that is the one an adversary can satisfy on
+purpose.</p>"""
+    return f"""<h2>When the page is a picture</h2>
+<p>Every document measured so far arrived with a text layer <code>reportlab</code> wrote: exact,
+complete, in the order the values were drawn. That is the last unearned advantage in the corpus. An
+invoice in a real inbox is frequently a <em>photograph</em> of an invoice, and there is no text layer
+at all. So a third corpus prints the same gold in the same layout and then scans it, at three rungs
+that each isolate one thing: one keeps a text layer (an OCR assumed perfect), one removes the text
+layer and changes nothing else, and one is what a supplier emails at 150&nbsp;dpi.</p>
+<table><thead><tr><th>baseline</th><th class="num">its own page</th>{head}</tr></thead>
+<tbody>
+{body}
+</tbody></table>
+<p class="note">The control is exact rather than approximate: the fitted reader's predictions on the
+rung that keeps a text layer are identical, field for field, to its predictions on the clean corpus.
+That is what makes the other two columns a measurement of the missing text layer and not of the
+damage to the image.</p>
+{gate}"""
+
+
 def stripped_section(study: dict[str, object] | None) -> str:
     """The degenerate reading, rendered from `stripped_study` rather than from memory."""
     if study is None:  # pragma: no cover — a checkout without that run
@@ -780,6 +926,7 @@ def build() -> str:
         detector_section=detector_section(detector_study(corpus)),
         stripped_section=stripped_section(stripped_study(corpus)),
         foreign_section=foreign_section(foreign_study(corpus)),
+        scanned_section=scanned_section(scanned_study(corpus), grounding_on_a_scan()),
         injection_section=injection_section(injection_study(corpus)),
         formatting_only=formatting_only_differences(corpus),
         opus_cost=OPUS_COST,
@@ -1017,6 +1164,8 @@ footer {{
 {stripped_section}
 
 {foreign_section}
+
+{scanned_section}
 
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no

@@ -49,6 +49,7 @@ def predict(
     config: ExtractionConfig = DEFAULT_CONFIG,
     options: Mapping[str, Any] | None = None,
     progress: Progress | None = None,
+    vision: bool = False,
 ) -> tuple[Prediction, ...]:
     """Run one baseline over every document of a corpus, in manifest order.
 
@@ -56,8 +57,16 @@ def predict(
     and the record keeps the answer rather than the page. A hash mismatch raises rather than being
     recorded — a prediction made on bytes the manifest does not describe is not a prediction about
     the corpus the report names.
+
+    `vision` sends the page as images instead of as text. The baseline is unchanged by it — every
+    offline one answers from the gold or from the text and ignores what was sent — which is the
+    point: the modality is a property of the *request*, and putting it here rather than in a
+    baseline of its own keeps the two arms comparable through one prompt, one repair loop and one
+    failure taxonomy.
     """
-    return tuple(_predict(corpus, baseline, config=config, options=options, progress=progress))
+    return tuple(_predict(
+        corpus, baseline, config=config, options=options, progress=progress, vision=vision
+    ))
 
 
 def _predict(
@@ -67,6 +76,7 @@ def _predict(
     config: ExtractionConfig,
     options: Mapping[str, Any] | None,
     progress: Progress | None,
+    vision: bool = False,
 ) -> Iterator[Prediction]:
     for case in corpus.cases:
         #: Read once. `Case.source()` verifies the PDF's hash and re-parses its geometry, and doing
@@ -79,7 +89,9 @@ def _predict(
             seed=case.seed,
             options=dict(options or {}),
         ))
-        extraction = pipeline.extract(source, prepared.client, config=config)
+        extraction = pipeline.extract(
+            source, prepared.client, config=config, images=case.images() if vision else ()
+        )
         record = prediction_file.record(
             extraction,
             doc_id=case.doc_id,

@@ -88,6 +88,9 @@ def main(argv: list[str] | None = None) -> int:
     runner.add_argument("--effort", default=None, help="reasoning effort, passed through when set")
     runner.add_argument("--rate", type=float, default=DEFAULT_RATE,
                         help=f"corruption rate for the noisy oracle (default: {DEFAULT_RATE})")
+    runner.add_argument("--vision", action="store_true",
+                        help="send each page as an image instead of as text — the only reader a "
+                             "scanned document leaves")
     runner.add_argument("--quiet", action="store_true", help="no per-document line")
     runner.add_argument("--yes", action="store_true",
                         help="confirm a baseline that calls a paid API over the network")
@@ -154,7 +157,12 @@ def _run(args: argparse.Namespace) -> int:
         max_repairs=args.max_repairs,
         effort=args.effort,
     )
-    options = {"rate": args.rate} if baseline.name == "noisy" else {}
+    options: dict[str, object] = {"rate": args.rate} if baseline.name == "noisy" else {}
+    if args.vision:
+        #: Recorded as an option rather than inferred from the corpus: the same scanned corpus can
+        #: be read either way, and a report whose header did not say which was which would put two
+        #: incomparable numbers under one name.
+        options["reads"] = "the page as an image"
     meta = run.meta(corpus, baseline, config=config, options=options)
     #: A baseline writes to a directory named for itself; a remote run writes to one named for the
     #: model, because the baseline is the same `claude` every time and the model is the variable.
@@ -168,7 +176,7 @@ def _run(args: argparse.Namespace) -> int:
 
     records = run.predict(
         corpus, baseline, config=config, options=options,
-        progress=None if args.quiet else _progress,
+        progress=None if args.quiet else _progress, vision=args.vision,
     )
     run.write(out_dir, records, meta)
     return _report(corpus, records, meta, out_dir, allow_partial=args.allow_partial or partial)

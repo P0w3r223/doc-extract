@@ -28,7 +28,14 @@ from typing import Any
 from pydantic import ValidationError
 
 from doc_extract.extract import prompt, wire
-from doc_extract.extract.client import LLMClient, LLMError, LLMRequest, LLMResponse, Usage
+from doc_extract.extract.client import (
+    LLMClient,
+    LLMError,
+    LLMRequest,
+    LLMResponse,
+    PageImage,
+    Usage,
+)
 from doc_extract.extract.result import REPAIRABLE, Attempt, Extraction, FailureClass, Stage
 from doc_extract.schema.ksef import Invoice
 from doc_extract.source.document import SourceDocument
@@ -81,22 +88,36 @@ def extract(
     client: LLMClient,
     *,
     config: ExtractionConfig = DEFAULT_CONFIG,
+    images: tuple[PageImage, ...] = (),
 ) -> Extraction:
-    """One document, at most `1 + max_repairs` calls, always a result and never an exception."""
+    """One document, at most `1 + max_repairs` calls, always a result and never an exception.
+
+    `images` chooses the modality and nothing else. Supplied, the request carries the pages and the
+    system prompt for reading them; left out, it carries the sealed text exactly as before. The
+    stage order, the repair budget, the failure taxonomy and the usage accounting are one code path
+    for both — a vision arm that ran through a pipeline of its own would report a failure taxonomy
+    that could not be compared with the text arm's, which is the whole of what M7d is for.
+
+    `document` is still the source of the *text* turn, and on a scanned page it is empty. That is
+    not a special case to guard: a scanned document read as text is a document with nothing in it,
+    and the pipeline reports what that produces rather than refusing to try.
+    """
     schema = wire.invoice_schema()
     attempts: list[Attempt] = []
-    message = prompt.extraction_message(document)
+    vision = bool(images)
+    message = prompt.vision_message(len(images)) if vision else prompt.extraction_message(document)
     stage = Stage.EXTRACT
     max_tokens = config.max_tokens
 
     for _ in range(config.max_repairs + 1):
         request = LLMRequest(
             model=config.model,
-            system=prompt.SYSTEM,
+            system=prompt.SYSTEM_VISION if vision else prompt.SYSTEM,
             user=message,
             schema=schema,
             max_tokens=max_tokens,
             effort=config.effort,
+            images=images,
         )
         try:
             response = client.complete(request)
@@ -118,7 +139,11 @@ def extract(
         if failure not in REPAIRABLE:
             break
 
-        message = prompt.repair_message(document, previous=response.text, errors=detail)
+        message = (
+            prompt.vision_repair_message(previous=response.text, errors=detail)
+            if vision
+            else prompt.repair_message(document, previous=response.text, errors=detail)
+        )
         stage = Stage.REPAIR
         max_tokens = config.repair_max_tokens
 

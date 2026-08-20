@@ -20,14 +20,19 @@ memory at a time, and a scorer that only needs the gold never opens a PDF at all
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from PIL import Image
+
+from doc_extract.extract.client import PageImage
 from doc_extract.schema.ksef import Invoice
 from doc_extract.source import document as source_document
+from doc_extract.source import raster
 from doc_extract.source.document import SourceDocument
 from doc_extract.synth import fa3_xml
 from doc_extract.synth.corpus import MANIFEST_NAME, PROVENANCE_NAME
@@ -67,6 +72,19 @@ class Case:
     def source(self) -> SourceDocument:
         """The page, as text with a span per word and per cell. No model, no network."""
         return source_document.read(self._verified(self.pdf_path, self.pdf_sha256))
+
+    def images(self) -> tuple[PageImage, ...]:
+        """The page as pictures of itself, one per printed page, ready to send to a model.
+
+        Rasterised from the same verified bytes `source()` reads, so a vision arm and a text arm are
+        demonstrably looking at the same document rather than at two files that happen to share a
+        name. PNG rather than JPEG: the corpus already carries whatever damage it is meant to carry,
+        and a second lossy encoding on the way out would add damage no rung asked for.
+        """
+        data = self._verified(self.pdf_path, self.pdf_sha256)
+        return tuple(
+            PageImage(media_type="image/png", data=_png(page)) for page in raster.for_vision(data)
+        )
 
     def _verified(self, path: Path, expected: str) -> bytes:
         try:
@@ -174,3 +192,9 @@ def _provenance(directory: Path) -> dict[str, Any]:
     """
     path = directory / PROVENANCE_NAME
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def _png(image: Image.Image) -> bytes:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
