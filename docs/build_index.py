@@ -380,12 +380,25 @@ def scanned_study(corpus: list) -> list[dict[str, object]] | None:
             continue  # pragma: no cover — a scanned arm whose own-page counterpart is not committed
         here = _summary(directory, scanned)
         by_rung = dict(here.by_template)
+        records = prediction_file.read(directory / prediction_file.PREDICTIONS_NAME)
         rows.append({
             "baseline": baseline,
+            #: A remote run's directory is named for the model, so this is also how the section
+            #: knows a row is the system under test rather than a control — and the counterpart it
+            #: was paired with is that model's *text* arm on the clean page, which is two changes
+            #: at once and has to be said out loud.
+            "is_model": baseline not in {entry.name for entry in BASELINES},
             "own_accuracy": _summary(familiar, gold).overall.accuracy,
             "rungs": {
                 name: by_rung[name].accuracy for name in RUNG_ORDER if name in by_rung
             },
+            #: A single truncated document can dominate one rung's figure — one did, at 180 missed
+            #: fields — so the count is carried rather than left for a reader to wonder about.
+            "truncated": collections.Counter(
+                scanned[record.doc_id].template
+                for record in records
+                if record.failure == "truncated"
+            ),
         })
     rows.sort(key=_row_order)
     return rows or None
@@ -398,32 +411,66 @@ def _with_template(document, template: str):
     )
 
 
-def grounding_on_a_scan() -> dict[str, dict[str, int]] | None:
-    """How many values ground per rung, on a reading that is right everywhere.
+def grounding_on_a_scan(corpus: list) -> dict[str, object] | None:
+    """Grounding per rung, on the perfect reading and on a model's, if either is committed.
 
-    The one figure on this page that needs a corpus on disk: grounding resolves a value against the
-    page's *text*, and there is no way to know what a page says without the page. `data/scanned` is
-    one command away (`python -m doc_extract.degrade`) and is not committed, so a checkout without
-    it renders this section without its second table rather than with an invented one.
+    The one part of this page that needs a corpus on disk: grounding resolves a value against the
+    page's *text*, and no committed artifact records what a page says. `data/scanned` is one command
+    away (`python -m doc_extract.degrade`) and is not committed, so a checkout without it renders
+    this section without its second half rather than with an invented one.
+
+    Two readings, because they answer different halves of one question. On the **oracle** every
+    alarm is provably false — the reading is right everywhere — so the split shows what a scan does
+    to the signal. On a **model** the alarms are mostly real, so the split shows that the signal is
+    not merely quiet on a page with a text layer: it is at its most precise there.
     """
-    directory = ROOT / "results" / SCANNED_CONTROL
     corpus_dir = ROOT / "data" / "scanned"
-    if not (directory / prediction_file.PREDICTIONS_NAME).exists():
-        return None  # pragma: no cover — a checkout without that run
     if not (corpus_dir / MANIFEST_NAME).exists():
         return None  # pragma: no cover — the corpus has not been built here
 
+    control = ROOT / "results" / SCANNED_CONTROL
+    if not (control / prediction_file.PREDICTIONS_NAME).exists():
+        return None  # pragma: no cover — a checkout without that run
+
     cases = {case.doc_id: case for case in dataset.load(corpus_dir).cases}
-    counts: dict[str, dict[str, int]] = {name: {"grounded": 0, "ungrounded": 0} for name in RUNG_ORDER}
+    gold = {
+        document.doc_id: _with_template(document, rung.name)
+        for document, rung in scanned_documents()
+    }
+    models = sorted(
+        directory for directory in (ROOT / "results").glob(f"{SCANNED_PREFIX}*")
+        if directory.name[len(SCANNED_PREFIX):] not in {entry.name for entry in BASELINES}
+        and (directory / prediction_file.PREDICTIONS_NAME).exists()
+    )
+    return {
+        "control": _grounding_by_rung(control, cases, gold),
+        "model": models[0].name[len(SCANNED_PREFIX):] if models else None,
+        "model_rows": _grounding_by_rung(models[0], cases, gold) if models else None,
+    }
+
+
+def _grounding_by_rung(directory, cases: dict, gold: dict) -> dict[str, collections.Counter]:
+    """One committed run's groundings, split by rung and by whether the value was actually wrong."""
+    counts: dict[str, collections.Counter] = {name: collections.Counter() for name in RUNG_ORDER}
     for record in prediction_file.read(directory / prediction_file.PREDICTIONS_NAME):
         invoice = record.parse()
-        case = cases[record.doc_id]
-        if invoice is None:  # pragma: no cover — the oracle answers every document
+        if invoice is None:
             continue
-        for row in ground(case.source(), invoice):
+        document = gold[record.doc_id]
+        score = judge(
+            document.invoice, invoice, doc_id=record.doc_id, tier=document.tier,
+            template=document.template, failure=FailureClass(record.failure),
+        )
+        wrong = {(row.field, row.key) for row in score.results if row.outcome.name == "WRONG"}
+        for row in ground(cases[record.doc_id].source(), invoice):
             if not row.measured:
                 continue
-            counts[case.template]["ungrounded" if row.suspicious else "grounded"] += 1
+            bad = (row.field, row.key) in wrong
+            counts[document.template][
+                "TP" if row.suspicious and bad else
+                "FP" if row.suspicious else
+                "FN" if bad else "TN"
+            ] += 1
     return counts
 
 
@@ -742,6 +789,77 @@ was presentation. Real invoices also bring skew, stamps, scans and layouts nobod
 none of that is here.</p>"""
 
 
+def _grounding_on_a_model(grounding: dict) -> str:
+    """The other half: what the same signal does on a population of real mistakes, rung by rung."""
+    rows = grounding.get("model_rows")
+    if not rows:  # pragma: no cover — a checkout with no paid arm over the scanned corpus
+        return ""
+    name = html.escape(str(grounding["model"]))
+    body = "\n".join(
+        f'    <tr><th><code>{html.escape(rung)}</code></th>'
+        f'<td class="num">{counts["TP"]}</td><td class="num">{counts["FP"]}</td>'
+        f'<td class="num">{counts["FN"]}</td>'
+        f'<td class="num">{percent(_ratio(counts["TP"], counts["TP"] + counts["FP"]))}</td>'
+        f'<td class="num">{percent(_ratio(counts["TP"], counts["TP"] + counts["FN"]))}</td></tr>'
+        for rung, counts in rows.items()
+    )
+    return f"""<p>And the mirror of it, on a population of real mistakes: <code>{name}</code>
+reading the same pages as images.</p>
+<table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
+<tbody>
+{body}
+</tbody></table>
+<p class="note">Read the first row against the other two. Where a text layer survives, grounding is
+at its <em>most</em> precise measurement anywhere in this project &mdash; it catches almost every
+wrong value and raises no false alarm at all. Where there is none it flags everything, so its recall
+is 100&nbsp;% by vacuity and its precision collapses. <strong>The gate does not survive a scan; it
+survives an OCR</strong> &mdash; which is a usable engineering conclusion rather than a negative
+one: put a recogniser in front of the model and the signal comes back.</p>"""
+
+
+def _ratio(numerator: int, denominator: int) -> float | None:
+    return None if denominator == 0 else numerator / denominator
+
+
+def _scanned_caveats(rows: list[dict[str, object]]) -> str:
+    """What a reader has to know before comparing a model's row with a baseline's.
+
+    Both are generated from the rows rather than typed, because both are properties of whichever
+    runs happen to be committed: a checkout with no paid arm should not carry a paragraph about
+    one, and a rung whose figure is dragged by a truncation should say which run truncated.
+    """
+    notes = []
+    models = [row for row in rows if row["is_model"]]
+    if models:
+        named = ", ".join(f"<code>{html.escape(str(row['baseline']))}</code>" for row in models)
+        notes.append(
+            f"<p class=\"note\">For {named}, <em>its own page</em> is that model reading the clean "
+            "corpus as <strong>text</strong>, so the drop across the row is two changes at once — "
+            "the page became a picture and the reader started looking at pixels. The column that "
+            "isolates the modality alone is <code>searchable</code>: the same information is "
+            "available there as in the text arm, and it is read as an image.</p>"
+        )
+    dragged = [
+        (row["baseline"], rung, count)
+        for row in rows
+        for rung, count in sorted(dict(row["truncated"]).items())
+    ]
+    if dragged:
+        listed = ", ".join(
+            f"<code>{html.escape(str(name))}</code> on <code>{html.escape(rung)}</code> "
+            f"({count} document{'s' if count > 1 else ''})"
+            for name, rung, count in dragged
+        )
+        notes.append(
+            f"<p class=\"note\">One figure above is not a legibility result: {listed} ran out of "
+            "output tokens mid-answer. A truncated document contributes every one of its fields as "
+            "<em>missed</em>, which is enough to move a rung's accuracy by several points on its "
+            "own — and running out of room while transcribing a long table from an image is a cost "
+            "of the modality rather than of the rung.</p>"
+        )
+    return "\n".join(notes)
+
+
 def scanned_section(rows: list[dict[str, object]] | None, grounding: dict | None) -> str:
     """M7's other paired comparison: the same page, photographed."""
     if not rows:  # pragma: no cover — a checkout without the scanned arms
@@ -758,13 +876,14 @@ def scanned_section(rows: list[dict[str, object]] | None, grounding: dict | None
     )
     gate = ""
     if grounding:
+        control = grounding["control"]
         cells = "\n".join(
             f'    <tr><th><code>{html.escape(name)}</code></th>'
-            f'<td class="num">{counts["grounded"]}</td>'
-            f'<td class="num">{counts["ungrounded"]}</td></tr>'
-            for name, counts in grounding.items()
+            f'<td class="num">{counts["TN"]}</td>'
+            f'<td class="num">{counts["FP"] + counts["TP"]}</td></tr>'
+            for name, counts in control.items()
         )
-        total = sum(counts["ungrounded"] for counts in grounding.values())
+        total = sum(counts["FP"] + counts["TP"] for counts in control.values())
         #: Fenced by a comment because this is the one block on the page that needs a corpus on
         #: disk, so it is the one block `tests/test_site_committed.py` has to forgive when it
         #: checks the committed page against the generator. A fence the test can key on beats a
@@ -782,6 +901,7 @@ does not degrade &mdash; it inverts, and it inverts <em>silently</em>: an ungrou
 looks exactly like an ungrounded fabricated one. Of the two signals the routing gate is built on,
 only the arithmetic survives a scan &mdash; and that is the one an adversary can satisfy on
 purpose.</p>
+{_grounding_on_a_model(grounding)}
 {CORPUS_DEPENDENT_END}"""
     return f"""<h2>When the page is a picture</h2>
 <p>Every document measured so far arrived with a text layer <code>reportlab</code> wrote: exact,
@@ -798,6 +918,7 @@ layer and changes nothing else, and one is what a supplier emails at 150&nbsp;dp
 rung that keeps a text layer are identical, field for field, to its predictions on the clean corpus.
 That is what makes the other two columns a measurement of the missing text layer and not of the
 damage to the image.</p>
+{_scanned_caveats(rows)}
 {gate}"""
 
 
@@ -944,7 +1065,7 @@ def build() -> str:
         detector_section=detector_section(detector_study(corpus)),
         stripped_section=stripped_section(stripped_study(corpus)),
         foreign_section=foreign_section(foreign_study(corpus)),
-        scanned_section=scanned_section(scanned_study(corpus), grounding_on_a_scan()),
+        scanned_section=scanned_section(scanned_study(corpus), grounding_on_a_scan(corpus)),
         injection_section=injection_section(injection_study(corpus)),
         formatting_only=formatting_only_differences(corpus),
         opus_cost=OPUS_COST,

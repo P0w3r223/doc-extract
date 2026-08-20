@@ -313,6 +313,8 @@ layer and changes nothing else, and one is what a supplier emails at 150&nbsp;dp
 rung that keeps a text layer are identical, field for field, to its predictions on the clean corpus.
 That is what makes the other two columns a measurement of the missing text layer and not of the
 damage to the image.</p>
+<p class="note">For <code>claude-haiku-4-5</code>, <em>its own page</em> is that model reading the clean corpus as <strong>text</strong>, so the drop across the row is two changes at once — the page became a picture and the reader started looking at pixels. The column that isolates the modality alone is <code>searchable</code>: the same information is available there as in the text arm, and it is read as an image.</p>
+<p class="note">One figure above is not a legibility result: <code>claude-haiku-4-5</code> on <code>rasterised</code> (1 document) ran out of output tokens mid-answer. A truncated document contributes every one of its fields as <em>missed</em>, which is enough to move a rung's accuracy by several points on its own — and running out of room while transcribing a long table from an image is a cost of the modality rather than of the rung.</p>
 <!-- corpus-dependent: begin -->
 <p><strong>The column above is not the finding. What a scan does to the
 <em>gate</em> is.</strong> Run the oracle &mdash; a perfect reading, nothing wrong anywhere &mdash;
@@ -328,6 +330,20 @@ does not degrade &mdash; it inverts, and it inverts <em>silently</em>: an ungrou
 looks exactly like an ungrounded fabricated one. Of the two signals the routing gate is built on,
 only the arithmetic survives a scan &mdash; and that is the one an adversary can satisfy on
 purpose.</p>
+<p>And the mirror of it, on a population of real mistakes: <code>claude-haiku-4-5</code>
+reading the same pages as images.</p>
+<table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
+<tbody>
+    <tr><th><code>searchable</code></th><td class="num">136</td><td class="num">0</td><td class="num">1</td><td class="num">100&nbsp;%</td><td class="num">99.3&nbsp;%</td></tr>
+    <tr><th><code>rasterised</code></th><td class="num">160</td><td class="num">1672</td><td class="num">0</td><td class="num">8.7&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
+    <tr><th><code>scanned</code></th><td class="num">132</td><td class="num">1828</td><td class="num">0</td><td class="num">6.7&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
+</tbody></table>
+<p class="note">Read the first row against the other two. Where a text layer survives, grounding is
+at its <em>most</em> precise measurement anywhere in this project &mdash; it catches almost every
+wrong value and raises no false alarm at all. Where there is none it flags everything, so its recall
+is 100&nbsp;% by vacuity and its precision collapses. <strong>The gate does not survive a scan; it
+survives an OCR</strong> &mdash; which is a usable engineering conclusion rather than a negative
+one: put a recogniser in front of the model and the signal comes back.</p>
 <!-- corpus-dependent: end -->
 
 <h2>The gap this fills</h2>
@@ -502,7 +518,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>f3e7c09</code> &middot; part of a
+  <code>88e3b90</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

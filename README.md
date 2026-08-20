@@ -44,7 +44,9 @@ at all for a language model given a clean PDF text layer.
 So the corpus is saturated, and the headline question cannot be asked of *that* run: with no errors,
 the detector has nothing to detect. What it does establish is that the gate never blocks correct
 work — **0 false positives on 108 correct documents**. The question itself is answered on a second
-arm: the same corpus, the same pipeline, a weaker model.
+arm: the same corpus, the same pipeline, a weaker model. Milestone 7 adds two more corpora that
+un-saturate it without touching the gold — the same invoices printed in an unfamiliar vocabulary,
+and the same page photographed — and a third arm that reads the photographs as pixels.
 
 ## Does "the arithmetic holds" predict "the fields are right"?
 
@@ -197,6 +199,43 @@ it inverts — every value looks fabricated, so high-confidence coverage falls t
 reading that is entirely correct. Of the gate's two signals, **only the arithmetic survives a scan**,
 and that is the signal M6 already showed an adversary can satisfy on purpose.
 
+## What a model reads off a scan, and what the gate can still tell it
+
+The vision path is the reader a scanned document leaves, and it is the **same pipeline**: `images`
+on the request chooses the modality, and the schema, the repair loop with its own budget, the
+failure taxonomy and the usage accounting are the same objects. The two system prompts differ in
+exactly two blocks — the trust boundary and the layout description — and a test asserts the rest is
+shared rather than merely alike, because a gap measured across two independently written prompts
+would be partly a gap between prompts.
+
+`claude-haiku-4-5`, same gold, same 108 invoices:
+
+| | text, clean page | image, scanned page |
+|---|---:|---:|
+| accuracy | 97.8 % | **88.7 %** |
+| value accuracy | 98.9 % | 92.1 % |
+| every field right | 65 / 108 | 10 / 108 |
+
+Per rung it scores 92.0 %, 82.8 % and 91.6 %, and the middle figure is not a legibility result: one
+document ran out of output tokens mid-answer and contributed 180 missed fields by itself. Set it
+aside and the three rungs read **92.0 / 90.7 / 91.6 %**. So the rung barely matters to a reader that
+looks at the page — the exact mirror of the baseline table above, where it decides everything.
+
+The gate is the interesting half. Split the same run's grounding by whether the page kept a text
+layer:
+
+| rung | TP | FP | FN | precision | recall |
+|---|---:|---:|---:|---:|---:|
+| `searchable` | 136 | **0** | 1 | **100 %** | 99.3 % |
+| `rasterised` | 160 | 1672 | 0 | 8.7 % | 100 % |
+| `scanned` | 132 | 1828 | 0 | 6.7 % | 100 % |
+
+Where a text layer survives, grounding gives its **most precise measurement anywhere in this
+project** — 136 of 137 wrong values caught, not one false alarm, on a real vision-error population.
+Where there is none it flags everything, so the recall is 100 % by vacuity and the precision
+collapses. **The gate does not survive a scan; it survives an OCR** — which is a usable conclusion
+rather than a negative one. Put a recogniser in front of the model and the signal comes back.
+
 A misread year — `2025-08-05` for `2026-08-05` — is the tenth injected error kind, and gives the
 date rules a recall too: on `noisy`, the heuristic half reads precision 100 %, recall 5.6 %, zero
 false positives — and **100 % on the kind it actually owns**, on a support of 4 documents, which is
@@ -220,10 +259,10 @@ letting a zero read as a miss.
 | `degrade/`, `source/raster.py` | the same page photographed at three rungs of legibility, and the pixels a model is sent |
 | tests | **658 passing**, ruff clean |
 
-What milestone 7 has **not** got is a paid arm over either held-out corpus. The two corpora, the
-vision request path and the offline baselines over both are built and reported above; the models'
-own numbers on them — and therefore the synthetic↔real gap as a figure rather than as a method —
-are the open item.
+Milestone 7 has both held-out corpora, the vision path, and a paid arm reading the scanned one as
+images. What it has **not** got is a paid arm over the *foreign* corpus — a separate spend and a
+separate question — and the synthetic↔real gap collected into an artifact of its own rather than
+reported as three sections above.
 
 ## What an attacker gets, and what the gate does about it
 

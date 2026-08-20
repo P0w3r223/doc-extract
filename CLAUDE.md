@@ -291,8 +291,11 @@ re-run a paid model to be checked would be one too.
    answers how much of it was the text layer, and what a scan does to the gate (*What a scan
    costs* below). The vision path is built and tested offline — one pipeline, one repair loop,
    one failure taxonomy, with the modality chosen by the request rather than by a second code
-   path. Still open: the paid arms over both held-out corpora, and the reported gap as its own
-   artifact.
+   path, and it has been **run against a real model**: `claude-haiku-4-5` reads the scanned corpus
+   as images at 88.7 % against 97.8 % for the same model on the clean page as text, and the gate's
+   grounding signal turns out to survive an OCR even though it does not survive a scan. Still open:
+   a paid arm over the *foreign* corpus, which is a separate spend and a separate question, and the
+   synthetic↔real gap as an artifact of its own rather than as three sections.
 
 ## The headline answer, and what it is really measuring
 
@@ -424,6 +427,38 @@ with nothing wrong in it**, and high-confidence coverage of 32.3 %. It does not 
 inverts, and it inverts *silently*, since an ungrounded correct value is indistinguishable from an
 ungrounded fabricated one. Of the gate's two signals only the arithmetic survives a scan, and M6
 already showed that is the one an adversary can satisfy on purpose.
+
+### What a model reads off it, and what the gate can still tell it
+
+`claude-haiku-4-5` over the same corpus, each page sent as an image, everything else unchanged:
+
+| | text, clean page | image, scanned page |
+|---|---:|---:|
+| accuracy | 97.8 % | **88.7 %** |
+| value accuracy | 98.9 % | 92.1 % |
+| every field right | 65 / 108 | 10 / 108 |
+
+Per rung: 92.0 %, 82.8 %, 91.6 %. The middle figure is **not a legibility result** — one document
+ran out of output tokens mid-answer and contributed 180 missed fields on its own, which is a cost of
+transcribing a long table from an image rather than of the rung. Set it aside and the three read
+92.0 / 90.7 / 91.6 %: **the rung barely matters to a reader that looks at the page**, the exact
+mirror of the baseline table, where it decides everything.
+
+Then split the same run's grounding by whether the page kept a text layer, and the picture reverses
+again:
+
+| rung | TP | FP | FN | precision | recall |
+|---|---:|---:|---:|---:|---:|
+| `searchable` | 136 | **0** | 1 | **100 %** | 99.3 % |
+| `rasterised` | 160 | 1672 | 0 | 8.7 % | 100 % |
+| `scanned` | 132 | 1828 | 0 | 6.7 % | 100 % |
+
+That first row is grounding's **most precise measurement anywhere in this project** — 136 of 137
+wrong values caught with no false alarm, on a real vision-error population rather than an injected
+one. The other two flag everything, so their recall is 100 % by vacuity. **The gate does not survive
+a scan; it survives an OCR**, and that is a usable engineering conclusion rather than a negative
+result: a recogniser in front of the model brings the signal back. It is also why the `searchable`
+rung is a control and not a curiosity — it is the pipeline anyone would actually deploy.
 
 The vision path is what is left when the text layer is gone, and it is one pipeline rather than two:
 `images` on the request chooses the modality, and the schema, the repair loop with its own budget,
