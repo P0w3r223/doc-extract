@@ -171,7 +171,7 @@ footer {
 </head>
 <body>
 <header>
-  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;6 of 7</p>
+  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;6 of 7, and most of the seventh</p>
   <h1>Poland's national e-invoice schema checks nothing an accountant would</h1>
   <p class="lead">FA(3) &mdash; mandatory since 2026 &mdash; is 183 798 bytes of XSD carrying
   328 enumerations and <strong>0 assertions</strong>. It knows what shape an
@@ -314,7 +314,7 @@ layer and changes nothing else, and one is what a supplier emails at 150&nbsp;dp
 rung that keeps a text layer are identical, field for field, to its predictions on the clean corpus.
 That is what makes the other two columns a measurement of the missing text layer and not of the
 damage to the image.</p>
-<p class="note">For <code>claude-haiku-4-5</code>, <code>claude-opus-5</code>, <em>its own page</em> is that model reading the clean corpus as <strong>text</strong>, so the drop across the row is two changes at once — the page became a picture and the reader started looking at pixels. The column that isolates the modality alone is <code>searchable</code>: the same information is available there as in the text arm, and it is read as an image.</p>
+<p class="note">For <code>claude-haiku-4-5</code> and <code>claude-opus-5</code>, <em>its own page</em> is that model reading the clean corpus as <strong>text</strong>, so the drop across each of those rows is two changes at once — the page became a picture and the reader started looking at pixels. The column that isolates the modality alone is <code>searchable</code>: the same information is available there as in the text arm, and it is read as an image.</p>
 <p class="note">One figure above is not a legibility result: <code>claude-haiku-4-5</code> on <code>rasterised</code> (1 document) ran out of output tokens mid-answer. A truncated document contributes every one of its fields as <em>missed</em>, which is enough to move a rung's accuracy by several points on its own — and running out of room while transcribing a long table from an image is a cost of the modality rather than of the rung.</p>
 <!-- corpus-dependent: begin -->
 <p><strong>The column above is not the finding. What a scan does to the
@@ -335,9 +335,9 @@ purpose.</p>
 reading the same pages as images.</p>
 <table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
 <tbody>
-    <tr><th><code>searchable</code></th><td class="num">136</td><td class="num">0</td><td class="num">1</td><td class="num">100&nbsp;%</td><td class="num">99.3&nbsp;%</td></tr>
-    <tr><th><code>rasterised</code></th><td class="num">160</td><td class="num">1672</td><td class="num">0</td><td class="num">8.7&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
-    <tr><th><code>scanned</code></th><td class="num">132</td><td class="num">1828</td><td class="num">0</td><td class="num">6.7&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
+    <tr><th><code>searchable</code></th><td class="num">136</td><td class="num">0</td><td class="num">9</td><td class="num">100&nbsp;%</td><td class="num">93.8&nbsp;%</td></tr>
+    <tr><th><code>rasterised</code></th><td class="num">167</td><td class="num">1665</td><td class="num">0</td><td class="num">9.1&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
+    <tr><th><code>scanned</code></th><td class="num">140</td><td class="num">1820</td><td class="num">0</td><td class="num">7.1&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
 </tbody></table>
 <p class="note">Read the first row against the other two. Where a text layer survives, grounding is
 at its <em>most</em> precise measurement anywhere in this project &mdash; it catches almost every
@@ -424,9 +424,11 @@ field, and reads a quantity printed beside a price as two &mdash; from the boxes
 not from the string. The separation is not a tuned threshold either: a space is 0.32&nbsp;em wide,
 while every column gap in the corpus is at least 12&nbsp;pt, because each cell is asserted to fit
 its column with reportlab's padding still to spare.</p>
-<p>What it does <em>not</em> have is real-world visual chaos &mdash; skew, stamps, poor scans,
-layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
-costs, and the gap will be reported whichever way it comes out.</p>
+<p>What it does <em>not</em> have is a page nobody in this repository designed. Two of the three
+things that used to be missing are measured now, on held-out corpora of their own &mdash; an
+unfamiliar layout and a poor scan, each varying one thing so that a drop is attributable to it, and
+both reported above. What is still absent is a genuinely real invoice: a stamp, a signature, a fold,
+a layout no template anticipated because no template wrote it.</p>
 
 <h2>What the baselines say, and what the model says</h2>
 <p>7 committed runs over the same 108 documents, scoring
@@ -495,14 +497,17 @@ page at all.</p>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
     <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms</td></tr>
-    <tr><th>M7 &mdash; real held-out set and the reported synthetic&harr;real gap</th><td class="num">not built</td></tr>
+    <tr><th>M7 &mdash; held-out corpora, the vision path, the reported gap</th><td class="num">built, model arms on one of the two</td></tr>
+    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus, and a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
 </table>
 <p class="note">The headline question &mdash; does &ldquo;the invariants hold&rdquo; actually predict
-&ldquo;the fields are correct&rdquo;? &mdash; is measurable now, and the first answer is an awkward
-one: on the run that matters most there is nothing to predict, because the model made no mistakes.
-The question is being answered instead against injected errors, a weaker reader, and M7's real set.
-A negative result is a publishable result, and so is a corpus that turned out to be too easy.</p>
+&ldquo;the fields are correct&rdquo;? &mdash; met an awkward first answer: on the run that mattered
+most there was nothing to predict, because the model made no mistakes. It has been answered instead
+against injected errors, a weaker reader, and two held-out corpora &mdash; and the scanned one shows
+that making a page <em>harder to see</em> does not un-saturate it either. Making a page unfamiliar
+might, and that is the arm this project has not paid for. A negative result is a publishable result,
+and so is a corpus that turned out to be too easy.</p>
 
 <h2>Reproduce it</h2>
 <pre><code>git clone https://github.com/P0w3r223/doc-extract
@@ -519,7 +524,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>ce12805</code> &middot; part of a
+  <code>c453134</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

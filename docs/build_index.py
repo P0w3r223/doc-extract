@@ -26,6 +26,7 @@ from doc_extract.eval.aggregate import Scored, summarise
 from doc_extract.eval.baselines import BASELINES, BY_NAME
 from doc_extract.eval.format import DASH, rate
 from doc_extract.eval.scorer import judge
+from doc_extract.eval.selective import WRONG
 from doc_extract.extract.result import FailureClass
 from doc_extract.foreign.corpus import documents as foreign_documents
 from doc_extract.ground.resolve import resolve as ground
@@ -411,7 +412,7 @@ def _with_template(document, template: str):
     )
 
 
-def grounding_on_a_scan(corpus: list) -> dict[str, object] | None:
+def grounding_on_a_scan() -> dict[str, object] | None:
     """Grounding per rung, on the perfect reading and on a model's, if either is committed.
 
     The one part of this page that needs a corpus on disk: grounding resolves a value against the
@@ -437,30 +438,51 @@ def grounding_on_a_scan(corpus: list) -> dict[str, object] | None:
         document.doc_id: _with_template(document, rung.name)
         for document, rung in scanned_documents()
     }
-    arms = {
-        directory: _grounding_by_rung(directory, cases, gold)
-        for directory in sorted((ROOT / "results").glob(f"{SCANNED_PREFIX}*"))
+    arms = [
+        directory for directory in sorted((ROOT / "results").glob(f"{SCANNED_PREFIX}*"))
         if directory.name[len(SCANNED_PREFIX):] not in {entry.name for entry in BASELINES}
         and (directory / prediction_file.PREDICTIONS_NAME).exists()
-    }
+    ]
     #: The arm with the most wrong values, not the first one on disk. A precision of 100 % over a
     #: single mistake is an anecdote; the point of this table is what the signal does against a
     #: *population* of them, so the model that made one is the one worth printing. Alphabetical
     #: order happened to pick the right arm here, which is exactly why it should not decide.
-    best = max(arms, key=lambda directory: _wrong_values(arms[directory]), default=None)
+    #:
+    #: Chosen from the prediction files before anything is grounded, because grounding an arm means
+    #: parsing all 108 pages and this page would otherwise pay that for every arm it discards.
+    best = max(arms, key=lambda directory: _wrong_values(directory, gold), default=None)
     return {
         "control": _grounding_by_rung(control, cases, gold),
         "model": best.name[len(SCANNED_PREFIX):] if best else None,
-        "model_rows": arms[best] if best else None,
+        "model_rows": _grounding_by_rung(best, cases, gold) if best else None,
     }
 
 
-def _wrong_values(rows: dict[str, collections.Counter]) -> int:
-    return sum(counts["TP"] + counts["FN"] for counts in rows.values())
+def _wrong_values(directory, gold: dict) -> int:
+    """How many asserted values one committed run got wrong. Reads no page."""
+    total = 0
+    for record in prediction_file.read(directory / prediction_file.PREDICTIONS_NAME):
+        invoice = record.parse()
+        if invoice is None:
+            continue
+        document = gold[record.doc_id]
+        score = judge(
+            document.invoice, invoice, doc_id=record.doc_id, tier=document.tier,
+            template=document.template, failure=FailureClass(record.failure),
+        )
+        total += sum(1 for row in score.results if row.outcome in WRONG)
+    return total
 
 
 def _grounding_by_rung(directory, cases: dict, gold: dict) -> dict[str, collections.Counter]:
-    """One committed run's groundings, split by rung and by whether the value was actually wrong."""
+    """One committed run's groundings, split by rung and by whether the value was actually wrong.
+
+    `selective.WRONG` rather than a comparison against the name `WRONG`: a *spurious* value is one
+    the model asserted where the document has none, which is a wrong asserted value by the same
+    definition the gate uses, and `eval/selective.py` is where that definition lives. Restating it
+    here as one outcome dropped 23 instances of the committed haiku arm, and the table printed
+    beside `gate.md` disagreed with it about the same run and the same signal.
+    """
     counts: dict[str, collections.Counter] = {name: collections.Counter() for name in RUNG_ORDER}
     for record in prediction_file.read(directory / prediction_file.PREDICTIONS_NAME):
         invoice = record.parse()
@@ -471,7 +493,7 @@ def _grounding_by_rung(directory, cases: dict, gold: dict) -> dict[str, collecti
             document.invoice, invoice, doc_id=record.doc_id, tier=document.tier,
             template=document.template, failure=FailureClass(record.failure),
         )
-        wrong = {(row.field, row.key) for row in score.results if row.outcome.name == "WRONG"}
+        wrong = {(row.field, row.key) for row in score.results if row.outcome in WRONG}
         for row in ground(cases[record.doc_id].source(), invoice):
             if not row.measured:
                 continue
@@ -831,6 +853,13 @@ def _ratio(numerator: int, denominator: int) -> float | None:
     return None if denominator == 0 else numerator / denominator
 
 
+def _and_list(items: list[str]) -> str:
+    """`a`, `a and b`, `a, b and c` — so a generated sentence reads as one however many arms land."""
+    if len(items) < 3:
+        return " and ".join(items)
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
 def _scanned_caveats(rows: list[dict[str, object]]) -> str:
     """What a reader has to know before comparing a model's row with a baseline's.
 
@@ -841,10 +870,13 @@ def _scanned_caveats(rows: list[dict[str, object]]) -> str:
     notes = []
     models = [row for row in rows if row["is_model"]]
     if models:
-        named = ", ".join(f"<code>{html.escape(str(row['baseline']))}</code>" for row in models)
+        named = _and_list(
+            [f"<code>{html.escape(str(row['baseline']))}</code>" for row in models]
+        )
         notes.append(
             f"<p class=\"note\">For {named}, <em>its own page</em> is that model reading the clean "
-            "corpus as <strong>text</strong>, so the drop across the row is two changes at once — "
+            "corpus as <strong>text</strong>, so the drop across each of those rows is two changes "
+            "at once — "
             "the page became a picture and the reader started looking at pixels. The column that "
             "isolates the modality alone is <code>searchable</code>: the same information is "
             "available there as in the text arm, and it is read as an image.</p>"
@@ -860,12 +892,14 @@ def _scanned_caveats(rows: list[dict[str, object]]) -> str:
             f"({count} document{'s' if count > 1 else ''})"
             for name, rung, count in dragged
         )
+        many = len(dragged) > 1
         notes.append(
-            f"<p class=\"note\">One figure above is not a legibility result: {listed} ran out of "
-            "output tokens mid-answer. A truncated document contributes every one of its fields as "
-            "<em>missed</em>, which is enough to move a rung's accuracy by several points on its "
-            "own — and running out of room while transcribing a long table from an image is a cost "
-            "of the modality rather than of the rung.</p>"
+            f"<p class=\"note\">{'Some figures' if many else 'One figure'} above "
+            f"{'are' if many else 'is'} not a legibility result: {listed} ran out of output tokens "
+            "mid-answer. A truncated document contributes every one of its fields as <em>missed</em>, "
+            "which is enough to move a rung's accuracy by several points on its own — and running "
+            "out of room while transcribing a long table from an image is a cost of the modality "
+            "rather than of the rung.</p>"
         )
     return "\n".join(notes)
 
@@ -1075,7 +1109,7 @@ def build() -> str:
         detector_section=detector_section(detector_study(corpus)),
         stripped_section=stripped_section(stripped_study(corpus)),
         foreign_section=foreign_section(foreign_study(corpus)),
-        scanned_section=scanned_section(scanned_study(corpus), grounding_on_a_scan(corpus)),
+        scanned_section=scanned_section(scanned_study(corpus), grounding_on_a_scan()),
         injection_section=injection_section(injection_study(corpus)),
         formatting_only=formatting_only_differences(corpus),
         opus_cost=OPUS_COST,
@@ -1258,7 +1292,7 @@ footer {{
 </head>
 <body>
 <header>
-  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;6 of 7</p>
+  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;6 of 7, and most of the seventh</p>
   <h1>Poland's national e-invoice schema checks nothing an accountant would</h1>
   <p class="lead">FA(3) &mdash; mandatory since 2026 &mdash; is {xsd_bytes} bytes of XSD carrying
   {enumerations} enumerations and <strong>{assertions} assertions</strong>. It knows what shape an
@@ -1393,9 +1427,11 @@ field, and reads a quantity printed beside a price as two &mdash; from the boxes
 not from the string. The separation is not a tuned threshold either: a space is 0.32&nbsp;em wide,
 while every column gap in the corpus is at least 12&nbsp;pt, because each cell is asserted to fit
 its column with reportlab's padding still to spare.</p>
-<p>What it does <em>not</em> have is real-world visual chaos &mdash; skew, stamps, poor scans,
-layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
-costs, and the gap will be reported whichever way it comes out.</p>
+<p>What it does <em>not</em> have is a page nobody in this repository designed. Two of the three
+things that used to be missing are measured now, on held-out corpora of their own &mdash; an
+unfamiliar layout and a poor scan, each varying one thing so that a drop is attributable to it, and
+both reported above. What is still absent is a genuinely real invoice: a stamp, a signature, a fold,
+a layout no template anticipated because no template wrote it.</p>
 
 <h2>What the baselines say, and what the model says</h2>
 <p>{baseline_count} committed runs over the same {documents} documents, scoring
@@ -1439,14 +1475,17 @@ page at all.</p>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
     <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms</td></tr>
-    <tr><th>M7 &mdash; real held-out set and the reported synthetic&harr;real gap</th><td class="num">not built</td></tr>
+    <tr><th>M7 &mdash; held-out corpora, the vision path, the reported gap</th><td class="num">built, model arms on one of the two</td></tr>
+    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus, and a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
 </table>
 <p class="note">The headline question &mdash; does &ldquo;the invariants hold&rdquo; actually predict
-&ldquo;the fields are correct&rdquo;? &mdash; is measurable now, and the first answer is an awkward
-one: on the run that matters most there is nothing to predict, because the model made no mistakes.
-The question is being answered instead against injected errors, a weaker reader, and M7's real set.
-A negative result is a publishable result, and so is a corpus that turned out to be too easy.</p>
+&ldquo;the fields are correct&rdquo;? &mdash; met an awkward first answer: on the run that mattered
+most there was nothing to predict, because the model made no mistakes. It has been answered instead
+against injected errors, a weaker reader, and two held-out corpora &mdash; and the scanned one shows
+that making a page <em>harder to see</em> does not un-saturate it either. Making a page unfamiliar
+might, and that is the arm this project has not paid for. A negative result is a publishable result,
+and so is a corpus that turned out to be too easy.</p>
 
 <h2>Reproduce it</h2>
 <pre><code>git clone {repo}

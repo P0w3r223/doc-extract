@@ -443,8 +443,8 @@ Two models over the same corpus, each page sent as an image, everything else unc
 `claude-opus-5` reads a 150 dpi off-square grainy JPEG as well as it reads the clean text layer:
 107 of 108 exact, no repairs, no failures, and the single wrong value is caught by a hard rule. That
 is the M4 result again on a harder page — legibility is not what makes this task difficult for a
-frontier model, which is why `pattern` going 86.3 % → 0 % across the same rungs is the more
-informative row.
+frontier model, which is why `pattern` going 86.3 % → 79.7 % → 0 % across the three rungs is the
+more informative row.
 
 The haiku arm is the one with a population to look at. Per rung: 92.0 %, 82.8 %, 91.6 %. The middle
 figure is **not a legibility result** — one document
@@ -458,22 +458,23 @@ again:
 
 | rung | TP | FP | FN | precision | recall |
 |---|---:|---:|---:|---:|---:|
-| `searchable` | 136 | **0** | 1 | **100 %** | 99.3 % |
-| `rasterised` | 160 | 1672 | 0 | 8.7 % | 100 % |
-| `scanned` | 132 | 1828 | 0 | 6.7 % | 100 % |
+| `searchable` | 136 | **0** | 9 | **100 %** | 93.8 % |
+| `rasterised` | 167 | 1665 | 0 | 9.1 % | 100 % |
+| `scanned` | 140 | 1820 | 0 | 7.1 % | 100 % |
 
-That first row is grounding's **most precise measurement anywhere in this project** — 136 of 137
-wrong values caught with no false alarm, on a real vision-error population rather than an injected
-one. The other two flag everything, so their recall is 100 % by vacuity. **The gate does not survive
+That first row is grounding's **most precise measurement anywhere in this project** — not one false
+alarm on 1902 asserted values, on a real vision-error population rather than an injected one. It is
+the precision that row establishes and not the recall: nine wrong values there grounded anyway. The
+other two rungs flag everything, so their recall is 100 % by vacuity. **The gate does not survive
 a scan; it survives an OCR**, and that is a usable engineering conclusion rather than a negative
 result: a recogniser in front of the model brings the signal back. It is also why the `searchable`
 rung is a control and not a curiosity — it is the pipeline anyone would actually deploy.
 
 **The coverage is paid whether or not the model needed watching.** `claude-opus-5` gets one value
 wrong in the whole corpus and still reaches only **32.3 %** high-confidence coverage — the oracle's
-own figure, because only the `searchable` third can ground at all — against 89.7 % for the same gate
-on a clean page. Two thirds of a nearly perfect reading is routed to review by a signal that had
-nothing to say about it.
+figure to the printed precision, because only the `searchable` third can ground at all — against
+**100 %** for the same model on a clean page. Two thirds of a nearly perfect reading is routed to
+review by a signal that had nothing to say about it.
 
 The vision path is what is left when the text layer is gone, and it is one pipeline rather than two:
 `images` on the request chooses the modality, and the schema, the repair loop with its own budget,
@@ -623,12 +624,13 @@ changing the corpus and invalidating every committed run.
 
 **M7 tested that diagnosis and it held.** Making the page *illegible* — 150 dpi, off-square, grainy,
 no text layer — moved `claude-opus-5` from 100 % to 99.98 % while moving `pattern` from 86.3 % to
-0 %. Legibility is not the axis a frontier model is short on. Making the page *unfamiliar* is a
+0 % on the two rungs that lose the text layer. Legibility is not the axis a frontier model is short
+on. Making the page *unfamiliar* is a
 different matter and is the one M7 could not put a model against: the foreign corpus has no paid arm
 yet. **A real held-out set remains load-bearing** — it is the only place the question gets asked on
 documents nobody generated.
 
-662 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+667 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`
