@@ -5,10 +5,11 @@
 | run | `results/scanned-oracle` |
 | answered by | `oracle` |
 | saw | the gold |
-| values asserted | 5892 |
+| values asserted | 1903 |
 | of which wrong | 0 |
 | gold values never asserted | 0 |
 | asserted but not assessable | 782 |
+| asserted on a page with no text | 3989 |
 | documents with no invoice | 0 |
 
 ## The two signals, scored apart
@@ -17,9 +18,9 @@ Field-level detectors of a wrong asserted value. They are complements with very 
 
 | signal | TP | FP | FN | TN | precision | recall |
 |---|---:|---:|---:|---:|---:|---:|
-| `grounding` | 0 | 3989 | 0 | 1903 | 0.0 % | — |
-| `arithmetic` | 0 | 0 | 0 | 5892 | — | — |
-| `either` | 0 | 3989 | 0 | 1903 | 0.0 % | — |
+| `grounding` | 0 | 0 | 0 | 1903 | — | — |
+| `arithmetic` | 0 | 0 | 0 | 1903 | — | — |
+| `either` | 0 | 0 | 0 | 1903 | — | — |
 
 ## Coverage and accuracy
 
@@ -27,15 +28,15 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 
 | accept down to | route | coverage | accuracy | accepted | leaked |
 |---|---|---:|---:|---:|---:|
-| `high` | `accept` | 32.3 % | 100 % | 1903 | 0 |
-| `medium` | `review` | 32.3 % | 100 % | 1903 | 0 |
-| `low` | `review` | 32.3 % | 100 % | 1903 | 0 |
-| `none` | `reject` | 100 % | 100 % | 5892 | 0 |
+| `high` | `accept` | 100 % | 100 % | 1903 | 0 |
+| `medium` | `review` | 100 % | 100 % | 1903 | 0 |
+| `low` | `review` | 100 % | 100 % | 1903 | 0 |
+| `none` | `reject` | 100 % | 100 % | 1903 | 0 |
 
 ## Read this before the tables
 
 * **Coverage is over the values the model asserted, not over the document.** A field it left `null` cannot be grounded, so it carries no confidence and sits outside every denominator above. 0 gold value(s) were never asserted at all, and no signal here can see them — a model that answered less would score better on this curve.
 * 782 asserted value(s) are **outside the curve** because grounding declines to ask about them: `kind` is an FA(3) code the page never prints, and a non-numeric rate is an exemption code each issuer abbreviates their own way. They are values a model can get wrong, and nothing above measures whether it did.
-* **3989 of the 5892 assessed value(s) (67.7 %) sit on a page with no text layer at all.** Grounding resolves a value against page text and there is none, so it returns `UNGROUNDED` for every one of them — correct or not. Nothing here distinguishes *this value is not on the page* from *there was no page to look in*, which means the coverage figure above is partly a measurement of the missing text layer rather than of the reader. Read the accuracy at `none` — accepting everything — as the comparison that is not affected by it.
+* **3989 of the 5892 asserted value(s) (67.7 %) sit on a page with no text layer at all, and are outside the curve.** Grounding resolves a value against page text and there is none, so it answers `NO_TEXT` — *I could not ask* — rather than `UNGROUNDED`, which would have claimed the value is missing from the page. They are routed `review` and carry no confidence, so every figure above is over the 1903 value(s) this pipeline could actually assess. **The gate has no signal at all on the rest**, and that is a statement about the page rather than about the reader: a recogniser in front of the model brings the signal back.
 * **Nothing asserted was wrong**, so the gate had nothing to catch. Accuracy is 100 % at every level and the curve is flat by construction; it says the gate does not block correct work, and nothing about whether it blocks incorrect work.
 * The confidence levels are produced by fixed rules over the two signals, not by weights fitted to this corpus. That is why there are four of them and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.

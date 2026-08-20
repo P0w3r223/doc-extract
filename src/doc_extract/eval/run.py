@@ -192,29 +192,26 @@ def gate(
         raise CoverageError(coverage_message(coverage))
 
     rows: list[selective.Judged] = []
-    missed = unassessable = without_prediction = without_text = 0
+    #: Every exclusion is decided where the evidence is — inside `judge`, which holds the page's
+    #: own verdict on each value. An earlier version counted the text-less ones here instead, by
+    #: asking whether the document had any text and attributing the whole document to the answer.
+    #: That worked only while grounding could not say so itself, and it counted values that were
+    #: *in* the curve rather than excluded from it.
+    excluded = selective.Excluded()
+    without_prediction = 0
     for record in scored:
         invoice = record.parse()
         if invoice is None:
             without_prediction += 1
             continue
         case = by_id[record.doc_id]
-        document = case.source()
-        judged, lost, skipped = selective.judge(case.doc_id, case.gold(), invoice, document)
+        judged, lost = selective.judge(case.doc_id, case.gold(), invoice, case.source())
         rows.extend(judged)
-        missed += lost
-        unassessable += skipped
-        #: Counted here because this is where the page is in hand. Grounding returns `UNGROUNDED`
-        #: whether the value is absent from the page or the page is absent, and `decide/` cannot
-        #: tell those apart — so a curve computed largely over documents with no text layer is
-        #: reporting the missing layer. The count is what lets the report say so instead of
-        #: printing a coverage figure that reads as a property of the reader.
-        if not document.text.strip():
-            without_text += len(judged)
+        excluded += lost
 
     return selective.summarise(
-        rows, missed=missed, unassessable=unassessable,
-        without_prediction=without_prediction, without_text=without_text,
+        rows, missed=excluded.missed, unassessable=excluded.unassessable,
+        without_prediction=without_prediction, without_text=excluded.without_text,
     )
 
 

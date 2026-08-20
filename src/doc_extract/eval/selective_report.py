@@ -5,6 +5,9 @@ change how the numbers should be read:
 
 * **Coverage is over values the model asserted.** A gate that only sees what was answered cannot
   see what was dropped, so `missed` is printed above the curve rather than after it.
+* **And over values it could be asked about.** On a page with no text layer grounding has nothing
+  to search, so those values leave the curve rather than filling it with `UNGROUNDED`. The count is
+  printed above the tables, because a curve over a third of a corpus should say which third.
 * **A rate with no denominator prints as `—`.** On a run where nothing was wrong, the gate has no
   leakage to report and a `0 %` would read as a measurement of a gate that was never tested.
 """
@@ -41,6 +44,7 @@ def _header(curve: Curve, *, run: RunMeta, directory: str) -> str:
         f"| of which wrong | {curve.wrong} |",
         f"| gold values never asserted | {curve.missed} |",
         f"| asserted but not assessable | {curve.unassessable} |",
+        f"| asserted on a page with no text | {curve.without_text} |",
         f"| documents with no invoice | {curve.without_prediction} |",
     ]
     if directory:
@@ -110,15 +114,17 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
             "fields was assessed. The pipeline had already refused them."
         )
     if curve.without_text:
-        share = curve.without_text / curve.asserted if curve.asserted else None
+        offered = curve.asserted + curve.without_text
+        share = curve.without_text / offered if offered else None
         lines.append(
-            f"* **{curve.without_text} of the {curve.asserted} assessed value(s) "
-            f"({_rate(share)}) sit on a page with no text layer at all.** Grounding resolves a "
-            "value against page text and there is none, so it returns `UNGROUNDED` for every one "
-            "of them — correct or not. Nothing here distinguishes *this value is not on the page* "
-            "from *there was no page to look in*, which means the coverage figure above is partly "
-            "a measurement of the missing text layer rather than of the reader. Read the accuracy "
-            "at `none` — accepting everything — as the comparison that is not affected by it."
+            f"* **{curve.without_text} of the {offered} asserted value(s) ({_rate(share)}) sit on "
+            "a page with no text layer at all, and are outside the curve.** Grounding resolves a "
+            "value against page text and there is none, so it answers `NO_TEXT` — *I could not "
+            "ask* — rather than `UNGROUNDED`, which would have claimed the value is missing from "
+            "the page. They are routed `review` and carry no confidence, so every figure above is "
+            f"over the {curve.asserted} value(s) this pipeline could actually assess. **The gate "
+            "has no signal at all on the rest**, and that is a statement about the page rather "
+            "than about the reader: a recogniser in front of the model brings the signal back."
         )
     if curve.wrong == 0:
         lines.append(

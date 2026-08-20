@@ -33,6 +33,19 @@ each issuer abbreviates their own way. Both are kept out of every denominator. T
 why that matters rather than being tidy-mindedness: the usual abbreviation of `oo` is a substring of
 `sp. z o.o.`, so a grounding that insisted on an answer would ground the tax rate against the
 seller's legal form and call it evidence.
+
+**And one exclusion is a property of the page rather than of the value: `NO_TEXT`.** A scan with no
+text layer gives this module nothing to search, and the first version answered `UNGROUNDED` anyway —
+which reads as *this value is not on the page* when it means *there was no page to look in*. M7c
+measured what that costs: `oracle`, a reading with nothing wrong in it anywhere, drew **3989 false
+alarms out of 5892 asserted values** on the two text-less rungs. M7e measured what it costs the
+gate, which is worse than noise: because the only values that could ground were the ones on the rung
+that kept a text layer — and that is the rung an injected instruction survives — the gate sorted the
+attacked-and-obeyed values into the bucket it called high confidence, and *auto-accepting only that
+bucket was less accurate than accepting everything*. So the verdict is its own, kept out of every
+denominator, and a reader of the curve is told how many values it covers. Saying **I could not ask**
+is a different claim from saying **I asked and found nothing**, and a gate that conflates the two
+inverts on exactly the corpus it was built for.
 """
 
 from __future__ import annotations
@@ -86,6 +99,9 @@ class Support(StrEnum):
     ABSENT = "absent"
     #: The field is a code the page does not print. Not answerable, so not answered.
     NOT_PRINTED = "not_printed"
+    #: The **page** carries no text at all, so there was nothing to search. Says nothing about the
+    #: value: a correct one and a fabricated one are equally unfindable on a page made of pixels.
+    NO_TEXT = "no_text"
 
 
 #: The supports over which a coverage figure exists, and the only ones a rate may count.
@@ -145,7 +161,13 @@ def _ground(field: str, key: str, value: object | None, page: _Page) -> Groundin
         return Grounding(field, key, None, Support.ABSENT, None)
     rendered = fields.render(value)
     if _not_printed(field, value):
+        #: Asked before the page is consulted, and deliberately: `NOT_PRINTED` is a property of the
+        #: field and holds on any page at all. Checking it first keeps the two exclusions
+        #: orthogonal, so a scanned run and a clean run report the same `kind` count and a reader
+        #: can subtract one from the other.
         return Grounding(field, key, rendered, Support.NOT_PRINTED, None)
+    if not page.readable:
+        return Grounding(field, key, rendered, Support.NO_TEXT, None)
 
     if BY_NAME[field].match is Match.TEXT:
         #: Tokens that are pure punctuation carry nothing to look for. The renderer draws an en
@@ -195,6 +217,18 @@ class _Page:
         self._words: dict[str, list[Span]] = {}
         for span in document.words:
             _add(self._words, _bare(document.text_of(span)), span)
+
+    @property
+    def readable(self) -> bool:
+        """Whether there is any text here to search at all.
+
+        A rung with no text layer yields no words, so no lines, so `source/document.py` assembles
+        the empty string — but the test is `strip()` rather than emptiness, because the separators
+        this layer joins with (a tab between cells, a newline between lines) are exactly what a
+        page reduced to whitespace would come back as, and accusing every value on it of not being
+        found there would be the same mistake in a rarer shape.
+        """
+        return bool(self._source.strip())
 
     def find_value(self, candidates: tuple[str, ...], match: Match) -> tuple[Span, ...]:
         """Spans covering the first candidate that occurs on the page, in candidate order."""

@@ -9,6 +9,7 @@
 | of which wrong | 77 |
 | gold values never asserted | 5 |
 | asserted but not assessable | 762 |
+| asserted on a page with no text | 0 |
 | documents with no invoice | 1 |
 
 ## The two signals, scored apart

@@ -33,6 +33,7 @@ from doc_extract.eval.scorer import judge
 from doc_extract.eval.selective import WRONG
 from doc_extract.extract.result import FailureClass
 from doc_extract.foreign.corpus import documents as foreign_documents
+from doc_extract.ground.resolve import Support
 from doc_extract.ground.resolve import resolve as ground
 from doc_extract.schema import invariants, vocab
 from doc_extract.schema.generate_vocab import XSD_PATH
@@ -357,8 +358,9 @@ CORPUS_DEPENDENT_END = "<!-- corpus-dependent: end -->"
 RUNG_ORDER: tuple[str, ...] = RUNG_NAMES
 
 #: Which committed run the grounding split is read off. The oracle, because the whole force of that
-#: number is that the reading it is computed on is *perfect* — a signal raising 3989 alarms on a
-#: model's mistakes would be doing its job.
+#: table is that the reading it is computed on is *perfect* — a signal raising thousands of alarms
+#: on a model's mistakes would be doing its job, and that is what made the same count on this run a
+#: defect worth fixing rather than a hard corpus.
 SCANNED_CONTROL = f"{SCANNED_PREFIX}oracle"
 
 
@@ -499,6 +501,13 @@ def _grounding_by_rung(directory, cases: dict, gold: dict) -> dict[str, collecti
         )
         wrong = {(row.field, row.key) for row in score.results if row.outcome in WRONG}
         for row in ground(cases[record.doc_id].source(), invoice):
+            if row.support is Support.NO_TEXT:
+                #: Counted rather than skipped, and this is the whole point of the table. A rung
+                #: with no text layer contributes nothing to the four confusion cells, so without
+                #: this column its row would read as an empty measurement instead of as the
+                #: measurement it is: the signal is not weak there, it is unavailable.
+                counts[document.template]["unasked"] += 1
+                continue
             if not row.measured:
                 continue
             bad = (row.field, row.key) in wrong
@@ -795,6 +804,10 @@ def _gate_curve(predictions_path) -> dict[str, object] | None:
     everything — so both ends are read off one `Curve` rather than one being quoted and the other
     remembered. Grounding needs the rendered page, which is why this is the second half of this
     section that a checkout without the corpus renders without.
+
+    `without_text` comes along because the comparison is only readable beside it: the curve is over
+    the values this pipeline could assess, and on a corpus of scans that is a minority of what the
+    model asserted.
     """
     if not (SCANNED_ATTACK_CORPUS / MANIFEST_NAME).exists():
         return None  # pragma: no cover — the composed corpus has not been built here
@@ -808,6 +821,7 @@ def _gate_curve(predictions_path) -> dict[str, object] | None:
     return {
         "coverage": top.coverage, "accuracy": top.accuracy, "leaked": top.leaked,
         "all_accuracy": everything.accuracy, "all_leaked": everything.leaked,
+        "assessed": curve.asserted, "without_text": curve.without_text,
     }
 
 
@@ -1035,21 +1049,47 @@ def _grounding_on_a_model(grounding: dict) -> str:
         f'<td class="num">{counts["TP"]}</td><td class="num">{counts["FP"]}</td>'
         f'<td class="num">{counts["FN"]}</td>'
         f'<td class="num">{percent(_ratio(counts["TP"], counts["TP"] + counts["FP"]))}</td>'
-        f'<td class="num">{percent(_ratio(counts["TP"], counts["TP"] + counts["FN"]))}</td></tr>'
+        f'<td class="num">{percent(_ratio(counts["TP"], counts["TP"] + counts["FN"]))}</td>'
+        f'<td class="num">{counts["unasked"]}</td></tr>'
         for rung, counts in rows.items()
     )
+    #: Which rungs the signal is silent on is read off the counts rather than named, so a rung list
+    #: that changes cannot leave this paragraph describing the old one.
+    silent = [rung for rung, counts in rows.items() if counts["unasked"] and not counts.total()
+              - counts["unasked"]]
+    where = _and_list([f"<code>{html.escape(rung)}</code>" for rung in silent])
     return f"""<p>And the mirror of it, on a population of real mistakes: <code>{name}</code>
 reading the same pages as images.</p>
-<table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
+<table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th><th class="num">could not ask</th></tr></thead>
 <tbody>
 {body}
 </tbody></table>
 <p class="note">Read the first row against the other two. Where a text layer survives, grounding is
 at its <em>most</em> precise measurement anywhere in this project &mdash; it catches almost every
-wrong value and raises no false alarm at all. Where there is none it flags everything, so its recall
-is 100&nbsp;% by vacuity and its precision collapses. <strong>The gate does not survive a scan; it
-survives an OCR</strong> &mdash; which is a usable engineering conclusion rather than a negative
-one: put a recogniser in front of the model and the signal comes back.</p>"""
+wrong value and raises no false alarm at all, on a real population of vision errors rather than an
+injected one. On {where} it does not answer: every value falls in the last column, and the row is
+empty because <strong>the signal is absent there rather than weak</strong>. That is the honest
+shape, and it is also the reason the confusion cells are worth printing per rung instead of pooled
+&mdash; pooled over the whole corpus, this signal once looked barely precise at all, which was a
+measurement of the missing text layer wearing the reader's name. <strong>The gate does not survive
+a scan; it
+survives an OCR</strong> &mdash; a usable engineering conclusion rather than a negative one: put a
+recogniser in front of the model and the signal comes back.</p>"""
+
+
+def _alarm_verdict(alarms: int) -> str:
+    """Whether the fix actually removed them, said by counting rather than by assertion.
+
+    A sentence claiming the alarms are gone is exactly the kind that outlives the state it
+    describes: this section carried *the gate inverts* through the change that stopped it
+    inverting, and the fix for that is to let the count decide the verb.
+    """
+    if alarms == 0:
+        return "The false alarms are gone entirely &mdash; not one on this run."
+    return (
+        f"{alarms} false alarm(s) remain, on values the page does carry text for, so the "
+        "verdict below is about a signal that is quieter rather than clean."
+    )
 
 
 def _ratio(numerator: int, denominator: int) -> float | None:
@@ -1126,11 +1166,13 @@ def scanned_section(rows: list[dict[str, object]] | None, grounding: dict | None
         control = grounding["control"]
         cells = "\n".join(
             f'    <tr><th><code>{html.escape(name)}</code></th>'
-            f'<td class="num">{counts["TN"]}</td>'
-            f'<td class="num">{counts["FP"] + counts["TP"]}</td></tr>'
+            f'<td class="num">{counts["TN"] + counts["FP"] + counts["TP"] + counts["FN"]}</td>'
+            f'<td class="num">{counts["FP"]}</td>'
+            f'<td class="num">{counts["unasked"]}</td></tr>'
             for name, counts in control.items()
         )
-        total = sum(counts["FP"] + counts["TP"] for counts in control.values())
+        alarms = sum(counts["FP"] for counts in control.values())
+        unasked = sum(counts["unasked"] for counts in control.values())
         #: Fenced by a comment because this is the one block on the page that needs a corpus on
         #: disk, so it is the one block `tests/test_site_committed.py` has to forgive when it
         #: checks the committed page against the generator. A fence the test can key on beats a
@@ -1138,16 +1180,22 @@ def scanned_section(rows: list[dict[str, object]] | None, grounding: dict | None
         gate = f"""{CORPUS_DEPENDENT}
 <p><strong>The column above is not the finding. What a scan does to the
 <em>gate</em> is.</strong> Run the oracle &mdash; a perfect reading, nothing wrong anywhere &mdash;
-over the scanned corpus, and grounding raises {total} false alarms:</p>
-<table><thead><tr><th>rung</th><th class="num">grounded</th><th class="num">ungrounded</th></tr></thead>
+over the scanned corpus, and grounding has nothing to resolve against on two of the three
+rungs:</p>
+<table><thead><tr><th>rung</th><th class="num">could ask</th><th class="num">false alarms</th><th class="num">no text to search</th></tr></thead>
 <tbody>
 {cells}
 </tbody></table>
-<p class="note">Grounding resolves a value to a span of page text, and there is no page text. It
-does not degrade &mdash; it inverts, and it inverts <em>silently</em>: an ungrounded correct value
-looks exactly like an ungrounded fabricated one. Of the two signals the routing gate is built on,
-only the arithmetic survives a scan &mdash; and that is the one an adversary can satisfy on
-purpose.</p>
+<p class="note">The last column was the finding, and it was a defect. Grounding resolves a value to
+a span of page text; where there is none it used to answer <code>UNGROUNDED</code> anyway, so every
+one of those {unasked} values arrived as a <strong>false alarm on a reading with nothing wrong in
+it</strong>. That does not degrade, it <em>inverts</em>, and silently: an ungrounded correct value
+looks exactly like an ungrounded fabricated one. It now answers <em>I could not ask</em>, so those
+values leave the curve rather than filling it, and the count is printed above every affected
+<code>gate.md</code>. {_alarm_verdict(alarms)} <strong>Of the two signals the routing gate is built
+on, only the arithmetic survives a scan</strong>, and that is the one an adversary can satisfy on
+purpose &mdash; so what changed is that the gate reports having no opinion where it used to report
+a wrong one. A better instrument, and the same missing capability.</p>
 {_grounding_on_a_model(grounding)}
 {CORPUS_DEPENDENT_END}"""
     return f"""<h2>When the page is a picture</h2>
@@ -1268,7 +1316,7 @@ those rungs because no <em>text</em> did &mdash; the page carries none. A reader
 page sees them exactly as the reach table says it does.</p>
 {_reach_section(study.get("reach"))}
 {_vision_section(study.get("vision"))}
-{_inversion(study.get("curve"))}"""
+{_selectivity(study.get("curve"))}"""
 
 
 def _vision_section(arms: object) -> str:
@@ -1312,8 +1360,13 @@ rate of {rate(_success_rate(row))}{", the same at every rung" if row["uniform"] 
 {f", with {clean}" if clean else ""}.{ink}</p>"""
 
 
-def _inversion(curve: object) -> str:
-    """The gate's two ends, side by side, or a note saying which command produces them."""
+def _selectivity(curve: object) -> str:
+    """The gate's two ends, side by side, or a note saying which command produces them.
+
+    The verdict is read off the comparison rather than written into it. This paragraph asserted
+    *the gate inverts* for as long as that was true, and the sentence would have survived the fix
+    that made it false — the same failure two earlier reviews caught elsewhere on this page.
+    """
     if not curve:
         return (  # pragma: no cover — the composed corpus has not been built here
             '<p class="note">Grounding resolves a value against the page\'s text, so the gate\'s '
@@ -1321,15 +1374,33 @@ def _inversion(curve: object) -> str:
             'doc_extract.degrade --attacked</code>.</p>'
         )
     row: dict[str, object] = curve  # type: ignore[assignment]
+    top, everything = row["accuracy"], row["all_accuracy"]
+    inverted = top is not None and everything is not None and top < everything
+    verdict = (
+        "<strong>And the gate inverts: its own bucket is the less accurate one.</strong>"
+        if inverted else
+        "<strong>And the gate is selective again</strong> &mdash; more accurate on less work, "
+        "which is what a gate is for."
+    )
+    history = (
+        "" if inverted else
+        " It was not, until grounding learned to say <em>I could not ask</em>. While a value on a "
+        "page with no text came back as <code>UNGROUNDED</code>, the only values that could reach "
+        "the confident bucket were those on the rung that kept a text layer &mdash; which is "
+        "exactly the rung where the attacks worked &mdash; so the gate collected the "
+        "attacked-and-obeyed values into the bucket it called high confidence, and auto-accepting "
+        "that bucket scored <em>worse</em> than accepting everything. The inversion was the "
+        "instrument, and fixing the instrument was the milestone after this one."
+    )
     return f"""{CORPUS_DEPENDENT}
-<p><strong>And the gate inverts.</strong> Accepting only the high-confidence values
-covers {rate(row["coverage"])} of what the reader asserted at {rate(row["accuracy"])} accuracy and
-lets {row["leaked"]} wrong values through; accepting <em>everything</em> is
-{rate(row["all_accuracy"])} accurate. <strong>The gate's own bucket is the less accurate one.</strong>
-The only values that ground are those on a page that kept a text layer &mdash; which is exactly the
-rung where the attacks worked &mdash; so the gate concentrates the attacked-and-obeyed values into
-the bucket it calls high confidence. On a population of model <em>errors</em> the same gate raised
-accuracy instead of lowering it, and the committed <code>gate.md</code> files hold both curves.</p>
+<p>{verdict} Accepting only the high-confidence values covers {rate(row["coverage"])} of what this
+pipeline could assess at {rate(row["accuracy"])} accuracy and lets {row["leaked"]} wrong values
+through; accepting <em>everything</em> is {rate(row["all_accuracy"])} accurate and leaks
+{row["all_leaked"]}.{history}</p>
+<p class="note">Both figures are over the {row["assessed"]} values the gate could form an opinion
+about. The other {row["without_text"]} sit on a page with no text layer, and it has
+<strong>no signal on them at all</strong> &mdash; not a low one. That is the cost a scan actually
+imposes here, and it is a property of the page rather than of the reader.</p>
 {CORPUS_DEPENDENT_END}"""
 
 
@@ -1818,9 +1889,10 @@ page at all.</p>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
     <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms and one paid</td></tr>
     <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on two of the three</td></tr>
+    <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">built</td></tr>
     <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">not built</td></tr>
     <tr><th>&mdash; an adaptive attacker, which no fixed payload set stands in for</th><td class="num">not built</td></tr>
-    <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a check that a grounded value sits where the page would <em>print</em> it</th><td class="num">not built</td></tr>
     <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
 </table>

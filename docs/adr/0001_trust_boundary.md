@@ -175,28 +175,43 @@ control and 0 of 24 here, which is a fact about two readers rather than about th
 here changes the conclusion below — the structural rules are still what the defence rests on,
 because they are what holds when the reader is not this one.
 
-**And the gate inverts.** Run over the same predictions:
+**And the gate inverted — until the signal was taught to say it could not answer (M7g).** The
+comparison as it stood, and as it stands:
 
-| accept down to | coverage | accuracy | leaked |
-|---|---:|---:|---:|
-| `high` | **20.1 %** | **99.0 %** | 18 |
-| `none` (answer everything) | 100 % | **99.2 %** | 66 |
+| accept down to | coverage | accuracy | leaked | | coverage | accuracy | leaked |
+|---|---:|---:|---:|---|---:|---:|---:|
+| `high` | 20.1 % | **99.0 %** | 18 | | **65.3 %** | **99.0 %** | 18 |
+| `none` (answer everything) | 100 % | **99.2 %** | 66 | | 100 % | **97.6 %** | 66 |
 
-Auto-accepting only the high-confidence values is **less accurate than accepting everything**, while
-doing a fifth of the work. The mechanism is not subtle once stated: the only values that ground are
-the ones on a page that kept a text layer, and that is exactly the rung where the attacks worked. So
-the gate concentrates the attacked-and-obeyed values into the bucket it calls high confidence. On
-M5's population of model *errors* the same gate turned 98.7 % into 99.96 %; here it is anti-selective.
+*Left: before. Right: after.* Auto-accepting only the high-confidence values used to be **less
+accurate than accepting everything**, while doing a fifth of the work. The mechanism was not subtle
+once stated: the only values that grounded were the ones on a page that kept a text layer, and that
+is exactly the rung where the attacks worked, so the gate concentrated the attacked-and-obeyed
+values into the bucket it called high confidence. **That was the instrument and not the gate.**
+Grounding now answers `NO_TEXT` where it means *there was nothing to look in*, those values leave
+the curve rather than filling it with false alarms, and both columns are over the same population —
+the 2697 values this pipeline could form an opinion about, of 8745 asserted. The right-hand column
+is a gate behaving as a gate: more accurate on less work.
 
-Three things follow:
+Not one leaked value moved. **Fixing a measurement did not defend anything**, and the reason to
+record the correction here rather than only in the milestone list is that the ADR's threat model was
+briefly resting on a defect: a reader who took the left column at face value would have concluded
+that routing makes an attacked scan *worse*, which is a claim about the pipeline that was never
+true.
 
-* **A grounding signal must know whether it could have answered.** It returns `UNGROUNDED` where it
-  means *there was no text to look in*, and those two are the same value to `decide/`. Separating
-  them would drop the text-less rungs out of the curve instead of filling it with false alarms.
-  **Not built — but no longer silent:** `selective.Curve.without_text` counts the assessed values
-  that sit on a page carrying no text at all, and every `gate.md` computed over one now says so
-  above its tables (69.2 % of this corpus, and 67.7 % of the clean scanned one). A number a reader
-  can see is not a fix, and it is the difference between a limitation and a defect.
+Four things follow, and the first is now built:
+
+* **A grounding signal must know whether it could have answered.** It used to return `UNGROUNDED`
+  where it meant *there was no text to look in*, and those two were the same value to `decide/`.
+  **Built (M7g):** `Support.NO_TEXT` is its own verdict, kept out of every denominator, and such a
+  value is routed `review` rather than `accept` — an absent value is a question that never arose,
+  while this one arose and could not be put. `selective.Curve.without_text` counts them and every
+  `gate.md` computed over such a corpus prints the share above its tables (69.2 % of this corpus,
+  67.7 % of the clean scanned one). On the clean scanned corpus this removed **3989 false alarms
+  raised against a reading with nothing wrong in it**.
+* **The gate is now silent rather than wrong on a page it cannot read, and silent is still not
+  useful.** Two thirds of an attacked scan carries no signal at all. The capability that is missing
+  did not change; only the honesty of the report about it did.
 * **The `searchable` rung is the deployable pipeline and the vulnerable one.** A recogniser in front
   of the model brings grounding back (M7d), and it brings the attack surface back with it. Those are
   the same sentence.

@@ -23,6 +23,17 @@ nothing to look for, and no signal here can tell "correctly absent" from "silent
 instances carry no confidence and are excluded from every denominator, which means the curve this
 feeds answers *"of the values it gave me, which can I trust"* and not *"did it give me
 everything"*. Naming that limit is the point of excluding them rather than scoring them as safe.
+
+**Nor is a field on a page this pipeline cannot read.** `Support.NO_TEXT` is the verdict M7e forced:
+a scan with no text layer gave grounding nothing to search, it answered `UNGROUNDED` anyway, and
+this module could not tell that from a value genuinely missing from the page. The consequence was
+not noise but inversion — the values that *could* ground were the ones on the rung an injected
+instruction survives, so the gate sorted the attacked-and-obeyed values into `HIGH` and
+auto-accepting only that bucket scored **worse than accepting everything**. Such a value now carries
+no confidence either, and it is routed `REVIEW` rather than `ACCEPT`: an absent value and a
+non-printed code are questions that did not arise, while this one arose and could not be put. A gate
+that auto-accepted what it had failed to check would be reporting an instrument's absence as its
+verdict.
 """
 
 from __future__ import annotations
@@ -144,19 +155,31 @@ def _at(grounding: Grounding, confidence: Confidence, reasons: list[str]) -> Ass
     )
 
 
-def _unassessed(grounding: Grounding) -> Assessment:
-    """A value the page cannot be asked about: absent, or a code it never prints.
+#: What to do with a value that carries no confidence, by the reason it carries none. The two kinds
+#: are not the same claim and must not share a route. `ABSENT` and `NOT_PRINTED` are questions that
+#: never arose — the invoice has no discount, the page never prints an FA(3) code — and this gate
+#: has no grounds to stop them. `NO_TEXT` is a question that arose and could not be put, and
+#: accepting it would report the absence of an instrument as a clean reading.
+UNASSESSED_ROUTES: dict[Support, Route] = {
+    Support.ABSENT: Route.ACCEPT,
+    Support.NOT_PRINTED: Route.ACCEPT,
+    Support.NO_TEXT: Route.REVIEW,
+}
 
-    Routed `ACCEPT` and carrying no confidence. The route is not a judgement that the value is
-    right — it is that this gate has no grounds to stop it, which is a different claim and the one
-    the reasons record.
+
+def _unassessed(grounding: Grounding) -> Assessment:
+    """A value grounding did not judge: absent, a code the page never prints, or no page text.
+
+    Carries no confidence in every case, so none of these reaches the curve. The route differs, and
+    `UNASSESSED_ROUTES` carries why: neither route is a judgement that the value is right, and the
+    reasons record which of the two claims was made.
     """
     return Assessment(
         field=grounding.field,
         key=grounding.key,
         value=grounding.value,
         confidence=None,
-        route=Route.ACCEPT,
+        route=UNASSESSED_ROUTES[grounding.support],
         support=grounding.support,
         reasons=(f"unassessed:{grounding.support}",),
     )
