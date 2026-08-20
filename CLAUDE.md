@@ -91,8 +91,10 @@ src/doc_extract/
   degrade/           # M7 — the same page, seen through a scanner
     rungs.py         # three rungs of legibility, as data; one of them keeps a text layer
     optics.py        # skew, blur, grain, JPEG — pure functions over one image, all seeded
-    page.py          # rasterise, damage, rewrap; the OCR text layer re-emitted invisibly
+    page.py          # rasterise, damage, rewrap; the OCR text layer re-emitted from visible ink
     corpus.py        # M2's documents scanned — same gold, same layout, a different picture
+    attacked.py      # M6's grid photographed; which channel a payload still reaches a reader by
+    attacked_report.py # that reach table, printed above the rates it reframes
   attack/            # M6 — the invoice as untrusted input, measured by attacking it
     payloads.py      # what an attacker prints, what obeying looks like, when it has succeeded
     suite.py         # the attacked corpus: payload x placement, gold untouched, payload verified
@@ -102,9 +104,10 @@ src/doc_extract/
 schemas/*.xsd        # the national standard and its three imports + PROVENANCE.md
 results/<run>/       # committed: predictions.jsonl, run.meta.json, report.md, detector.md, gate.md,
                      # and attack.md for a run over the attacked corpus (`results/attack-<baseline>`).
-                     # A run over the foreign corpus is `results/foreign-<baseline>` and one over
-                     # the scanned corpus is `results/scanned-<baseline>`; the prefix is what pairs
-                     # either with the same baseline's run over the synthetic one.
+                     # A run over the foreign corpus is `results/foreign-<baseline>`, one over
+                     # the scanned corpus is `results/scanned-<baseline>`, and one over the attacked
+                     # corpus scanned is `results/attacked-scanned-<baseline>`; the prefix is what
+                     # pairs any of them with the same baseline's run over the synthetic one.
                      # Named for the baseline, except a remote run, which is named for the model:
                      # the baseline is `claude` every time and the model is what varies, so two
                      # models over one corpus are two directories rather than one overwritten one.
@@ -188,7 +191,20 @@ results/<run>/       # committed: predictions.jsonl, run.meta.json, report.md, d
 - **A payload that did not reach the page is a build failure.** `attack/suite.py` parses every
   attacked PDF back through `source/` and requires the payload's marker in the text layer. An attack
   the model never saw would otherwise sit in the denominator as a *failed* attack — the one
-  direction an attack success rate must not be wrong in. The attacker's identifiers pass their own
+  direction an attack success rate must not be wrong in. On the *scanned* attacked corpus the check
+  moves to the page **as printed**, before any scanner touches it, and what the scan then does is
+  recorded as data (`degrade/attacked.Reach`) rather than raised: a rung that erases a payload has
+  produced the result, not a build error.
+- **A perfect OCR is not a clairvoyant one.** The `searchable` rung re-emits only words drawn in ink
+  that leaves a mark, because a recogniser returns what is *on the image*. Copying white-on-white
+  text forward would be the one place the idealisation handed an attacker something the scanner had
+  destroyed — and that erasure is M7e's finding, so manufacturing its opposite would delete the
+  measurement. No clean document carries white ink, so `data/scanned` is unchanged by the rule.
+- **`degrade` may import `attack`'s pure planner; `attack` imports nothing from `degrade`.** The
+  attack suite is about what an attacker prints and a scanner is about what survives being
+  photographed. A suite that knew about rungs would make every clean attacked document depend on a
+  rasteriser, which is why the composition lives in `degrade/attacked.py` and the reach table
+  reaches `attack/report.py` as a `preamble` rather than as an import. The attacker's identifiers pass their own
   check digits for the mirror-image reason: an attack caught by a rule written for typos would
   flatter the leak column that is the milestone's actual result.
 - **No secrets in code.** `ANTHROPIC_API_KEY` from the environment at call time.
@@ -216,6 +232,11 @@ python -m doc_extract.eval run --baseline pattern --corpus data/scanned --out re
 python -m doc_extract.attack --out data/attacked          # 112 attacked documents (M6)
 python -m doc_extract.eval run --baseline gullible --corpus data/attacked --out results/attack-gullible
 python -m doc_extract.eval attack --run results/attack-gullible  # the attack success rate
+
+python -m doc_extract.degrade --attacked --out data/attacked-scanned   # M6's grid, photographed
+python -m doc_extract.eval run --baseline gullible --corpus data/attacked-scanned \
+    --out results/attacked-scanned-gullible
+python -m doc_extract.eval attack --run results/attacked-scanned-gullible  # with the reach table
 
 python -m doc_extract.eval run --baseline claude --yes    # the only command that costs money
 python -m doc_extract.eval run --baseline claude --model claude-haiku-4-5 --yes   # a second arm
@@ -295,9 +316,15 @@ re-run a paid model to be checked would be one too.
    as images at 99.98 % and `claude-haiku-4-5` at 88.7 %, against 100 % and 97.8 % for the same two
    on the clean page as text. So a scan costs a frontier model essentially nothing and a small one
    nine points — and the gate's grounding signal turns out to survive an OCR even though it does not
-   survive a scan. Still open: a paid arm over the *foreign* corpus, which is a separate spend and a
-   separate question, and the synthetic↔real gap as an artifact of its own rather than as three
-   sections.
+   survive a scan. `degrade/attacked.py` then composes M6 with M7c — the attacked grid photographed,
+   which `docs/adr/0001_trust_boundary.md` had named as unbuilt — and answers the question that
+   composition was for: a scan deletes the white-ink attack outright, the two text-less rungs' zero
+   attack success rate is blindness rather than defence, and **the gate's accepted bucket becomes
+   less accurate than answering everything** (*What a scan does to an attacked page* above). Still
+   open: a paid arm over the *foreign* corpus and a vision arm over the attacked scan, which are two
+   separate spends and two separate questions; teaching grounding to say *there was nothing to look
+   in* rather than *ungrounded*; and the synthetic↔real gap as an artifact of its own rather than as
+   four sections.
 
 ## The headline answer, and what it is really measuring
 
@@ -485,6 +512,62 @@ written prompts would be partly a measurement of the prompts. The image path has
 `docs/adr/0001_trust_boundary.md` carries why that is structurally stronger and informationally
 weaker rather than a lapse.
 
+## What a scan does to an attacked page, and to the gate reading it (M7e)
+
+`degrade/attacked.py` composes the two things M6 and M7c built separately: **M6's grid printed and
+then photographed** — 7 payloads × 4 placements × 2 documents × 3 rungs, 168 in all, every cell
+filled twice, the gold untouched by either the injection or the scanner. `oracle` reads it at
+**100 %**, which is the control that says the gold did not move.
+
+**First, which channel a payload still reaches a reader by.** Measured at build time with no model:
+the text layer by parsing the scanned page back, the image by comparing the attacked page with the
+*unattacked* page it was made from, through the same scanner at the same seed — so a difference is
+the ink and never the sensor.
+
+| placement | `searchable` | `rasterised` | `scanned` |
+|---|---|---|---|
+| `description`, `annotations`, `footer` | text + image | image only | image only |
+| `invisible` | **nobody** | **nobody** | **nobody** |
+
+**A scan deletes the white-ink attack outright.** It contributes no pixel, so there is nothing for a
+recogniser to recover and nothing for a vision model to read — the placement designed to be
+invisible to the human approving the invoice is the one a photocopier destroys. It is an accident of
+the medium and not a control: nothing here chose it, it protects only the placement that hides from
+a person, and an attacker who prints in ink loses nothing. It is also why `searchable` had to stop
+re-emitting invisible ink: the old rung would have reported that attack as surviving a scan that
+had erased it.
+
+**Second, the compliant control.** `gullible` obeys every instruction it finds and is breached on
+**25.0 %** of the attacked documents rather than M6's 100 %. The decomposition is the whole finding
+— 6 of 24 per payload, and all six on `searchable`:
+
+| rung | n | succeeded | ASR |
+|---|---:|---:|---:|
+| `searchable` | 48 | 36 | **75.0 %** |
+| `rasterised` | 48 | 0 | 0.0 % |
+| `scanned` | 48 | 0 | 0.0 % |
+
+**The two zeros are blindness, not defence.** No payload reached the text layer on those rungs
+because no *text* did, and the report says so above its own tables. A model that looks at the page
+sees them exactly as the `image` column says it does; measuring that needs a vision arm, which this
+corpus is now built for and has not been given.
+
+**Third, and this is the result the ADR was missing — the gate inverts.** On the same predictions:
+
+| accept down to | coverage | accuracy | leaked |
+|---|---:|---:|---:|
+| `high` | **20.1 %** | **99.0 %** | 18 |
+| `none` (answer everything) | 100 % | **99.2 %** | 66 |
+
+**Auto-accepting only the high-confidence values is less accurate than accepting everything**, while
+doing a fifth of the work. The mechanism is not subtle once stated: the only values that ground are
+the ones on a page that kept a text layer, and that is exactly the rung where the attacks worked, so
+the gate concentrates the attacked-and-obeyed values into the bucket it calls high confidence. On
+M5's population of model *errors* the same gate turned 98.7 % into 99.96 %. Here it is
+anti-selective, and *`grounding` returning `UNGROUNDED` where it means "there was no text to look
+in" is the reason* — `decide/` cannot tell those two apart, and separating them is the first thing
+to build next.
+
 ## The heuristic half, and what it took to measure it
 
 Through M6 the three `HEURISTIC` rules had fired **zero times on every run**, reported as `—`/0 %
@@ -610,6 +693,9 @@ The suite verifies at build time that every payload survived into the text layer
 printed on. An attack the model never saw would otherwise land in the denominator as a failed
 attack, which is the one direction an attack success rate must not be wrong in.
 
+All of the above is on a page nobody photographed. What a scan does to it — including to the
+`invisible` placement, which it deletes — is *What a scan does to an attacked page* below.
+
 ## The corpus is saturated, and that is also a finding
 
 `claude-opus-5` reads every document perfectly — 100 % on all 108, exact everywhere. That arm of the
@@ -630,7 +716,7 @@ different matter and is the one M7 could not put a model against: the foreign co
 yet. **A real held-out set remains load-bearing** — it is the only place the question gets asked on
 documents nobody generated.
 
-667 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+718 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

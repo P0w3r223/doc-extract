@@ -29,7 +29,9 @@ import pytest
 
 from doc_extract.attack import suite
 from doc_extract.attack.payloads import BY_NAME as PAYLOADS
+from doc_extract.degrade import attacked as attacked_grid
 from doc_extract.degrade.corpus import documents as scanned_documents
+from doc_extract.degrade.rungs import BY_NAME as RUNGS
 from doc_extract.eval import detector, detector_report, predictions, report
 from doc_extract.eval.aggregate import Scored, summarise
 from doc_extract.eval.scorer import judge
@@ -87,17 +89,33 @@ def golds():
     planned: dict[tuple, list] = {}
 
     def grid(meta) -> list:
-        """The suite's plan for an attacked run, cached per distinct set of parameters."""
+        """The suite's plan for an attacked run, cached per distinct set of parameters.
+
+        A corpus that was attacked *and* scanned is planned by `degrade/attacked.py` instead, and
+        the rungs are part of the key: the same seven payloads in the same four placements are a
+        different set of documents once a third factor multiplies them. The document a report is
+        scored against carries the **rung** as its template, because that is what the manifest of
+        that corpus says a page looks like — rebuilding it from M2's layouts would name three
+        layouts where the committed report names three scanners.
+        """
         corpus = meta.corpus
-        key = (corpus["per_cell"], tuple(corpus["payloads"]), tuple(corpus["placements"]))
+        rungs = tuple(rung["name"] for rung in corpus.get("rungs", ()))
+        key = (corpus["per_cell"], tuple(corpus["payloads"]), tuple(corpus["placements"]), rungs)
         if key not in planned:
-            per_cell, payload_names, placements = key
-            planned[key] = suite.plan(
-                per_cell=per_cell,
-                payloads=tuple(PAYLOADS[name] for name in payload_names),
-                placements=placements,
-                base=base,
-            )
+            per_cell, payload_names, placements, rung_names = key
+            payloads = tuple(PAYLOADS[name] for name in payload_names)
+            if rung_names:
+                planned[key] = [
+                    (_with_template(document, rung.name), assignment)
+                    for document, rung, assignment in attacked_grid.plan(
+                        per_cell=per_cell, payloads=payloads, placements=placements,
+                        rungs=tuple(RUNGS[name] for name in rung_names), base=base,
+                    )
+                ]
+            else:
+                planned[key] = suite.plan(
+                    per_cell=per_cell, payloads=payloads, placements=placements, base=base,
+                )
         return planned[key]
 
     def for_run(meta):

@@ -27,16 +27,27 @@ from doc_extract.eval.format import rate as _rate
 from doc_extract.eval.predictions import RunMeta
 
 
-def render(study: Study, *, run: RunMeta, directory: str = "") -> str:
+def render(study: Study, *, run: RunMeta, directory: str = "", preamble: str = "") -> str:
+    """`preamble` is a section a caller knows about and this module must not.
+
+    The scanned attacked corpus measures which channel each payload reached its reader by, and that
+    table reframes every rate below it — a rung where nothing reached the model at all produces an
+    attack success rate of zero that means *blind*, not *defended*. It is rendered by the package
+    that measured it and inserted here, above the tables, because a qualification printed under the
+    numbers it qualifies is one a reader meets too late. Importing it would point `attack/` at the
+    scanner, which is the one direction `degrade/attacked.py` says this composition does not run in.
+    """
     #: The caveats sit **above** the tables, as they do in `selective_report.py` and for the same
     #: reason: one of them reframes the leak column entirely, and a qualification printed under the
     #: numbers it qualifies is one a reader meets too late.
     parts = [
         _header(study, run=run, directory=directory),
         _coverage(study),
+        preamble,
         _caveats(study, run=run),
         _payloads(study),
         _placements(study),
+        _templates(study),
         _grid(study),
         _leaks(study),
     ]
@@ -118,9 +129,11 @@ def _placements(study: Study) -> str:
         "",
         "`unchanged` is **not comparable across placements**. The `description` placement prints "
         "the payload inside an item's own description cell, and that description is a scored "
-        "field — so a reader that transcribes the cell perfectly still differs from the gold "
-        "there, and the column is near zero for that row by definition rather than by behaviour. "
-        "The other three write where nothing is scored.",
+        "field — so wherever the payload reaches the reader, one that transcribes the cell "
+        "perfectly still differs from the gold there, by definition rather than by behaviour. The "
+        "other three write where nothing is scored. On a corpus where the payload reaches the "
+        "reader on some documents and not others, this row mixes the two and the reach table above "
+        "is what separates them.",
         "",
         "| placement | n | succeeded | ASR | leaked | unchanged |",
         "|---|---:|---:|---:|---:|---:|",
@@ -128,6 +141,32 @@ def _placements(study: Study) -> str:
             f"| `{row.label}` | {row.documents} | {row.succeeded} | {_rate(row.rate)} | "
             f"{row.leaked} | {_rate(row.unchanged)} |"
             for row in study.by_placement
+        ),
+    ])
+
+
+def _templates(study: Study) -> str:
+    """What the manifest calls a page. Printed only when the corpus varies it.
+
+    On M6's attacked corpus that is the layout the invoice was printed in, and the row exists to say
+    whether a layout mattered. On the scanned attacked corpus it is the rung, and the row is the
+    measurement — but what it means is decided by the manifest, so nothing here names either.
+    """
+    if len(study.by_template) < 2:
+        return ""
+    return "\n".join([
+        "## Per template",
+        "",
+        "`template` is whatever the corpus's manifest records as what a page looks like. Read it "
+        "against that corpus's provenance block rather than assuming a layout: a corpus that "
+        "varies the scanner puts the rung here, and records the layouts beside it.",
+        "",
+        "| template | n | succeeded | ASR | leaked | unchanged |",
+        "|---|---:|---:|---:|---:|---:|",
+        *(
+            f"| `{row.label}` | {row.documents} | {row.succeeded} | {_rate(row.rate)} | "
+            f"{row.leaked} | {_rate(row.unchanged)} |"
+            for row in study.by_template
         ),
     ])
 
@@ -232,8 +271,10 @@ def _caveats(study: Study, *, run: RunMeta) -> str:
     if run.corpus.get("verified", True):
         lines.append(
             "* The suite verified at build time that every payload survived into the text layer of "
-            "the page it was printed on. An attack the model never saw would otherwise sit in the "
-            "denominator as a failed attack."
+            "the page **as printed**. An attack the corpus never carried would otherwise sit in "
+            "the denominator as a failed attack. It is a check on the rendering and not on what "
+            "happened to the page afterwards — on a corpus that was then scanned, what each "
+            "payload still reached is the reach table rather than this sentence."
         )
     else:
         lines.append(

@@ -21,6 +21,15 @@ The gap glyph is what an OCR engine emits for the same reason.
 deskew would put them, which is the same assumption `searchable` already makes about the recognition
 itself. A rung that also skewed the text layer would be measuring a second failure — misplaced
 boxes — that no reader in this project is equipped to notice.
+
+**Only visible ink is re-emitted, and that is where the idealisation stops.** `searchable` assumes
+the recognition is perfect; it does not assume it is clairvoyant. A word printed in white on white
+paper contributes no pixel to the image, so no recogniser reading that image can return it, and
+copying it forward out of the original text layer would be the one place this rung handed a reader
+something the scanner had destroyed. It is not a hypothetical: M6's `invisible` placement is exactly
+that word, and the composed corpus in `degrade/attacked.py` measures what a scan does to it. On a
+corpus nobody attacked no page carries white ink, which is why this changes not one byte of
+`data/scanned` — asserted in `tests/test_degrade_page.py` rather than argued here.
 """
 
 from __future__ import annotations
@@ -66,28 +75,39 @@ def render(document: Document, rung: Rung) -> Scan:
 
 def scan(data: bytes, rung: Rung, *, seed: int) -> Scan:
     """Any PDF through the scanner. Deterministic in `seed`, and in nothing else."""
-    rng = random.Random(seed)
     #: The text layer is measured with the same font the page was set in, so the metrics have to be
     #: loaded even when this is called on a PDF this project did not render.
     synth_render.register_fonts()
     sizes = raster.page_sizes(data)
-    images = raster.pages(data, dpi=rung.dpi)
-    words = read_words(data) if rung.text_layer else ()
+    images = damaged(data, rung, seed=seed)
+    words = tuple(word for word in read_words(data) if word.visible) if rung.text_layer else ()
 
     sink = io.BytesIO()
     canvas = Canvas(sink, pagesize=sizes[0])
     for number, (image, size) in enumerate(zip(images, sizes, strict=True), start=1):
         canvas.setPageSize(size)
-        canvas.drawImage(
-            ImageReader(io.BytesIO(_degrade(image, rung, rng))),
-            0, 0, width=size[0], height=size[1],
-        )
+        canvas.drawImage(ImageReader(io.BytesIO(image)), 0, 0, width=size[0], height=size[1])
         if rung.text_layer:
             here = [word for word in words if word.page == number]
             _draw_text_layer(canvas, here, height=size[1])
         canvas.showPage()
     canvas.save()
     return Scan(data=sink.getvalue(), pages=len(images))
+
+
+def damaged(data: bytes, rung: Rung, *, seed: int) -> tuple[bytes, ...]:
+    """What the scanner leaves on the glass: one encoded image per page, before any text is added.
+
+    Separate from `scan` because it is the only thing a *reader looking at the page* ever gets, and
+    `degrade/attacked.py` compares two of these to ask whether an overlay left a mark at all.
+    Deterministic in `seed` for the same reason `scan` is, and in the same way: two documents that
+    share a seed meet the same grain, so a difference between their images is the ink and not the
+    sensor.
+    """
+    rng = random.Random(seed)
+    return tuple(
+        _degrade(image, rung, rng) for image in raster.pages(data, dpi=rung.dpi)
+    )
 
 
 def _degrade(image: Image.Image, rung: Rung, rng: random.Random) -> bytes:
