@@ -17,6 +17,7 @@ data/synthetic/
 data/attacked/
 data/foreign/
 data/scanned/
+data/attacked-scanned/
 
 # `results/` is deliberately NOT ignored. The metric rules require the prediction files to be
 # committed: a report is recomputable from `predictions.jsonl` alone, which is what makes a number
@@ -26,3 +27,7 @@ data/scanned/
 # Working notes for the assistant sessions, not part of the project. Scoped to `sessions/` so a
 # checked-in `.claude/settings.json` would still be versioned if one is ever added.
 .claude/sessions/
+
+# Throwaway git worktrees an assistant subagent runs in. Whole checkouts of this repository, so
+# committing one would nest the tree inside itself.
+.claude/worktrees/

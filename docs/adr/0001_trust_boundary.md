@@ -1,9 +1,12 @@
 # The trust boundary around an untrusted invoice
 
 Date: 2026-08-19
+Updated: 2026-08-20 — the attacked corpus has been scanned; see *What a scan does to the gate's
+answer*, which replaces the bullet that named that composition as unbuilt.
 Status: accepted
 Author: P0w3r223 + Claude
-Related to: milestone 6 (`src/doc_extract/attack/`), `results/attack-*/attack.md`
+Related to: milestone 6 (`src/doc_extract/attack/`), `results/attack-*/attack.md`, milestone 7
+(`src/doc_extract/degrade/attacked.py`), `results/attacked-scanned-*/attack.md`
 
 ---
 
@@ -79,8 +82,9 @@ Which way that cuts is worth being exact about, because it is not simply weaker:
   against misreading and not against injection — carries over unchanged, and one thing gets worse:
   grounding, the gate's other signal, needs page text to resolve a value against, so on a scanned
   document it does not merely weaken. It returns *ungrounded* for every value, correct or not.
-  **The attack suite has not been run over the scanned corpus**, so the size of that effect on an
-  attacked scan is unmeasured, and the direction is not in doubt.
+  **That effect has since been measured on an attacked scan** — see *What a scan does to the gate's
+  answer* below — and it is worse than "the signal is lost": the gate's accepted bucket becomes
+  *less* accurate than answering everything.
 
 ## Consequences
 
@@ -121,11 +125,62 @@ rules above, whose value is that they hold regardless of what the page says.
   block or in a footnote. It is not built.
 * **The suite measures placements, not adaptivity.** Every payload is a fixed string; none of them
   responds to a failed attempt. An adaptive attacker is a different threat model and a different
-  suite.
-* **The attacked corpus has not been scanned.** Both halves exist — `attack/` prints payloads on a
-  page and `degrade/` photographs one — and composing them is a build step nobody has run. It is
-  the case where one of the gate's two signals is known in advance to be useless, so the result
-  would not be a surprise; it would be a number where there is currently an argument.
+  suite — and the section below sharpens what that costs: an attacker who knows the invoice will be
+  photographed simply prints in ink rather than in white, and loses nothing.
+
+## What a scan does to the gate's answer
+
+`degrade/attacked.py` composes the two halves the previous version of this document said were
+uncomposed: M6's grid printed and then photographed, 168 documents, every payload in every placement
+at every rung, the gold untouched by either. Two things came out of it, and the second is the one
+this ADR exists to record.
+
+**A payload reaches a reader by one of two channels, and the scanner treats them differently.**
+Measured at build time with no model involved — the text layer by parsing the scanned page back,
+the image by comparing the attacked page with the unattacked one it was made from, through the same
+scanner at the same seed:
+
+| placement | `searchable` | `rasterised` | `scanned` |
+|---|---|---|---|
+| `description`, `annotations`, `footer` | text + image | image only | image only |
+| `invisible` | **nobody** | **nobody** | **nobody** |
+
+The white-ink placement is destroyed outright. It contributes no pixel, so there is nothing for a
+recogniser to recover and nothing for a vision model to read — **the attack designed to be invisible
+to the human approving the invoice is the one a photocopier deletes.** That is an accident of the
+medium and not a control: nothing in this repository chose it, it protects only the placement that
+hides from a person, and an attacker who prints in ink loses nothing.
+
+The compliant control makes the other half concrete. `gullible` obeys every instruction it finds and
+is breached on **25 % of the attacked documents** rather than 100 % — but the decomposition is the
+whole story: 6 successes of 24 per payload, and all six on `searchable`. The two text-less rungs
+score zero because **the reader could not read the document at all**, which is blindness rather than
+a defence. A model that looks at the page sees those payloads exactly as the `image` column says.
+
+**And the gate inverts.** Run over the same predictions:
+
+| accept down to | coverage | accuracy | leaked |
+|---|---:|---:|---:|
+| `high` | **20.1 %** | **99.0 %** | 18 |
+| `none` (answer everything) | 100 % | **99.2 %** | 66 |
+
+Auto-accepting only the high-confidence values is **less accurate than accepting everything**, while
+doing a fifth of the work. The mechanism is not subtle once stated: the only values that ground are
+the ones on a page that kept a text layer, and that is exactly the rung where the attacks worked. So
+the gate concentrates the attacked-and-obeyed values into the bucket it calls high confidence. On
+M5's population of model *errors* the same gate turned 98.7 % into 99.96 %; here it is anti-selective.
+
+Three things follow:
+
+* **A grounding signal must know whether it could have answered.** It currently returns `UNGROUNDED`
+  where it means *there was no text to look in*, and those two are the same value to `decide/`.
+  Separating them would drop the text-less rungs out of the curve instead of filling it with false
+  alarms. It is not built, and it is the first thing to build.
+* **The `searchable` rung is the deployable pipeline and the vulnerable one.** A recogniser in front
+  of the model brings grounding back (M7d), and it brings the attack surface back with it. Those are
+  the same sentence.
+* **A payee allow-list is still the missing control**, and a scan does not change that: the two
+  payloads that leak here are the two that leaked in M6, for the reason they leaked in M6.
 
 ### Costs accepted
 

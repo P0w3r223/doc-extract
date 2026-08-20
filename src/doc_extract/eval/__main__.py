@@ -31,6 +31,7 @@ from pathlib import Path
 from doc_extract.attack import report as attack_report
 from doc_extract.attack import suite
 from doc_extract.attack.suite import SuiteError
+from doc_extract.degrade import attacked, attacked_report
 from doc_extract.eval import (
     dataset,
     detector_report,
@@ -265,11 +266,18 @@ def _attack(args: argparse.Namespace) -> int:
     records = predictions.read(args.run / predictions.PREDICTIONS_NAME)
     corpus = dataset.load(args.corpus or Path(meta.corpus_dir))
     assignments = suite.load_assignments(corpus.directory)
+    #: A corpus that was also scanned records which channel each payload survived by, and that
+    #: table reframes every rate in this report. Absent on M6's unscanned corpus, where there is
+    #: only one channel and nothing damaged it — hence a lookup rather than a requirement.
+    reaches = _reaches(corpus.directory)
 
     study = run.attacks(corpus, records, assignments, allow_partial=args.allow_partial)
     path = args.run / ATTACK_NAME
     path.write_bytes(
-        attack_report.render(study, run=meta, directory=args.run.as_posix()).encode("utf-8")
+        attack_report.render(
+            study, run=meta, directory=args.run.as_posix(),
+            preamble=attacked_report.render(reaches),
+        ).encode("utf-8")
     )
 
     print(f"{meta.baseline} — {meta.model}")
@@ -277,9 +285,23 @@ def _attack(args: argparse.Namespace) -> int:
     print()
     for line in attack_report.summary_lines(study):
         print(f"  {line}")
+    for line in attacked_report.summary_lines(reaches):
+        print(f"  {line}")
     print()
     print(f"  report     : {path}")
     return 0
+
+
+def _reaches(directory: Path) -> tuple[attacked.Reach, ...]:
+    """The reach file if the corpus has one, and no complaint if it does not.
+
+    Missing is the ordinary case — M6's attacked corpus was never photographed — so its absence is
+    not an error here, unlike in `load_reaches`, whose caller has already said which kind of corpus
+    it is looking at.
+    """
+    if not (directory / attacked.REACH_NAME).exists():
+        return ()
+    return attacked.load_reaches(directory)
 
 
 def _report(

@@ -149,6 +149,11 @@ class Study:
     control: Rate
     by_payload: tuple[Rate, ...]
     by_placement: tuple[Rate, ...]
+    #: Whatever the corpus's manifest calls a page. On M6's attacked corpus that is the layout it
+    #: was printed in; on the scanned attacked corpus it is the **rung** the page went through,
+    #: which is the convention `degrade/corpus.py` set and `eval.report` already reads. One column
+    #: rather than two because a corpus varies one of them, and the other is in its provenance.
+    by_template: tuple[Rate, ...]
     grid: tuple[tuple[str, str, Rate], ...]
     #: Documents in the prediction file that no assignment describes, and assignments with no
     #: prediction. Both are reported rather than dropped: a suite measured over whichever documents
@@ -184,6 +189,12 @@ def summarise(
         #: per-payload table is where the control keeps its own row.
         by_placement=tuple(
             _rate(name, [row for row in attacking if row.placement == name]) for name in placements
+        ),
+        #: Over attacking payloads only, for the reason the placement table is: a template's row
+        #: aggregates across payloads, so the control would move every row by the same amount.
+        by_template=tuple(
+            _rate(name, [row for row in attacking if row.template == name])
+            for name in _ordered(row.template for row in rows)
         ),
         grid=tuple(
             (payload, placement, _rate(

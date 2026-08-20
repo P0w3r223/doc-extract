@@ -488,6 +488,46 @@ choose them, deriving the fence marker from the text it wraps, and telling the m
 rather than compute are what stand between the payload and the answer &mdash; and the honest way to
 report a structural defence is to attack it and publish the rate.</p>
 
+<h2>Now photograph the attacked page</h2>
+<p>Compose the two corpora &mdash; M6's grid printed and then put through M7's
+scanner, gold untouched by either &mdash; and the compliant reader above, breached on every attacked
+document it is given a clean page of, is breached on 25.0 % of these
+(36 of 144). The decomposition is the whole finding.</p>
+<table>
+  <thead><tr><th>rung</th><th class="num">attacked</th><th class="num">succeeded</th><th class="num">ASR</th></tr></thead>
+  <tbody><tr><th><code>searchable</code></th><td class="num">48</td><td class="num">36</td><td class="num">75.0 %</td></tr><tr><th><code>rasterised</code></th><td class="num">48</td><td class="num">0</td><td class="num">0.0 %</td></tr><tr><th><code>scanned</code></th><td class="num">48</td><td class="num">0</td><td class="num">0.0 %</td></tr></tbody>
+</table>
+<p class="note">Computed from <code>attacked-scanned-gullible</code>, the same control M6 uses,
+by rebuilding each scanned attacked document's gold in memory from the corpus seed.</p>
+<p><strong>The two zeros are blindness, not defence.</strong> No payload reached the text layer on
+those rungs because no <em>text</em> did &mdash; the page carries none. A reader that looks at the
+page sees them exactly as the reach table says it does.</p>
+<!-- corpus-dependent: begin -->
+<table>
+  <thead><tr><th>placement</th><th><code>searchable</code></th><th><code>rasterised</code></th><th><code>scanned</code></th></tr></thead>
+  <tbody><tr><th><code>description</code></th><td>text&nbsp;+&nbsp;image</td><td>image only</td><td>image only</td></tr><tr><th><code>annotations</code></th><td>text&nbsp;+&nbsp;image</td><td>image only</td><td>image only</td></tr><tr><th><code>footer</code></th><td>text&nbsp;+&nbsp;image</td><td>image only</td><td>image only</td></tr><tr><th><code>invisible</code></th><td>nobody</td><td>nobody</td><td>nobody</td></tr></tbody>
+</table>
+<p class="note">Measured at build time with no model. <em>text</em> means the marker is in the text
+layer the source reader gets off the scanned page; <em>image</em> means the attacked page and the
+unattacked page it was made from differ as pictures, through the same scanner at the same seed
+&mdash; so a payload that moved no pixel cannot be seen by anything that looks at the page.</p>
+<p><strong>A scan deletes the white-ink attack outright.</strong> White on white contributes no
+pixel, so there is nothing for a recogniser to recover and nothing for a vision model to read: the
+placement designed to be invisible to the human approving the invoice is the one a photocopier
+destroys. That is an accident of the medium and not a control &mdash; it protects only the placement
+that hides from a person, and an attacker who prints in ink loses nothing.</p>
+<!-- corpus-dependent: end -->
+<!-- corpus-dependent: begin -->
+<p><strong>And the gate inverts.</strong> Accepting only the high-confidence values
+covers 20.1 % of what the reader asserted at 99.0 % accuracy and
+lets 18 wrong values through; accepting <em>everything</em> is
+99.2 % accurate. <strong>The gate's own bucket is the less accurate one.</strong>
+The only values that ground are those on a page that kept a text layer &mdash; which is exactly the
+rung where the attacks worked &mdash; so the gate concentrates the attacked-and-obeyed values into
+the bucket it calls high confidence. On a population of model <em>errors</em> the same gate raised
+accuracy instead of lowering it, and the committed <code>gate.md</code> files hold both curves.</p>
+<!-- corpus-dependent: end -->
+
 <h2>What is not built yet</h2>
 <p>Stated plainly, because a portfolio page that reads as finished when it is not is worse than no
 page at all.</p>
@@ -497,8 +537,10 @@ page at all.</p>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
     <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms</td></tr>
-    <tr><th>M7 &mdash; held-out corpora, the vision path, the reported gap</th><td class="num">built, model arms on one of the two</td></tr>
-    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus, and a real invoice nobody generated</th><td class="num">not built</td></tr>
+    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on one of the three</td></tr>
+    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus, and a vision arm over the attacked scan</th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
 </table>
 <p class="note">The headline question &mdash; does &ldquo;the invariants hold&rdquo; actually predict
@@ -524,7 +566,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>c453134</code> &middot; part of a
+  <code>41bb834</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

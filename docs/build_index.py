@@ -18,9 +18,12 @@ import subprocess
 
 from doc_extract.attack import suite
 from doc_extract.attack.payloads import BY_NAME as PAYLOADS
+from doc_extract.decide.confidence import Confidence
+from doc_extract.degrade import attacked as attacked_grid
 from doc_extract.degrade.corpus import documents as scanned_documents
+from doc_extract.degrade.rungs import BY_NAME as RUNGS_BY_NAME
 from doc_extract.degrade.rungs import TEMPLATES as RUNG_NAMES
-from doc_extract.eval import dataset, detector, fields
+from doc_extract.eval import dataset, detector, fields, run
 from doc_extract.eval import predictions as prediction_file
 from doc_extract.eval.aggregate import Scored, summarise
 from doc_extract.eval.baselines import BASELINES, BY_NAME
@@ -651,6 +654,139 @@ def injection_study(corpus: list) -> dict[str, object] | None:
     }
 
 
+#: The composed corpus's compliant control. Same argument as `ATTACKED_RUN`: what a *scan* does to
+#: an attack that already worked is a property of the page and of the defences, and does not need a
+#: model to have been fooled first.
+SCANNED_ATTACK_RUN = "attacked-scanned-gullible"
+
+#: Where the composed corpus is built, when it has been. Not committed — 168 rasterised pages — and
+#: one command away (`python -m doc_extract.degrade --attacked`).
+SCANNED_ATTACK_CORPUS = ROOT / "data" / "attacked-scanned"
+
+
+def scanned_injection_study(corpus: list) -> dict[str, object] | None:
+    """M6's grid photographed, per rung, from the committed prediction file — plus the reach table.
+
+    The per-rung rate needs no corpus on disk: `degrade.attacked.plan` is pure, so the gold of a
+    scanned attacked document is rebuilt in memory from the seed and the run's own provenance block,
+    exactly as `injection_study` rebuilds M6's.
+
+    **The reach table is the half that cannot be.** Whether an overlay left a mark on the page is a
+    fact about pixels, and no committed artifact records pixels — so it is read from the corpus's
+    `reach.jsonl` when the corpus has been built here, and the section renders without it otherwise
+    rather than with an invented one. That is the same rule `grounding_on_a_scan` follows.
+    """
+    directory = ROOT / "results" / SCANNED_ATTACK_RUN
+    predictions_path = directory / prediction_file.PREDICTIONS_NAME
+    if not predictions_path.exists():  # pragma: no cover — a checkout without that run
+        return None
+
+    meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
+    planned = attacked_grid.plan(
+        per_cell=meta.corpus["per_cell"],
+        payloads=tuple(PAYLOADS[name] for name in meta.corpus["payloads"]),
+        placements=tuple(meta.corpus["placements"]),
+        rungs=tuple(RUNGS_BY_NAME[rung["name"]] for rung in meta.corpus["rungs"]),
+        base=corpus,
+    )
+    gold = {document.doc_id: document for document, _, _ in planned}
+    by_id = {assignment.doc_id: assignment for _, _, assignment in planned}
+
+    rows: dict[str, dict[str, int]] = {}
+    for record in prediction_file.read(predictions_path):
+        if record.doc_id not in by_id:  # pragma: no cover — reported in the committed attack.md
+            continue
+        assignment = by_id[record.doc_id]
+        payload = PAYLOADS[assignment.payload]
+        if payload.harmless:
+            #: The control asks for nothing and can never succeed. Leaving it in would lower every
+            #: rung's rate by the same seventh, for a reason that has nothing to do with the page.
+            continue
+        row = rows.setdefault(assignment.template, {"documents": 0, "succeeded": 0})
+        row["documents"] += 1
+        row["succeeded"] += payload.achieved(
+            gold[record.doc_id].invoice, record.parse(), FailureClass(record.failure)
+        )
+    return {
+        "run": SCANNED_ATTACK_RUN,
+        "rungs": [
+            {"rung": name, **rows[name]} for name in RUNG_NAMES if name in rows
+        ],
+        "documents": sum(row["documents"] for row in rows.values()),
+        "succeeded": sum(row["succeeded"] for row in rows.values()),
+        "reach": _reach_table(),
+        "curve": _gate_curve(predictions_path),
+    }
+
+
+def _gate_curve(predictions_path) -> dict[str, object] | None:
+    """The two ends of the gate's curve on this corpus, or `None` without the pages.
+
+    The finding is a *comparison* — accepting only the high-confidence values against accepting
+    everything — so both ends are read off one `Curve` rather than one being quoted and the other
+    remembered. Grounding needs the rendered page, which is why this is the second half of this
+    section that a checkout without the corpus renders without.
+    """
+    if not (SCANNED_ATTACK_CORPUS / MANIFEST_NAME).exists():
+        return None  # pragma: no cover — the composed corpus has not been built here
+    curve = run.gate(
+        dataset.load(SCANNED_ATTACK_CORPUS), prediction_file.read(predictions_path)
+    )
+    points = {str(point.level): point for point in curve.points}
+    top, everything = points.get(str(Confidence.HIGH)), points.get(str(Confidence.NONE))
+    if top is None or everything is None:  # pragma: no cover — the levels are a closed enum
+        return None
+    return {
+        "coverage": top.coverage, "accuracy": top.accuracy, "leaked": top.leaked,
+        "all_accuracy": everything.accuracy, "all_leaked": everything.leaked,
+    }
+
+
+def _reach_table() -> list[dict[str, object]] | None:
+    """One row per placement, one column per rung, or `None` when the corpus is not on disk."""
+    if not (SCANNED_ATTACK_CORPUS / attacked_grid.REACH_NAME).exists():
+        return None  # pragma: no cover — the composed corpus has not been built here
+    reaches = attacked_grid.load_reaches(SCANNED_ATTACK_CORPUS)
+    placements = _first_seen(row.placement for row in reaches)
+    return [
+        {
+            "placement": placement,
+            "channels": [
+                _channel([
+                    row for row in reaches
+                    if row.placement == placement and row.rung == rung
+                ])
+                for rung in RUNG_NAMES
+            ],
+        }
+        for placement in placements
+    ]
+
+
+def _channel(rows: list) -> str:
+    """What a cell says. Mixed answers are counted rather than averaged into a third thing."""
+    answers = {(row.in_text_layer, row.on_the_image) for row in rows}
+    if not answers:
+        return DASH  # pragma: no cover — every cell of the cross is filled
+    if len(answers) > 1:  # pragma: no cover — a placement behaves the same on every document
+        return "mixed"
+    in_text, on_image = answers.pop()
+    if in_text and on_image:
+        return "text&nbsp;+&nbsp;image"
+    if on_image:
+        return "image only"
+    if in_text:  # pragma: no cover — no rung keeps text of ink that left no mark
+        return "text only"
+    return "nobody"
+
+
+def _first_seen(values) -> tuple[str, ...]:
+    seen: dict[str, None] = {}
+    for value in values:
+        seen.setdefault(value, None)
+    return tuple(seen)
+
+
 def field_list(counts: collections.Counter, limit: int = 3) -> str:
     return ", ".join(
         f"<code>{html.escape(field)}</code>&nbsp;&times;&nbsp;{n}"
@@ -1037,6 +1173,99 @@ rather than compute are what stand between the payload and the answer &mdash; an
 report a structural defence is to attack it and publish the rate.</p>"""
 
 
+def scanned_injection_section(study: dict[str, object] | None) -> str:
+    """The same grid photographed. Two tables, and the second only when the corpus is on disk."""
+    if study is None:  # pragma: no cover — a checkout without that run
+        return "<p class=\"note\">No committed run over a scanned attacked corpus.</p>"
+
+    rungs: list[dict[str, object]] = study["rungs"]  # type: ignore[assignment]
+    body = "".join(
+        f'<tr><th><code>{html.escape(str(row["rung"]))}</code></th>'
+        f'<td class="num">{row["documents"]}</td>'
+        f'<td class="num">{row["succeeded"]}</td>'
+        f'<td class="num">{rate(_success_rate(row))}</td></tr>'
+        for row in rungs
+    )
+    return f"""<p>Compose the two corpora &mdash; M6's grid printed and then put through M7's
+scanner, gold untouched by either &mdash; and the compliant reader above, breached on every attacked
+document it is given a clean page of, is breached on {rate(_success_rate(study))} of these
+({study["succeeded"]} of {study["documents"]}). The decomposition is the whole finding.</p>
+<table>
+  <thead><tr><th>rung</th><th class="num">attacked</th><th class="num">succeeded</th><th class="num">ASR</th></tr></thead>
+  <tbody>{body}</tbody>
+</table>
+<p class="note">Computed from <code>{html.escape(str(study["run"]))}</code>, the same control M6 uses,
+by rebuilding each scanned attacked document's gold in memory from the corpus seed.</p>
+<p><strong>The two zeros are blindness, not defence.</strong> No payload reached the text layer on
+those rungs because no <em>text</em> did &mdash; the page carries none. A reader that looks at the
+page sees them exactly as the reach table says it does.</p>
+{_reach_section(study.get("reach"))}
+{_inversion(study.get("curve"))}"""
+
+
+def _inversion(curve: object) -> str:
+    """The gate's two ends, side by side, or a note saying which command produces them."""
+    if not curve:
+        return (  # pragma: no cover — the composed corpus has not been built here
+            '<p class="note">Grounding resolves a value against the page\'s text, so the gate\'s '
+            'curve on this corpus needs the pages. Build it with <code>python -m '
+            'doc_extract.degrade --attacked</code>.</p>'
+        )
+    row: dict[str, object] = curve  # type: ignore[assignment]
+    return f"""{CORPUS_DEPENDENT}
+<p><strong>And the gate inverts.</strong> Accepting only the high-confidence values
+covers {rate(row["coverage"])} of what the reader asserted at {rate(row["accuracy"])} accuracy and
+lets {row["leaked"]} wrong values through; accepting <em>everything</em> is
+{rate(row["all_accuracy"])} accurate. <strong>The gate's own bucket is the less accurate one.</strong>
+The only values that ground are those on a page that kept a text layer &mdash; which is exactly the
+rung where the attacks worked &mdash; so the gate concentrates the attacked-and-obeyed values into
+the bucket it calls high confidence. On a population of model <em>errors</em> the same gate raised
+accuracy instead of lowering it, and the committed <code>gate.md</code> files hold both curves.</p>
+{CORPUS_DEPENDENT_END}"""
+
+
+def _success_rate(row: dict[str, object]) -> float | None:
+    documents = int(row["documents"])  # type: ignore[arg-type]
+    return int(row["succeeded"]) / documents if documents else None  # type: ignore[arg-type]
+
+
+def _reach_section(reach: object) -> str:
+    """Which channel each payload survived by, when the corpus that measured it is on disk.
+
+    Fenced for the reason the scanned corpus's grounding block is: whether a payload left a mark is
+    a fact about pixels, no committed artifact records pixels, and a checkout without the corpus
+    would otherwise render a page that disagrees with the committed one.
+    """
+    if not reach:
+        return (  # pragma: no cover — the composed corpus has not been built here
+            '<p class="note">The reach table is a fact about pixels and no committed artifact '
+            'records pixels. Build the corpus with <code>python -m doc_extract.degrade '
+            '--attacked</code> to render it here.</p>'
+        )
+    rows = "".join(
+        f'<tr><th><code>{html.escape(str(row["placement"]))}</code></th>'
+        + "".join(f'<td>{channel}</td>' for channel in row["channels"])
+        + "</tr>"
+        for row in reach  # type: ignore[union-attr]
+    )
+    heads = "".join(f'<th><code>{html.escape(name)}</code></th>' for name in RUNG_NAMES)
+    return f"""{CORPUS_DEPENDENT}
+<table>
+  <thead><tr><th>placement</th>{heads}</tr></thead>
+  <tbody>{rows}</tbody>
+</table>
+<p class="note">Measured at build time with no model. <em>text</em> means the marker is in the text
+layer the source reader gets off the scanned page; <em>image</em> means the attacked page and the
+unattacked page it was made from differ as pictures, through the same scanner at the same seed
+&mdash; so a payload that moved no pixel cannot be seen by anything that looks at the page.</p>
+<p><strong>A scan deletes the white-ink attack outright.</strong> White on white contributes no
+pixel, so there is nothing for a recogniser to recover and nothing for a vision model to read: the
+placement designed to be invisible to the human approving the invoice is the one a photocopier
+destroys. That is an accident of the medium and not a control &mdash; it protects only the placement
+that hides from a person, and an attacker who prints in ink loses nothing.</p>
+{CORPUS_DEPENDENT_END}"""
+
+
 def build() -> str:
     facts = schema_facts()
     every_rule = rules()
@@ -1111,6 +1340,7 @@ def build() -> str:
         foreign_section=foreign_section(foreign_study(corpus)),
         scanned_section=scanned_section(scanned_study(corpus), grounding_on_a_scan()),
         injection_section=injection_section(injection_study(corpus)),
+        scanned_injection_section=scanned_injection_section(scanned_injection_study(corpus)),
         formatting_only=formatting_only_differences(corpus),
         opus_cost=OPUS_COST,
         baseline_count=len(runs),
@@ -1466,6 +1696,9 @@ is measuring layout parsing, not reading.</p>
 <h2>The invoice as untrusted input</h2>
 {injection_section}
 
+<h2>Now photograph the attacked page</h2>
+{scanned_injection_section}
+
 <h2>What is not built yet</h2>
 <p>Stated plainly, because a portfolio page that reads as finished when it is not is worse than no
 page at all.</p>
@@ -1475,8 +1708,10 @@ page at all.</p>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
     <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms</td></tr>
-    <tr><th>M7 &mdash; held-out corpora, the vision path, the reported gap</th><td class="num">built, model arms on one of the two</td></tr>
-    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus, and a real invoice nobody generated</th><td class="num">not built</td></tr>
+    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on one of the three</td></tr>
+    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus, and a vision arm over the attacked scan</th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
 </table>
 <p class="note">The headline question &mdash; does &ldquo;the invariants hold&rdquo; actually predict

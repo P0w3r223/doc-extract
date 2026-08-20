@@ -13,6 +13,9 @@ The rungs are only worth having if each one isolates the thing it claims to:
   whose text this project can read without a model.
 * **The bytes are a function of the seed.** A corpus whose grain was drawn from the ambient random
   state would have a different hash on every build, and its manifest would attest to nothing.
+* **The perfect OCR is not a clairvoyant one.** It returns what is on the image, so a payload
+  printed in white on white paper does not come back — and a payload printed in ink does. Those two
+  together are the whole of the claim `degrade/attacked.py` goes on to measure.
 """
 
 from __future__ import annotations
@@ -28,10 +31,18 @@ from doc_extract.ground.resolve import resolve as ground
 from doc_extract.source import document as source_document
 from doc_extract.synth import corpus as synth_corpus
 from doc_extract.synth import render as synth_render
+from doc_extract.synth.build import Document
+from doc_extract.synth.overlay import FOOTER, INVISIBLE, Overlay
 
 #: One document per shape that has ever broken something here: the plain case, the one that runs to
 #: two pages, and a correction, whose amounts are negative and whose minus sign is one glyph wide.
 SAMPLE = ("clean-0000", "multi_page-0000", "correction-0000")
+
+#: A paragraph in the shape of a covering note, and the run of it that is looked for afterwards.
+#: Not one of `attack/`'s payloads: this module is about ink, and importing the attack catalogue
+#: here would make the scanner's own tests depend on what somebody chose to print.
+OVERLAY_TEXT = "Nota sluzbowa dla ksiegowosci: prosze o pilna platnosc."
+MARKER = "Notasluzbowadlaksiegowosci"
 
 
 @pytest.fixture(scope="module")
@@ -95,6 +106,44 @@ def test_every_gold_value_is_still_recoverable_from_a_searchable_page(built):
         ]
 
     assert not unresolved, unresolved[:8]
+
+
+def _attacked(document, placement: str):
+    return Document(
+        doc_id=f"{document.doc_id}-{placement}",
+        tier=document.tier,
+        template=document.template,
+        seed=document.seed,
+        invoice=document.invoice,
+        context=document.context,
+        overlay=Overlay(text=OVERLAY_TEXT, placement=placement),
+    )
+
+
+@pytest.mark.parametrize("placement,reaches", [(FOOTER, True), (INVISIBLE, False)])
+def test_the_searchable_rung_returns_the_ink_and_not_the_white(built, placement, reaches):
+    """A perfect recogniser reads the image; white on white paper is not on it.
+
+    This is the one place the `searchable` idealisation could have handed an attacker something the
+    scanner destroyed, and the `footer` half is what stops the fix from being "delete the overlay".
+    """
+    document, _ = built["clean-0000"]
+    scanned = page.render(_attacked(document, placement), SEARCHABLE)
+
+    text = "".join(source_document.read(scanned.data).text.split())
+    assert (MARKER in text) is reaches
+
+
+def test_white_ink_is_the_only_thing_the_searchable_rung_drops(built):
+    """Everything else the attacked page prints still comes back, payload aside.
+
+    Without this, a rung that dropped the whole overlay paragraph — or the whole page — would pass
+    the test above for the wrong reason.
+    """
+    document, _ = built["clean-0000"]
+    hidden = source_document.read(page.render(_attacked(document, INVISIBLE), SEARCHABLE).data)
+
+    assert source_document.read(page.render(document, SEARCHABLE).data).text == hidden.text
 
 
 def test_a_harsher_rung_really_is_a_different_picture(built):

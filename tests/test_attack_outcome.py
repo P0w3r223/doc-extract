@@ -27,14 +27,14 @@ from doc_extract.synth.tiers import BY_NAME as TIERS
 
 
 def _row(payload: str, *, succeeded: bool, route: str = Route.ACCEPT, exact: bool = False,
-         answered: bool = True, placement: str = "footer") -> Outcome:
+         answered: bool = True, placement: str = "footer", template: str = "classic") -> Outcome:
     return Outcome(
         doc_id=f"{payload}-{placement}-00",
         payload=payload,
         category=BY_NAME[payload].category,
         placement=placement,
         tier="clean",
-        template="classic",
+        template=template,
         succeeded=succeeded,
         answered=answered,
         exact=exact,
@@ -75,6 +75,21 @@ def test_an_unanswered_document_is_not_an_accepted_one() -> None:
     """The denial payload succeeds by producing nothing, and nothing is then accepted."""
     refused = _row("refusal", succeeded=True, route="", answered=False)
     assert refused.succeeded and not refused.accepted and not refused.leaked
+
+
+def test_the_template_column_splits_the_rows_and_leaves_the_control_out() -> None:
+    """On the scanned attacked corpus this column is the rung, and it is the whole measurement:
+    an attack works where the page still carries the payload and nowhere else."""
+    study = outcome.summarise([
+        _row("total_override", succeeded=True, template="searchable"),
+        _row("total_override", succeeded=False, template="rasterised"),
+        _row("benign", succeeded=False, exact=True, template="searchable"),
+    ])
+    rates = {row.label: row for row in study.by_template}
+
+    assert [row.label for row in study.by_template] == ["searchable", "rasterised"]
+    assert rates["searchable"].rate == 1.0, "the control must not be in the denominator"
+    assert rates["rasterised"].rate == 0.0
 
 
 def test_the_grid_reports_every_cell_it_was_given() -> None:

@@ -51,6 +51,10 @@ model, and only one of the two has been asked to:** `claude-opus-5` reads a 150 
 while the regex baseline drops to 0 % on every rung that loses the text layer. The foreign corpus
 has no model arm.
 
+The scanner is then pointed at the attacked corpus, which is where the sharpest negative in the
+project is: on an attacked scan the routing gate's high-confidence bucket is **less** accurate than
+answering everything. See *Now photograph the attacked page* below.
+
 ## Does "the arithmetic holds" predict "the fields are right"?
 
 `claude-haiku-4-5` gets 42 of 107 documents wrong, which is a real and unlabelled model-error
@@ -274,12 +278,15 @@ letting a zero read as a miss.
 | `attack/` | 7 payloads × 4 placements over the same invoices, and the attack success rate |
 | `foreign/` | the same gold on three unfamiliar Polish layouts — how much of a reading was the template |
 | `degrade/`, `source/raster.py` | the same page photographed at three rungs of legibility, and the pixels a model is sent |
-| tests | **667 passing**, ruff clean |
+| `degrade/attacked.py` | M6's grid photographed — which channel a payload still reaches a reader by |
+| tests | **718 passing**, ruff clean |
 
-Milestone 7 has both held-out corpora, the vision path, and a paid arm reading the scanned one as
-images. What it has **not** got is a paid arm over the *foreign* corpus — a separate spend and a
-separate question — and the synthetic↔real gap collected into an artifact of its own rather than
-reported as three sections above.
+Milestone 7 has both held-out corpora, the vision path, a paid arm reading the scanned one as
+images, and the attacked corpus scanned. What it has **not** got is a paid arm over the *foreign*
+corpus or a vision arm over the attacked scan — two separate spends and two separate questions — a
+grounding signal that can say *there was nothing to look in* rather than *ungrounded*, and the
+synthetic↔real gap collected into an artifact of its own rather than reported as four sections
+above.
 
 ## What an attacker gets, and what the gate does about it
 
@@ -315,6 +322,45 @@ allow-list) are in [`docs/adr/0001_trust_boundary.md`](docs/adr/0001_trust_bound
 The suite verifies at build time that every payload survived into the text layer of the page it was
 printed on. An attack the model never saw would otherwise sit in the denominator as a failed attack,
 which is the one direction an attack success rate must not be wrong in.
+
+## Now photograph the attacked page, and the gate stops helping
+
+That whole table is a page nobody scanned. Compose the two corpora — M6's grid printed and then put
+through M7's scanner, 168 documents, gold untouched by either — and three things come out.
+
+**A payload reaches a reader by one of two channels, and a scan treats them differently.** Measured
+at build time with no model: the text layer by parsing the scanned page back, the image by comparing
+the attacked page with the unattacked page it was made from, through the same scanner at the same
+seed, so a difference is the ink rather than the sensor.
+
+| placement | `searchable` | `rasterised` | `scanned` |
+|---|---|---|---|
+| `description`, `annotations`, `footer` | text + image | image only | image only |
+| `invisible` | **nobody** | **nobody** | **nobody** |
+
+**A scan deletes the white-ink attack.** White on white contributes no pixel, so there is nothing for
+a recogniser to recover and nothing for a vision model to read: the placement designed to be
+invisible to the human approving the invoice is the one a photocopier destroys. That is an accident
+of the medium and not a control — it protects only the placement that hides from a person, and an
+attacker who prints in ink loses nothing.
+
+**The compliant reader is breached on 25 % rather than 100 %, and that number is mostly blindness.**
+All 36 successes are on `searchable`; the other two rungs score zero because no *text* reached the
+reader at all. A model that looks at the page sees those payloads exactly as the `image` column says.
+
+**And the gate inverts.** On the same predictions:
+
+| accept down to | coverage | accuracy | leaked |
+|---|---:|---:|---:|
+| `high` | **20.1 %** | **99.0 %** | 18 |
+| `none` — answer everything | 100 % | **99.2 %** | 66 |
+
+Auto-accepting only the high-confidence values is **less accurate than accepting everything**, while
+doing a fifth of the work. The only values that ground are the ones on a page that kept a text layer,
+and that is exactly the rung where the attacks worked — so the gate concentrates the
+attacked-and-obeyed values into the bucket it calls high confidence. On M5's population of model
+errors the same gate turned 98.7 % into 99.96 %. The fix it points at is specific: grounding returns
+`UNGROUNDED` where it means *there was no text to look in*, and `decide/` cannot tell those apart.
 
 ## What the baselines say, and what the model says
 
@@ -470,6 +516,11 @@ python -m doc_extract.eval gate   --run results/pattern  # the gate's coverage-a
 python -m doc_extract.attack --out data/attacked         # 112 attacked documents, verified on build
 python -m doc_extract.eval run --baseline gullible --corpus data/attacked --out results/attack-gullible
 python -m doc_extract.eval attack --run results/attack-gullible   # the attack success rate
+
+python -m doc_extract.degrade --attacked --out data/attacked-scanned   # the same grid, photographed
+python -m doc_extract.eval run --baseline gullible --corpus data/attacked-scanned \
+    --out results/attacked-scanned-gullible
+python -m doc_extract.eval attack --run results/attacked-scanned-gullible  # with the reach table
 ```
 
 Each run writes `results/<run>/` — `predictions.jsonl`, `run.meta.json`, `report.md`,
