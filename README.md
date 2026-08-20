@@ -111,10 +111,12 @@ and nothing behind them.
 | heuristic rules | 100 % | 100 % | **100 %** |
 
 Every arithmetic identity needs two figures to compare, and this answer offers one. The hard rules
-are therefore **silent on 108 documents that are wrong in 77 % of their fields** — not mistaken,
-unable to speak. The only rule that fires is the heuristic whose whole content is *no rule could
-run*, and it fires on all 108. Its score decomposes the same way: `value` **100 %** against `recall`
-22.8 % — nothing it said was wrong, and it barely said anything.
+are therefore **silent on 108 documents missing 77 % of their fields** — not mistaken, unable to
+speak. *Missing*, not wrong, is the whole shape of it: what the answer does say it says correctly,
+so the two hard rules that need only **one** figure — the NIP and the IBAN check digits — did run,
+and were right to find nothing. The only rule that fires is the heuristic whose whole content is *no
+rule could run*, and it fires on all 108. Its score decomposes the same way: `value` **100 %**
+against `recall` 22.8 % — nothing it said was wrong, and it barely said anything.
 
 **The gate accepts every one of them.** Coverage is measured over values a prediction asserted, so a
 reading that drops three quarters of the invoice routes 100 % to `accept` at 100 % accuracy with
@@ -139,8 +141,8 @@ difference between the two columns is the **page**, because nothing else moved.
 
 `pattern` did not read the page badly — it could not *begin*. Not one of the 108 documents produced
 an invoice the schema would accept, every one recorded as `schema_invalid`. Of the eleven fields its
-regexes fill on its own page it fills four here, and the only date it still recovers is on the third
-of the corpus whose dialect happens to print ISO. **The labels it matches were the whole of what it
+regexes fill on its own page it fills **three** here — four on the third of the corpus whose dialect
+happens to print ISO dates, which is the only place a date survives at all. **The labels it matches were the whole of what it
 was doing** — which is the bound this corpus exists to put on the strongest thing in the project
 that is not a language model.
 
@@ -156,8 +158,9 @@ which is what lets it attribute a drop to presentation and nothing else; real in
 skew, stamps, scans and layouts nobody anticipated, and none of that is here.
 
 A misread year — `2025-08-05` for `2026-08-05` — is the tenth injected error kind, and gives the
-date rules a recall too: on `noisy`, the heuristic half reads precision 100 %, recall 11.1 %, zero
-false positives. The recall is low by construction, because that half owns one of ten kinds, so each
+date rules a recall too: on `noisy`, the heuristic half reads precision 100 %, recall 5.6 %, zero
+false positives — and **100 % on the kind it actually owns**, on a support of 4 documents, which is
+the number to read the 100 % against. The recall is low by construction, because that half owns one of ten kinds, so each
 kind now declares which severity is meant to catch it and the table prints `not asked` rather than
 letting a zero read as a miss.
 

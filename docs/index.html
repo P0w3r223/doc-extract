@@ -249,8 +249,8 @@ internally consistent answer is invisible</strong>. The constant baseline sits a
 100&nbsp;% with recall 0&nbsp;%.</p>
 
 <h2>When the arithmetic has nothing to say</h2>
-<p>Every identity here needs two figures to compare. An answer that keeps the total and drops the
-rows and the rate blocks offers one &mdash; so the hard rules are not <em>wrong</em> about it, they
+<p>Every cross-field identity needs two figures to compare. An answer that keeps the total and drops
+the rows and the rate blocks offers one &mdash; so those rules are not <em>wrong</em> about it, they
 are <strong>unable to speak</strong>. The <code>stripped</code> baseline is exactly that reading, on
 all 108 documents.</p>
 <table><thead><tr><th></th><th class="num">prevalence</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
@@ -259,7 +259,10 @@ all 108 documents.</p>
     <tr><th>heuristic rules</th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
 </tbody></table>
 <p>The one rule that fires is the heuristic whose entire content is <em>no rule could run</em>, and
-it fires on every document, with 0 false positives. Those three
+it fires on every document, with 0 false positives. The fields
+this reading does keep are <em>missing</em> rather than wrong &mdash; which is why the two hard
+rules that need only a single figure, the NIP and the IBAN check digits, did run and were right to
+find nothing. Those three
 heuristic rules had never fired on any earlier run &mdash; a metric identical across every variant,
 which this project's own rules call broken rather than stable. Giving them a population was the fix;
 dropping them was the alternative.</p>
@@ -379,7 +382,7 @@ costs, and the gap will be reported whichever way it comes out.</p>
 answers in the same wire format and goes through the same prompt, parse, validation and repair
 loop, so a column is comparable down the table. The numbers are recomputed for this page from each
 run's committed <code>predictions.jsonl</code> &mdash; not copied from a report.</p>
-<table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">36</td><td class="num">99.3&nbsp;%</td><td class="num">98.2&nbsp;%</td><td class="num">97.5&nbsp;%</td></tr><tr><th><code>stripped</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">22.8&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">22.8&nbsp;%</td></tr><tr><th><code>claude-haiku-4-5</code></th><td>the page</td><td class="num">107 / 108</td><td class="num">65</td><td class="num">98.9&nbsp;%</td><td class="num">98.9&nbsp;%</td><td class="num">97.8&nbsp;%</td></tr><tr><th><code>claude-opus-5</code></th><td>the page</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr></tbody></table>
+<table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">36</td><td class="num">99.3&nbsp;%</td><td class="num">98.3&nbsp;%</td><td class="num">97.5&nbsp;%</td></tr><tr><th><code>stripped</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">22.8&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">22.8&nbsp;%</td></tr><tr><th><code>claude-haiku-4-5</code></th><td>the page</td><td class="num">107 / 108</td><td class="num">65</td><td class="num">98.9&nbsp;%</td><td class="num">98.9&nbsp;%</td><td class="num">97.8&nbsp;%</td></tr><tr><th><code>claude-opus-5</code></th><td>the page</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr></tbody></table>
 <p class="note"><strong>recall</strong> is how many of the values on the page the prediction offered
 a value for; <strong>value</strong> is how many of those it read correctly; <strong>accuracy</strong>
 is the two together. They are separate columns because a field that is half missed and a field that
@@ -464,7 +467,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from
-  <code>6338873</code> &middot; part of a
+  <code>d3d17df</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

@@ -9,7 +9,7 @@
 | corpus seed | 20260818 |
 | corpus built with | doc-extract 0.1.0, reportlab 5.0.0 |
 | budgets | extract 16000, repair 8192, at most 1 repair(s) |
-| started | 2026-08-19T11:32:41+00:00 |
+| started | 2026-08-20T08:22:23+00:00 |
 | rate | 0.1 |
 
 ## Summary
@@ -22,7 +22,7 @@
 | field instances | 6674 (support 6066, correctly absent 608) |
 | detection recall | 99.3 % |
 | detection precision | 100 % |
-| value accuracy | 98.2 % |
+| value accuracy | 98.3 % |
 | accuracy | 97.5 % |
 
 ## Per field
@@ -39,7 +39,7 @@
 | `seller.name` | 108 | 108 | 0 | 0 | 0 | 100 % | 100 % | 100 % | 100 % |
 | `seller.nip` | 108 | 94 | 14 | 0 | 0 | 100 % | 100 % | 87.0 % | 87.0 % |
 | `seller.address` | 108 | 108 | 0 | 0 | 0 | 100 % | 100 % | 100 % | 100 % |
-| `buyer.name` | 108 | 95 | 13 | 0 | 0 | 100 % | 100 % | 88.0 % | 88.0 % |
+| `buyer.name` | 108 | 97 | 11 | 0 | 0 | 100 % | 100 % | 89.8 % | 89.8 % |
 | `buyer.nip` | 108 | 108 | 0 | 0 | 0 | 100 % | 100 % | 100 % | 100 % |
 | `buyer.address` | 108 | 108 | 0 | 0 | 0 | 100 % | 100 % | 100 % | 100 % |
 | `lines[].description` | 698 | 691 | 0 | 7 | 0 | 99.0 % | 100 % | 100 % | 99.0 % |
@@ -58,7 +58,7 @@
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | `header` | 737 | 704 | 33 | 0 | 0 | 100 % | 100 % | 95.5 % | 95.5 % |
 | `seller` | 324 | 310 | 14 | 0 | 0 | 100 % | 100 % | 95.7 % | 95.7 % |
-| `buyer` | 324 | 311 | 13 | 0 | 0 | 100 % | 100 % | 96.0 % | 96.0 % |
+| `buyer` | 324 | 313 | 11 | 0 | 0 | 100 % | 100 % | 96.6 % | 96.6 % |
 | `lines` | 4297 | 4237 | 16 | 44 | 0 | 99.0 % | 100 % | 99.6 % | 98.6 % |
 | `rate_totals` | 384 | 353 | 31 | 0 | 0 | 100 % | 100 % | 91.9 % | 91.9 % |
 
@@ -66,13 +66,13 @@
 
 | tier | support | correct | wrong | missed | spurious | recall | precision | value acc. | accuracy |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `clean` | 366 | 339 | 14 | 13 | 0 | 96.4 % | 100 % | 96.0 % | 92.6 % |
+| `clean` | 366 | 340 | 13 | 13 | 0 | 96.4 % | 100 % | 96.3 % | 92.9 % |
 | `mixed_rates` | 628 | 613 | 15 | 0 | 0 | 100 % | 100 % | 97.6 % | 97.6 % |
 | `correction` | 354 | 346 | 8 | 0 | 0 | 100 % | 100 % | 97.7 % | 97.7 % |
 | `advance` | 274 | 262 | 12 | 0 | 0 | 100 % | 100 % | 95.6 % | 95.6 % |
 | `reverse_charge` | 394 | 380 | 7 | 7 | 0 | 98.2 % | 100 % | 98.2 % | 96.4 % |
 | `split_payment` | 468 | 444 | 12 | 12 | 0 | 97.4 % | 100 % | 97.4 % | 94.9 % |
-| `foreign_currency` | 473 | 455 | 18 | 0 | 0 | 100 % | 100 % | 96.2 % | 96.2 % |
+| `foreign_currency` | 473 | 456 | 17 | 0 | 0 | 100 % | 100 % | 96.4 % | 96.4 % |
 | `grosz_rounding` | 666 | 654 | 12 | 0 | 0 | 100 % | 100 % | 98.2 % | 98.2 % |
 | `multi_page` | 2443 | 2422 | 9 | 12 | 0 | 99.5 % | 100 % | 99.6 % | 99.1 % |
 
@@ -80,8 +80,8 @@
 
 | template | support | correct | wrong | missed | spurious | recall | precision | value acc. | accuracy |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `classic` | 1961 | 1899 | 38 | 24 | 0 | 98.8 % | 100 % | 98.0 % | 96.8 % |
-| `ledger` | 2068 | 2033 | 29 | 6 | 0 | 99.7 % | 100 % | 98.6 % | 98.3 % |
+| `classic` | 1961 | 1900 | 37 | 24 | 0 | 98.8 % | 100 % | 98.1 % | 96.9 % |
+| `ledger` | 2068 | 2034 | 28 | 6 | 0 | 99.7 % | 100 % | 98.6 % | 98.4 % |
 | `compact` | 2037 | 1983 | 40 | 14 | 0 | 99.3 % | 100 % | 98.0 % | 97.3 % |
 
 ## Failures and stop reasons
@@ -120,9 +120,9 @@ Over **every** attempt, including the ones that failed and were repaired.
 | `line_transposed` | 16 |
 | `nip_digit` | 14 |
 | `account_digit` | 13 |
-| `date_shifted` | 4 |
-| `year_misread` | 8 |
-| `name_truncated` | 13 |
+| `year_misread` | 4 |
+| `date_shifted` | 7 |
+| `name_truncated` | 11 |
 
 ## Read this before the tables
 

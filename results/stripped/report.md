@@ -9,7 +9,7 @@
 | corpus seed | 20260818 |
 | corpus built with | doc-extract 0.1.0, reportlab 5.0.0 |
 | budgets | extract 16000, repair 8192, at most 1 repair(s) |
-| started | 2026-08-19T11:33:10+00:00 |
+| started | 2026-08-20T08:15:29+00:00 |
 
 ## Summary
 
@@ -105,13 +105,6 @@ Over **every** attempt, including the ones that failed and were repaired.
 | output tokens | 0 |
 | cache write tokens | 0 |
 | cache read tokens | 0 |
-
-## Injected errors
-
-108 of 108 documents carry at least one known error.
-
-| kind | documents |
-|---|---:|
 
 ## Read this before the tables
 

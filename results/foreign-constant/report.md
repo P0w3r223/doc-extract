@@ -9,7 +9,7 @@
 | corpus seed | 20260818 |
 | corpus built with | doc-extract 0.1.0, reportlab 5.0.0 |
 | budgets | extract 16000, repair 8192, at most 1 repair(s) |
-| started | 2026-08-19T11:56:33+00:00 |
+| started | 2026-08-20T08:15:03+00:00 |
 
 ## Summary
 

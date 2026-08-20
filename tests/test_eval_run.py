@@ -183,8 +183,11 @@ def test_a_kind_the_other_severity_owns_is_labelled_rather_than_counted_as_a_mis
 
     assert hard["year_misread"].out_of_scope
     assert not hard["year_misread"].expected_invisible, "a rule does see it — just not a hard one"
-    assert hard["date_shifted"].expected_invisible
-    assert not hard["date_shifted"].out_of_scope, "nothing owns it, so nobody is off the hook"
+    #: `name_truncated` rather than `date_shifted` for the invisible half of the claim: the two are
+    #: the same declaration, and `date_shifted` is the kind that loses the sale-date collision at a
+    #: rate of one, so it has no row to read here.
+    assert hard["name_truncated"].expected_invisible
+    assert not hard["name_truncated"].out_of_scope, "nothing owns it, so nobody is off the hook"
     assert not hard["total_transposed"].out_of_scope
 
 

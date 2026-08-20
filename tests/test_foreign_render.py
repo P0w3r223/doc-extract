@@ -180,6 +180,47 @@ def test_the_kind_reaches_the_page_as_a_distinguishable_title(pages):
         assert expected in text, f"{tier}/{template} does not state that it is a {expected}"
 
 
+def test_every_label_a_dialect_declares_reaches_its_page(pages):
+    """The reverse direction of every other test here, and the one that was missing.
+
+    Everything else asserts that a *value* is printed. Nothing asserted that a **label** is, so
+    `_slip` interpolating its internal role names put the English words `seller` and `buyer` on a
+    third of the corpus while `Dostawca` and `Płatnik` reached no page at all — the opposite of what
+    the package is for, invisible to a green suite, and biased in the flattering direction: an
+    English role word is a stronger cue for an English-instructed model than an unfamiliar Polish
+    one. It also caught a dialect declaring a label for the invoice number and printing the number
+    without it.
+
+    Case-insensitive because `slip` prints its labels lowercased and trailing, the way a receipt
+    does. That is a style, not an absence: `dokument nr` is the label `Dokument nr`.
+    Over the union of the tiers rather than per page, because a label is only printed when its
+    field is: a correction's title reaches only a correction, and an account's label only an
+    invoice that states one. What may not happen is a label reaching **no** page at all.
+    """
+    corpus: dict[str, str] = {}
+    for (_, template), (_, _, text) in pages.items():
+        corpus[template] = corpus.get(template, "") + "\n" + text.casefold()
+
+    missing = [
+        f"{template}: {label!r}"
+        for template, folded in corpus.items()
+        for label in BY_NAME[template].labels()
+        if label.casefold() not in folded and not _wrapped_away(label, folded)
+    ]
+    assert not missing, sorted(missing)
+
+
+def _wrapped_away(label: str, folded: str) -> bool:
+    """Whether a multi-word label is on the page but broken across lines by its own column.
+
+    Table headers are `Paragraph`s and fold inside their column, so `Wartość netto` arrives as two
+    words on two lines. Every word being present is the most this can ask of a header without
+    demanding columns wide enough to hold labels no reader needs on one line.
+    """
+    words = label.split()
+    return len(words) > 1 and all(word.casefold() in folded for word in words)
+
+
 def test_the_item_tables_fit_the_pages_they_are_printed_on():
     """An over-wide table is drawn past the edge silently and the last column simply disappears."""
     for template, widths in render.COLUMNS.items():

@@ -238,6 +238,14 @@ def _sale_year_misread(invoice: Invoice, rng: random.Random) -> tuple[Invoice, I
 #: In a fixed order, so the same seed and the same rate give the same document every time. Two
 #: corruptions can fire on one document, which is realistic and is also why the order is fixed: a
 #: dropped line changes what a later corruption can pick.
+#:
+#: `year_misread` is placed **before** `date_shifted` deliberately. They are the one pair that
+#: writes the same field, so at most one can be recorded on a document, and the order decides which
+#: — the later one is discarded rather than allowed to falsify the earlier one's note. The heuristic
+#: half of the rule set owns exactly one kind and `year_misread` is it, while `date_shifted` is a
+#: control whose whole job is to be missed and whose population `name_truncated` already supplies.
+#: Losing a firing of the control costs a redundant zero; losing a firing of `year_misread` costs
+#: the only rate the heuristic half has.
 CORRUPTIONS: tuple[tuple[str, Corruption], ...] = (
     ("total_transposed", _total_transposed),
     ("vat_cent", _vat_off_by_a_cent),
@@ -246,8 +254,8 @@ CORRUPTIONS: tuple[tuple[str, Corruption], ...] = (
     ("line_transposed", _line_transposed),
     ("nip_digit", _nip_digit),
     ("account_digit", _account_digit),
-    ("date_shifted", _sale_date_shifted),
     ("year_misread", _sale_year_misread),
+    ("date_shifted", _sale_date_shifted),
     ("name_truncated", _buyer_name_truncated),
 )
 
@@ -293,7 +301,17 @@ def corrupt(
         applied = corruption(invoice, rng)
         if applied is None:
             continue
-        invoice, injection = applied
+        changed, injection = applied
+        if injection.field in {recorded.field for recorded in injections}:
+            #: A second corruption of a field an earlier one already recorded is dropped, because
+            #: the record would then be false: the earlier note's `after` is not what the document
+            #: says any more, and the prediction file would credit a rule's catch to a change the
+            #: document no longer carries. `year_misread` and `date_shifted` are the only pair this
+            #: can apply to, which is why the order above resolves it in the heuristic's favour.
+            #: Discarded *after* calling, so the RNG stream stays the one the ordering describes
+            #: and adding this guard changed no other document.
+            continue
+        invoice = changed
         injections.append(injection)
     return invoice, tuple(injections)
 

@@ -41,14 +41,16 @@ def documents(
 ) -> Iterator[Document]:
     """M2's documents, each reassigned to a foreign layout. Nothing else about them moves.
 
-    The reassignment is by position in the tier rather than by a hash of the document, so the same
-    tier rotates through the same layouts in both corpora and a paired comparison stays paired at
-    the level of the layout index as well as of the invoice.
+    The reassignment is by position **within the tier**, which is how `synth.corpus.documents`
+    rotates its own three, so the same tier meets the same layout index in both corpora and the
+    pairing holds at the level of the layout as well as of the invoice. Enumerating globally
+    coincides with that only while `per_tier` is a multiple of the number of layouts — true at the
+    shipping default and false at `--per-tier 5`, which the CLI accepts.
     """
     for index, document in enumerate(
         synth_corpus.documents(seed=seed, per_tier=per_tier, tiers=tiers)
     ):
-        yield _with_template(document, templates[index % len(templates)])
+        yield _with_template(document, templates[index % per_tier % len(templates)])
 
 
 def _with_template(document: Document, template: str) -> Document:

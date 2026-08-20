@@ -319,7 +319,9 @@ class KindRecall:
 
     kind: str
     #: The severity this row was computed at, so the row can say whether its own zero was expected.
-    severity: Severity = Severity.HARD
+    #: Required rather than defaulted: it decides `out_of_scope`, and a caller who omitted it would
+    #: silently get the hard reading of a heuristic table — a wrong label on a metric-bearing row.
+    severity: Severity
     isolated_documents: int = 0
     isolated_fired: int = 0
     marginal_documents: int = 0
