@@ -590,7 +590,6 @@ def foreign_section(rows: list[dict[str, object]] | None) -> str:
     """M7's paired comparison, rendered from `foreign_study` rather than from memory."""
     if not rows:  # pragma: no cover — a checkout without the foreign arms
         return ""
-    documents = rows[0]["documents"]
     body = "\n".join(
         f'    <tr><th><code>{html.escape(str(row["baseline"]))}</code></th>'
         f'<td class="num">{percent(row["own_accuracy"])}</td>'
@@ -606,9 +605,13 @@ def foreign_section(rows: list[dict[str, object]] | None) -> str:
             f"<code>{html.escape(name)}</code>"
             for row in failed for name in row["failures"]
         }))
+        #: The count comes from the failing rows themselves, not from the first row of the table.
+        #: Every arm scores the same corpus today, so reading it off the oracle's row happened to
+        #: print the right number — and would have gone on printing it after they diverged.
+        judged = " / ".join(sorted({str(row["documents"]) for row in failed}))
         note = (
             f"<p class=\"note\">{which} did not read the page badly &mdash; it could not "
-            f"<em>begin</em>. Not one of the {documents} documents produced an invoice the schema "
+            f"<em>begin</em>. Not one of the {judged} documents produced an invoice the schema "
             f"would accept, every one recorded as {classes}. The labels it matches are the whole "
             "of what it was doing.</p>"
         )
@@ -639,8 +642,8 @@ def stripped_section(study: dict[str, object] | None) -> str:
     if study is None:  # pragma: no cover — a checkout without that run
         return ""
     return f"""<h2>When the arithmetic has nothing to say</h2>
-<p>Every identity here needs two figures to compare. An answer that keeps the total and drops the
-rows and the rate blocks offers one &mdash; so the hard rules are not <em>wrong</em> about it, they
+<p>Every cross-field identity needs two figures to compare. An answer that keeps the total and drops
+the rows and the rate blocks offers one &mdash; so those rules are not <em>wrong</em> about it, they
 are <strong>unable to speak</strong>. The <code>stripped</code> baseline is exactly that reading, on
 all {study["judged"]} documents.</p>
 <table><thead><tr><th></th><th class="num">prevalence</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
@@ -649,7 +652,10 @@ all {study["judged"]} documents.</p>
     <tr><th>heuristic rules</th><td class="num">{percent(study["prevalence"])}</td><td class="num">{percent(study["heuristic_precision"])}</td><td class="num">{percent(study["heuristic_recall"])}</td></tr>
 </tbody></table>
 <p>The one rule that fires is the heuristic whose entire content is <em>no rule could run</em>, and
-it fires on every document, with {study["heuristic_false_positive"]} false positives. Those three
+it fires on every document, with {study["heuristic_false_positive"]} false positives. The fields
+this reading does keep are <em>missing</em> rather than wrong &mdash; which is why the two hard
+rules that need only a single figure, the NIP and the IBAN check digits, did run and were right to
+find nothing. Those three
 heuristic rules had never fired on any earlier run &mdash; a metric identical across every variant,
 which this project's own rules call broken rather than stable. Giving them a population was the fix;
 dropping them was the alternative.</p>

@@ -108,13 +108,6 @@ Over **every** attempt, including the ones that failed and were repaired.
 | cache write tokens | 0 |
 | cache read tokens | 0 |
 
-## Injected errors
-
-112 of 112 documents carry at least one known error.
-
-| kind | documents |
-|---|---:|
-
 ## Read this before the tables
 
 * This baseline saw **the page and the gold**.

@@ -38,6 +38,7 @@ DEFAULT_PER_TIER = 12
 MANIFEST_NAME = "manifest.jsonl"
 PROVENANCE_NAME = "manifest.meta.json"
 
+
 class Page(Protocol):
     """A rendered document: the bytes, and the one fact about them the manifest needs.
 

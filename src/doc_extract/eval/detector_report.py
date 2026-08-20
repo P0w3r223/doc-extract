@@ -138,7 +138,20 @@ def _caveats(study: Study) -> str:
             f"{counts.judged} correctly-read documents were flagged — a gate that does not block "
             "correct work. It says nothing about whether the gate catches incorrect work."
         )
-    elif counts.recall == 0:
+    elif counts.judged and counts.prevalence == 1:
+        lines.append(
+            f"* **Every one of the {counts.judged} judged documents was wrong, so a false positive "
+            "was impossible.** Precision"
+            + (f" prints {_rate(counts.precision)}, and it" if counts.precision is not None else "")
+            + " has no adversary here and cannot be read as one: a rule that fired on *every* "
+            "document would print the same figure. Specificity, whose denominator is the correct "
+            "documents, prints a dash for the same reason. **The rate this arm establishes is the "
+            "recall.** It is the mirror of a run with nothing wrong in it, where the recall is the "
+            "undefined one — and it is the more flattering of the two, which is why it is printed "
+            "rather than left to be noticed."
+        )
+
+    if counts.recall == 0 and counts.prevalence:
         lines.append(
             "* **The detector caught nothing.** Every wrong document passed. A prediction can be "
             "internally consistent and still be wrong everywhere, and arithmetic cannot see the "

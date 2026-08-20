@@ -61,9 +61,9 @@ The last column says whether a zero was expected. **`not asked` is not a miss**:
 | `line_transposed` | 100 % | 5 | 100 % | 16 |  |
 | `nip_digit` | 100 % | 8 | 100 % | 14 |  |
 | `account_digit` | 100 % | 6 | 100 % | 13 |  |
-| `date_shifted` | 0.0 % | 2 | 50.0 % | 4 | declared invisible |
-| `year_misread` | 0.0 % | 3 | 37.5 % | 8 | not asked |
-| `name_truncated` | 0.0 % | 5 | 46.2 % | 13 | declared invisible |
+| `year_misread` | 0.0 % | 2 | 50.0 % | 4 | not asked |
+| `date_shifted` | 0.0 % | 5 | 28.6 % | 7 | declared invisible |
+| `name_truncated` | 0.0 % | 5 | 54.5 % | 11 | declared invisible |
 
 ## Read this before the tables
 
@@ -92,17 +92,17 @@ The detector is `invariants.check` run on the **prediction**, never on the gold:
 
 | | flagged | silent |
 |---|---:|---:|
-| **fields wrong** | 8 | 64 |
+| **fields wrong** | 4 | 68 |
 | **fields right** | 0 | 36 |
 
 | | |
 |---|---:|
 | prevalence | 66.7 % |
 | precision | 100 % |
-| recall | 11.1 % |
-| F1 | 20.0 % |
+| recall | 5.6 % |
+| F1 | 10.5 % |
 | specificity | 100 % |
-| localisation | 100 % (8 / 8) |
+| localisation | 100 % (4 / 4) |
 
 ## Per rule
 
@@ -110,7 +110,7 @@ Precision only. A rule's recall is not a quantity this study can report: a docum
 
 | rule | fired on | of which wrong | precision |
 |---|---:|---:|---:|
-| `dates.issue_follows_sale` | 6 | 6 | 100 % |
+| `dates.issue_follows_sale` | 2 | 2 | 100 % |
 | `dates.issue_near_sale` | 2 | 2 | 100 % |
 
 ## Per injected error kind
@@ -125,12 +125,12 @@ The last column says whether a zero was expected. **`not asked` is not a miss**:
 | `vat_cent` | 0.0 % | 9 | 6.7 % | 15 | not asked |
 | `rate_swapped` | 0.0 % | 2 | 0.0 % | 8 | not asked |
 | `line_dropped` | 0.0 % | 2 | 0.0 % | 7 | not asked |
-| `line_transposed` | 0.0 % | 5 | 12.5 % | 16 | not asked |
+| `line_transposed` | 0.0 % | 5 | 6.2 % | 16 | not asked |
 | `nip_digit` | 0.0 % | 8 | 0.0 % | 14 | not asked |
 | `account_digit` | 0.0 % | 6 | 0.0 % | 13 | not asked |
-| `date_shifted` | 0.0 % | 2 | 25.0 % | 4 | declared invisible |
-| `year_misread` | 100 % | 3 | 100 % | 8 |  |
-| `name_truncated` | 0.0 % | 5 | 15.4 % | 13 | declared invisible |
+| `year_misread` | 100 % | 2 | 100 % | 4 |  |
+| `date_shifted` | 0.0 % | 5 | 0.0 % | 7 | declared invisible |
+| `name_truncated` | 0.0 % | 5 | 9.1 % | 11 | declared invisible |
 
 ## Read this before the tables
 

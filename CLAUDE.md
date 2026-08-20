@@ -348,9 +348,10 @@ the **page**, because nothing else moved.
 | `constant` | 3.0 % | 3.0 % | 108 / 108 |
 | `pattern` | **86.3 %** | **0.0 %** | **0 / 108** |
 
-`pattern` did not read badly — it could not *begin*: 108 of 108 `schema_invalid`. It fills four of
-the eleven wire fields it fills on its own page, and the one date it still recovers is on the third
-of the corpus whose dialect prints ISO. The labels it matches were the whole of what it was doing.
+`pattern` did not read badly — it could not *begin*: 108 of 108 `schema_invalid`. It fills three of
+the eleven wire fields it fills on its own page — four on the `statement` third, whose dialect
+prints ISO dates and is the only place a date survives. The labels it matches were the whole of what
+it was doing.
 
 Three things make that number trustworthy rather than merely dramatic, and each is a test:
 
@@ -379,8 +380,10 @@ instead of dropping them. Two arms, because the three rules divide into two clai
 - **`year_misread`** — a tenth kind in `eval/corrupt.py`, the sale date's year off by one. It is
   written to what `dates.issue_near_sale` already described in prose (`2025-08-05` for `2026-08-05`)
   rather than to its code, so a rule that stopped matching its own docstring would show up as a
-  recall of zero. On `noisy`: the heuristic half now reads **precision 100 %, recall 11.1 %, zero
-  false positives**. The recall is low *by construction* — the heuristic half owns one of the ten
+  recall of zero. On `noisy`: the heuristic half now reads **precision 100 %, recall 5.6 %, zero
+  false positives**, and **100 % recall on `year_misread`** — the one kind it owns, on a support of
+  4 documents (2 of them isolated), which is the figure the 100 % has to be read against. The
+  support is thin because only a document that prints a sale date can carry the kind at all. The recall is low *by construction* — the heuristic half owns one of the ten
   injected kinds — which is why `corrupt.CAUGHT_BY` now states per kind which severity is expected
   to catch it, and the per-kind table prints `not asked` rather than leaving a zero to read as a
   miss. A test asserts that mapping against the rule set instead of trusting it.
@@ -393,9 +396,12 @@ instead of dropping them. Two arms, because the three rules divide into two clai
 | hard rules | 100 % | — (nothing fired) | **0 %** |
 | heuristic rules | 100 % | 100 % | **100 %** |
 
-  Every hard rule needs two figures to compare, and an answer with only the total gives them one. So
-  the arithmetic is **completely silent on 108 documents that are wrong in 77 % of their fields**,
-  and the one rule that can speak is the heuristic whose entire content is *no rule could run*.
+  Every *cross-field* rule needs two figures to compare, and an answer with only the total gives
+  them one. So the arithmetic is **silent on 108 documents missing 77 % of their fields**, and the
+  one rule that can speak is the heuristic whose entire content is *no rule could run*. The two hard
+  rules that need a single figure — `identifiers.nip_checksum` and `identifiers.iban_checksum` — did
+  run, and correctly found nothing: the header this answer keeps is copied intact. *Missing* rather
+  than *wrong* is the point, and it is why `value accuracy` is 100 % beside a recall of 22.8 %.
   Its `accuracy` of 22.8 % decomposes into `recall` 22.8 % and `value` **100 %** — the shape that
   names the failure: nothing it said was wrong, and it barely said anything.
 
@@ -502,7 +508,7 @@ Hence the second remote arm: a weaker model on the same corpus buys a real error
 changing the corpus and invalidating every committed run. **M7's real held-out set remains
 load-bearing** — it is the only place the question gets asked on documents nobody generated.
 
-600 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+602 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

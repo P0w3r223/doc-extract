@@ -164,9 +164,13 @@ def _statement(document: Document, speaker: Dialect) -> list[Flowable]:
     """The amount payable first, then what it is made of — the reverse of every other layout."""
     invoice = document.invoice
     return [
+        Paragraph(_title(invoice, speaker), _style("st_title", size=13, font=BOLD)),
+        #: The number carries its own label rather than sitting after an em dash. It used to sit
+        #: after one, which left a third of the corpus with an unlabelled invoice number while the
+        #: dialect declared a label for it — a field harder to find than any real invoice makes it.
         Paragraph(
-            f"{_title(invoice, speaker)} &mdash; {escape(invoice.number)}",
-            _style("st_title", size=13, font=BOLD),
+            f"{escape(speaker.number)} <b>{escape(invoice.number)}</b>",
+            _style("st_no", size=10),
         ),
         Spacer(1, 3 * mm),
         *_payment(document, speaker),
@@ -199,7 +203,7 @@ def _slip(document: Document, speaker: Dialect) -> list[Flowable]:
     for role, party, company in _parties(document):
         story.append(Paragraph(
             f"{_party_text(party.name, party.nip, company, speaker)}<br/>"
-            f"<i>{escape(role)}</i>",
+            f"<i>{escape(_role_label(speaker, role))}</i>",
             _style(f"sl_p{role}", size=9),
         ))
         story.append(Spacer(1, 2 * mm))
@@ -249,10 +253,23 @@ def _header_lines(document: Document, speaker: Dialect, *, align) -> Flowable:
 
 
 def _parties(document: Document) -> list[tuple[str, object, object]]:
+    """The two parties under their **internal** role names, which never reach a page.
+
+    `_role_label` is the one place a role becomes something printable. Interpolating the role
+    itself put the English words `seller` and `buyer` on a third of the corpus — labels no Polish
+    invoice carries, and a stronger cue for an English-instructed model than the unfamiliar Polish
+    ones this package exists to print. The corpus was easiest exactly where it claimed to be
+    hardest, and a green test suite could not see it, because nothing asserted the reverse
+    direction: that every label a dialect *declares* is a label its page actually carries.
+    """
     return [
         ("seller", document.invoice.seller, document.context.seller),
         ("buyer", document.invoice.buyer, document.context.buyer),
     ]
+
+
+def _role_label(speaker: Dialect, role: str) -> str:
+    return speaker.seller if role == "seller" else speaker.buyer
 
 
 def _party_boxes(document: Document, speaker: Dialect) -> Flowable:
@@ -286,7 +303,7 @@ def _party_rows(document: Document, speaker: Dialect) -> Flowable:
     rows = [
         [Paragraph(_party_text(party.name, party.nip, company, speaker),
                    _style(f"st_p{role}", size=9)),
-         Paragraph(f"<i>{escape(speaker.seller if role == 'seller' else speaker.buyer)}</i>",
+         Paragraph(f"<i>{escape(_role_label(speaker, role))}</i>",
                    _style(f"st_l{role}", size=9, align=TA_RIGHT))]
         for role, party, company in _parties(document)
     ]

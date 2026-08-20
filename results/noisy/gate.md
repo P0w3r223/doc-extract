@@ -6,7 +6,7 @@
 | answered by | `noisy` |
 | saw | the gold |
 | values asserted | 5849 |
-| of which wrong | 107 |
+| of which wrong | 105 |
 | gold values never asserted | 44 |
 | asserted but not assessable | 781 |
 | documents with no invoice | 0 |
@@ -17,9 +17,9 @@ Field-level detectors of a wrong asserted value. They are complements with very 
 
 | signal | TP | FP | FN | TN | precision | recall |
 |---|---:|---:|---:|---:|---:|---:|
-| `grounding` | 78 | 0 | 29 | 5742 | 100 % | 72.9 % |
-| `arithmetic` | 83 | 2086 | 24 | 3656 | 3.8 % | 77.6 % |
-| `either` | 94 | 2086 | 13 | 3656 | 4.3 % | 87.9 % |
+| `grounding` | 77 | 0 | 28 | 5744 | 100 % | 73.3 % |
+| `arithmetic` | 83 | 2086 | 22 | 3658 | 3.8 % | 79.0 % |
+| `either` | 93 | 2086 | 12 | 3658 | 4.3 % | 88.6 % |
 
 ## Coverage and accuracy
 
@@ -27,10 +27,10 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 
 | accept down to | route | coverage | accuracy | accepted | leaked |
 |---|---|---:|---:|---:|---:|
-| `high` | `accept` | 62.7 % | 99.6 % | 3669 | 13 |
-| `medium` | `review` | 98.7 % | 99.5 % | 5771 | 29 |
-| `low` | `review` | 98.7 % | 99.5 % | 5771 | 29 |
-| `none` | `reject` | 100 % | 98.2 % | 5849 | 107 |
+| `high` | `accept` | 62.7 % | 99.7 % | 3670 | 12 |
+| `medium` | `review` | 98.7 % | 99.5 % | 5772 | 28 |
+| `low` | `review` | 98.7 % | 99.5 % | 5772 | 28 |
+| `none` | `reject` | 100 % | 98.2 % | 5849 | 105 |
 
 ## Read this before the tables
 

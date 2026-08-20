@@ -40,9 +40,27 @@ def test_a_rate_of_zero_is_the_oracle(invoice):
     assert injections == ()
 
 
-def test_a_rate_of_one_fires_everything_it_can(invoice):
+def test_a_rate_of_one_fires_every_kind_that_can_still_be_recorded_truthfully(invoice):
+    """Ten kinds, nine records: `year_misread` and `date_shifted` write the same field.
+
+    Only the first of the pair can be recorded honestly — the second's note would name a `before`
+    the document no longer carries, and the prediction file would then attribute a rule's catch to
+    a change that is not in it. So the contract is not "ten fired" but "one injection per field",
+    and this says which pair that costs and which way the order resolves it.
+    """
     _, injections = corrupt.corrupt(invoice, random.Random(1), rate=ALWAYS)
-    assert {injection.kind for injection in injections} == set(corrupt.KINDS)
+    fired = {injection.kind for injection in injections}
+
+    assert fired == set(corrupt.KINDS) - {"date_shifted"}
+    assert "year_misread" in fired, "the heuristic half's only kind must not lose the collision"
+
+
+def test_no_two_injections_on_one_document_claim_the_same_field(invoice):
+    """The guard's actual contract, asserted where a new colliding kind would trip it."""
+    _, injections = corrupt.corrupt(invoice, random.Random(1), rate=ALWAYS)
+    fields = [injection.field for injection in injections]
+
+    assert len(fields) == len(set(fields)), fields
 
 
 def test_every_corruption_still_produces_a_lawful_invoice(invoice):

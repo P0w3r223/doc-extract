@@ -156,15 +156,21 @@ def _cost(report: Report) -> str:
 
 
 def _injected(predictions: Sequence[Prediction]) -> str:
-    """What the noisy oracle broke, by kind. Empty for every baseline that only reads."""
+    """What the noisy oracle broke, by kind. Empty for every baseline that only reads.
+
+    A note whose first token is not a known kind is not an injected error. `stripped` records what
+    it removed the same way, and counting those as errors printed *"108 of 108 documents carry at
+    least one known error"* above a table with no rows in it. `detector.kinds` already takes this
+    position — an unrecognised token is dropped rather than guessed at — and the two modules read
+    the same notes, so they cannot be allowed to disagree about what one means.
+    """
     counts = {kind: 0 for kind in KINDS}
     documents = 0
     for prediction in predictions:
-        kinds = {note.split(" ", 1)[0] for note in prediction.notes}
+        kinds = {note.split(" ", 1)[0] for note in prediction.notes} & set(KINDS)
         documents += bool(kinds)
         for kind in kinds:
-            if kind in counts:
-                counts[kind] += 1
+            counts[kind] += 1
     if not documents:
         return ""
     return "\n".join([
