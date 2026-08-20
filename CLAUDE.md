@@ -568,6 +568,13 @@ anti-selective, and *`grounding` returning `UNGROUNDED` where it means "there wa
 in" is the reason* — `decide/` cannot tell those two apart, and separating them is the first thing
 to build next.
 
+**Until it is, the gate report says so about itself.** `selective.Curve.without_text` counts the
+assessed values sitting on a page with no text layer, and `selective_report` prints the share above
+its tables when it is non-zero: **69.2 % here, and 67.7 % on M7c's clean scanned corpus**, whose
+`gate.md` had previously reported a coverage figure without mentioning that two thirds of its
+denominator had nothing to resolve against. Counting it does not fix the signal; it stops a curve
+from reading as a property of the reader when most of it is a property of the page.
+
 ## The heuristic half, and what it took to measure it
 
 Through M6 the three `HEURISTIC` rules had fired **zero times on every run**, reported as `—`/0 %
@@ -716,7 +723,7 @@ different matter and is the one M7 could not put a model against: the foreign co
 yet. **A real held-out set remains load-bearing** — it is the only place the question gets asked on
 documents nobody generated.
 
-718 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+727 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

@@ -173,7 +173,7 @@ def generate(
         entries.append(synth_corpus.write_document(
             replace(document, template=rung.name), out_dir, draw=_already(scan),
         ))
-        reach = _reach(document, rung, assignment, printed=printed, scan=scan, clean=clean)
+        reach = _reach(document, rung, assignment, scan=scan, clean=clean)
         assignments.append(assignment)
         reaches.append(reach)
         if progress is not None:
@@ -206,18 +206,23 @@ class _CleanPages:
     """The unattacked page each attacked one is compared against, rendered and damaged once.
 
     A base document meets seven payloads at three rungs, and the picture it makes without any of
-    them is the same picture every time. Caching it is the difference between 168 rasterisations
-    and 336 of them, and it changes no result: the key is the document and the rung, which is
-    everything `damaged` depends on.
+    them is the same picture every time — so at the default sizes this is 24 rasterisations rather
+    than 168.
+
+    **The key is the base document, not the attacked one.** `plan` has already rewritten `doc_id` to
+    `{payload}-{placement}-{slot}-{rung}`, which is unique per row, so keying on the document that
+    arrives here would give every row its own entry and the cache would never return a hit. Nothing
+    the clean page depends on — the invoice, the context, the layout, the seed — differs between two
+    attacked documents built from one base, and the renderer never reads `doc_id`.
     """
 
     def __init__(self) -> None:
         self._pages: dict[tuple[str, str], tuple[bytes, ...]] = {}
 
-    def of(self, document: Document, rung: Rung) -> tuple[bytes, ...]:
-        key = (document.doc_id, rung.name)
+    def of(self, document: Document, rung: Rung, *, base_doc_id: str) -> tuple[bytes, ...]:
+        key = (base_doc_id, rung.name)
         if key not in self._pages:
-            unattacked = replace(document, overlay=None)
+            unattacked = replace(document, doc_id=base_doc_id, overlay=None)
             self._pages[key] = scanner.damaged(
                 synth_render.render(unattacked).data, rung, seed=document.seed
             )
@@ -229,7 +234,6 @@ def _reach(
     rung: Rung,
     assignment: Assignment,
     *,
-    printed: bytes,
     scan: scanner.Scan,
     clean: _CleanPages,
 ) -> Reach:
@@ -238,7 +242,10 @@ def _reach(
     The text channel is read off the scanned document, because that is the file a reader is handed.
     The image channel compares the attacked page with the unattacked one **through the same
     scanner** — same resolution, same skew, same seeded grain, same quantiser — so the only thing
-    that can differ between them is the overlay.
+    that can differ between them is the overlay. The attacked side is the images `scan` already
+    produced rather than a second rasterisation of the same page: recomputing them would be the
+    same bytes at twice the cost, and it would put a second definition of "what the scanner leaves"
+    beside the one that was written to disk.
     """
     return Reach(
         doc_id=assignment.doc_id,
@@ -249,7 +256,7 @@ def _reach(
             _squeezed(assignment.marker) in _squeezed(source_document.read(scan.data).text)
         ),
         on_the_image=(
-            scanner.damaged(printed, rung, seed=document.seed) != clean.of(document, rung)
+            scan.images != clean.of(document, rung, base_doc_id=assignment.base_doc_id)
         ),
     )
 

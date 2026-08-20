@@ -14,7 +14,9 @@ from decimal import Decimal
 import pytest
 
 from doc_extract.decide.confidence import Confidence, Route, assess, route
+from doc_extract.eval import selective_report
 from doc_extract.eval.format import DASH, rate
+from doc_extract.eval.predictions import RunMeta
 from doc_extract.eval.selective import Judged, summarise
 from doc_extract.source import document as source_document
 from doc_extract.source.layout import Cell, Line
@@ -152,6 +154,31 @@ def test_values_the_model_never_asserted_stay_out_of_the_curve():
     assert curve.missed == 40
     assert curve.without_prediction == 2
     assert curve.points[0].total == 1, "the denominator is what was asserted"
+
+
+def test_a_curve_computed_on_pages_with_no_text_says_so_above_its_tables():
+    """The limit M7e made concrete: grounding cannot tell *absent from the page* from *no page*.
+
+    Reported rather than corrected — correcting it means teaching `ground/` a third verdict — and
+    reported only when it applies, so a corpus of ordinary pages does not carry the sentence.
+    """
+    rows = _rows((Confidence.HIGH, False), (Confidence.NONE, True))
+    curve = summarise(rows, missed=0, without_prediction=0, without_text=1)
+
+    body = selective_report.render(curve, run=_meta(), directory="results/x")
+    assert "1 of the 2 assessed value(s)" in body
+    assert "no text layer at all" in body
+
+    silent = summarise(rows, missed=0, without_prediction=0)
+    assert silent.without_text == 0
+    assert "no text layer at all" not in selective_report.render(silent, run=_meta())
+
+
+def _meta() -> RunMeta:
+    return RunMeta(
+        baseline="gullible", model="gullible", corpus_dir="data/attacked-scanned",
+        documents=2, max_tokens=8192, repair_max_tokens=4096, max_repairs=1,
+    )
 
 
 def test_each_signal_is_scored_on_its_own():

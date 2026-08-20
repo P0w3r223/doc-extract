@@ -114,6 +114,12 @@ class Curve:
     unassessable: int
     #: Documents that produced no invoice at all, so no field of them was ever assessed.
     without_prediction: int
+    #: Values judged on a page that carries **no text at all**, where grounding had nothing to
+    #: resolve against and returned `UNGROUNDED` for every one of them. Counted separately because
+    #: the curve cannot tell that apart from a value the page genuinely does not carry: both arrive
+    #: as the same verdict, and on a corpus of scans the second reading is the wrong one. A gate
+    #: whose headline number is computed mostly over these is measuring the absence of a text layer.
+    without_text: int = 0
 
     @property
     def asserted(self) -> int:
@@ -197,6 +203,7 @@ def summarise(
     missed: int,
     unassessable: int = 0,
     without_prediction: int,
+    without_text: int = 0,
 ) -> Curve:
     """Rows into a curve and two signal scorecards. Pure: it never re-reads a page."""
     rows = tuple(judged)
@@ -211,6 +218,7 @@ def summarise(
         missed=missed,
         unassessable=unassessable,
         without_prediction=without_prediction,
+        without_text=without_text,
     )
 
 

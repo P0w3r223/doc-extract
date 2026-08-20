@@ -65,6 +65,11 @@ class Scan:
 
     data: bytes
     pages: int
+    #: The encoded page images that went into it, in page order. Carried rather than recomputed
+    #: because `degrade/attacked.py` needs exactly these bytes to ask whether an overlay left a
+    #: mark, and rasterising the same page a second time to get them back is the expensive half of
+    #: that build. Not part of the `Page` protocol, which wants only `data` and `pages`.
+    images: tuple[bytes, ...] = ()
 
 
 def render(document: Document, rung: Rung) -> Scan:
@@ -92,7 +97,7 @@ def scan(data: bytes, rung: Rung, *, seed: int) -> Scan:
             _draw_text_layer(canvas, here, height=size[1])
         canvas.showPage()
     canvas.save()
-    return Scan(data=sink.getvalue(), pages=len(images))
+    return Scan(data=sink.getvalue(), pages=len(images), images=images)
 
 
 def damaged(data: bytes, rung: Rung, *, seed: int) -> tuple[bytes, ...]:

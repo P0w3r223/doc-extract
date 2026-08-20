@@ -19,6 +19,7 @@ import pytest
 
 from doc_extract.attack.payloads import BY_NAME, PAYLOADS, Payload
 from doc_extract.attack.suite import SuiteError
+from doc_extract.degrade import __main__ as degrade_cli
 from doc_extract.degrade import attacked
 from doc_extract.degrade.rungs import BY_NAME as RUNGS
 from doc_extract.degrade.rungs import RUNGS as ALL_RUNGS
@@ -162,6 +163,29 @@ def test_a_payload_that_never_reached_the_printed_page_is_a_build_failure(tmp_pa
         )
 
 
+def test_the_clean_page_is_rasterised_once_per_base_document_and_rung() -> None:
+    """The cache keys on the base document, because `plan` made every `doc_id` unique.
+
+    Keying on the document that arrives at `_CleanPages.of` gave one entry per row and therefore no
+    hits at all, while the docstring claimed a saving — so this asserts the count rather than the
+    comment. It is also a correctness claim in disguise: a hit is only sound because two attacked
+    documents from one base render the same unattacked page.
+    """
+    base = _base()
+    planned = attacked.plan(per_cell=1, placements=(FOOTER,), base=base)
+    clean = attacked._CleanPages()
+
+    pages = [
+        clean.of(document, rung, base_doc_id=assignment.base_doc_id)
+        for document, rung, assignment in planned
+    ]
+    bases = {assignment.base_doc_id for _, _, assignment in planned}
+
+    assert len(clean._pages) == len(bases) * len(ALL_RUNGS)
+    assert len(pages) == len(planned) > len(clean._pages)
+    assert all(page for page in pages), "a cached entry must still be a rendered page"
+
+
 def test_the_reach_file_round_trips(built) -> None:
     directory, reaches = built
     assert attacked.load_reaches(directory) == reaches
@@ -179,6 +203,24 @@ def test_a_scanned_attacked_corpus_is_an_ordinary_corpus(built) -> None:
 
     assert corpus.doc_ids == tuple(row.doc_id for row in reaches)
     assert all(case.gold() is not None for case in corpus.cases)
+
+
+@pytest.mark.parametrize("argv,expected", [
+    (["--attacked", "--tier", "clean"], "--tier"),
+    (["--payload", "refusal"], "--payload"),
+    (["--placement", FOOTER], "--placement"),
+    (["--no-verify"], "--no-verify"),
+    (["--per-cell", "3"], "--per-cell"),
+])
+def test_a_flag_the_command_cannot_honour_is_refused_rather_than_dropped(
+    argv, expected, tmp_path, capsys
+) -> None:
+    """Both directions, because a silently dropped flag builds a corpus the caller misdescribes."""
+    assert degrade_cli.main([*argv, "--out", str(tmp_path)]) == 2
+
+    printed = capsys.readouterr().out
+    assert expected in printed and "does not apply" in printed
+    assert not list(tmp_path.iterdir()), "nothing should have been written"
 
 
 def test_the_manifest_says_the_rung_and_the_provenance_remembers_the_layout(built) -> None:

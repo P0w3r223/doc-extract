@@ -26,6 +26,9 @@ IMAGE_ONLY = "image only"
 TEXT_ONLY = "text only"
 NOBODY = "**nobody**"
 
+#: A cell whose documents do not agree. Reported rather than resolved — see `channel`.
+MIXED = "mixed"
+
 
 def render(reaches: Sequence[Reach]) -> str:
     """The reach table and the sentences that say what it does to the rates below it."""
@@ -55,26 +58,35 @@ def render(reaches: Sequence[Reach]) -> str:
         "|---|" + "---|" * len(rungs),
         *(
             f"| `{placement}` | "
-            + " | ".join(_cell(cells[(placement, rung)]) for rung in rungs)
+            + " | ".join(channel(cells[(placement, rung)]) for rung in rungs)
             + " |"
             for placement in placements
         ),
     ])
 
 
-def _cell(rows: Sequence[Reach]) -> str:
-    """One cell. Mixed answers within a cell are printed as a count rather than averaged away."""
+def channel(rows: Sequence[Reach]) -> str:
+    """What a group of rows says about the channel its payload came through.
+
+    The one place the classification lives. `docs/build_index.py` renders the same table on the
+    site and calls this rather than re-deriving it: a second implementation of a rule is the
+    failure a page of derived figures is most exposed to, and this project has caught one before.
+
+    Mixed answers are reported as mixed rather than resolved. A cell whose documents disagree is
+    telling you the placement is not the only thing deciding, and averaging it into a third value
+    would hide that.
+    """
     if not rows:
         return DASH
     channels = {(row.in_text_layer, row.on_the_image) for row in rows}
     if len(channels) > 1:  # pragma: no cover — a placement behaves the same on every document
-        return f"mixed ({len(rows)})"
+        return f"{MIXED} ({len(rows)})"
     in_text, on_image = channels.pop()
     if in_text and on_image:
         return BOTH
     if on_image:
         return IMAGE_ONLY
-    if in_text:  # pragma: no cover — no rung keeps text of ink that left no mark
+    if in_text:
         return TEXT_ONLY
     return NOBODY
 
@@ -91,14 +103,25 @@ def _findings(reaches: Sequence[Reach], *, rungs: Sequence[str]) -> list[str]:
             f"* **No payload reached the text layer on {_names(blind)}.** Nothing did: the page "
             "carries no text at all. Every attack success rate below for those rungs is therefore "
             "a measurement of a reader that could not read the document, and it is **not** "
-            "evidence of a defence. A model that looks at the page sees the payload exactly as "
-            "the `image` column says it does."
+            "evidence of a defence. Whatever the `image` column marks is still on the page as ink "
+            "at those rungs — whether a model reading pixels recovers it at 150 dpi through blur "
+            "and JPEG is a different question, and the arm that would answer it has not been run."
         )
-    erased = _ordered(
-        row.placement for row in reaches
-        if row.reaches_nobody
+    #: Every row of the placement, not any of them. A placement erased at one rung and surviving at
+    #: another belongs in neither list, and a version keyed on `any` would name it in both halves
+    #: of the same sentence.
+    by_placement = {
+        placement: [row for row in reaches if row.placement == placement]
+        for placement in _ordered(row.placement for row in reaches)
+    }
+    erased = tuple(
+        placement for placement, rows in by_placement.items()
+        if all(row.reaches_nobody for row in rows)
     )
-    kept = _ordered(row.placement for row in reaches if not row.reaches_nobody)
+    kept = tuple(
+        placement for placement, rows in by_placement.items()
+        if not any(row.reaches_nobody for row in rows)
+    )
     if erased:
         lines.append(
             f"* **The scanner erases {_names(erased)} outright**, at every rung, while ink "

@@ -37,7 +37,7 @@
 
 ## Per placement
 
-Where on the page the same sentences were printed. `invisible` is white ink: absent to a human approving the invoice, present in the text layer the extractor reads.
+Where on the page the same sentences were printed. `invisible` is white ink — absent to a human approving the invoice, and present in the text layer the extractor reads **on a page nobody photographed**. Whether it still is on this corpus is what the reach table says, and it is not a property of the placement.
 
 `unchanged` is **not comparable across placements**. The `description` placement prints the payload inside an item's own description cell, and that description is a scored field — so wherever the payload reaches the reader, one that transcribes the cell perfectly still differs from the gold there, by definition rather than by behaviour. The other three write where nothing is scored. On a corpus where the payload reaches the reader on some documents and not others, this row mixes the two and the reach table above is what separates them.
 

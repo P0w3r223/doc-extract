@@ -107,6 +107,17 @@ def _caveats(curve: Curve) -> str:
             f"* {curve.without_prediction} document(s) produced no invoice, so none of their "
             "fields was assessed. The pipeline had already refused them."
         )
+    if curve.without_text:
+        share = curve.without_text / curve.asserted if curve.asserted else None
+        lines.append(
+            f"* **{curve.without_text} of the {curve.asserted} assessed value(s) "
+            f"({_rate(share)}) sit on a page with no text layer at all.** Grounding resolves a "
+            "value against page text and there is none, so it returns `UNGROUNDED` for every one "
+            "of them — correct or not. Nothing here distinguishes *this value is not on the page* "
+            "from *there was no page to look in*, which means the coverage figure above is partly "
+            "a measurement of the missing text layer rather than of the reader. Read the accuracy "
+            "at `none` — accepting everything — as the comparison that is not affected by it."
+        )
     if curve.wrong == 0:
         lines.append(
             "* **Nothing asserted was wrong**, so the gate had nothing to catch. Accuracy is 100 % "
