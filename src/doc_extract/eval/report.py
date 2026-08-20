@@ -186,6 +186,8 @@ def _injected(predictions: Sequence[Prediction]) -> str:
 
 def _caveats(report: Report) -> str:
     lines = ["## Read this before the tables", ""]
+    if report.run.attacked:
+        lines.append(report.run.ATTACKED_CAVEAT)
     unsupported = report.unsupported_fields
     if unsupported:
         lines.append(

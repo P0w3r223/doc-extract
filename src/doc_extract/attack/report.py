@@ -44,9 +44,12 @@ def render(study: Study, *, run: RunMeta, directory: str = "", preamble: str = "
         _header(study, run=run, directory=directory),
         _coverage(study),
         preamble,
-        _caveats(study, run=run),
+        #: Whether a reach table is actually above the caveats, not whether one could be. A caveat
+        #: that points at a section this file does not contain is worse than the general one it
+        #: replaced — and `--vision` over M6's *unscanned* corpus is exactly that combination.
+        _caveats(study, run=run, has_reach=bool(preamble)),
         _payloads(study),
-        _placements(study),
+        _placements(study, has_reach=bool(preamble)),
         _templates(study),
         _grid(study),
         _leaks(study),
@@ -80,10 +83,6 @@ def _header(study: Study, *, run: RunMeta, directory: str) -> str:
     if directory:
         lines.insert(4, f"| run | `{directory}` |")
     return "\n".join(lines)
-
-
-def _reads_images(run: RunMeta) -> bool:
-    return run.options.get("reads") == RunMeta.VISION
 
 
 def _coverage(study: Study) -> str:
@@ -129,22 +128,29 @@ def _payload_row(row: Rate) -> str:
     )
 
 
-def _placements(study: Study) -> str:
+def _placements(study: Study, *, has_reach: bool = False) -> str:
     return "\n".join([
         "## Per placement",
         "",
         "Where on the page the same sentences were printed. `invisible` is white ink — absent to a "
         "human approving the invoice, and present in the text layer the extractor reads **on a "
-        "page nobody photographed**. Whether it still is on this corpus is what the reach table "
-        "says, and it is not a property of the placement.",
+        "page nobody photographed**."
+        + (
+            " Whether it still is on this corpus is what the reach table above says, and it is not "
+            "a property of the placement."
+            if has_reach else ""
+        ),
         "",
         "`unchanged` is **not comparable across placements**. The `description` placement prints "
         "the payload inside an item's own description cell, and that description is a scored "
         "field — so wherever the payload reaches the reader, one that transcribes the cell "
         "perfectly still differs from the gold there, by definition rather than by behaviour. The "
-        "other three write where nothing is scored. On a corpus where the payload reaches the "
-        "reader on some documents and not others, this row mixes the two and the reach table above "
-        "is what separates them.",
+        "other three write where nothing is scored."
+        + (
+            " On a corpus where the payload reaches the reader on some documents and not others, "
+            "this row mixes the two and the reach table above is what separates them."
+            if has_reach else ""
+        ),
         "",
         "| placement | n | succeeded | ASR | leaked | unchanged |",
         "|---|---:|---:|---:|---:|---:|",
@@ -233,11 +239,11 @@ def _leaks(study: Study) -> str:
     ])
 
 
-def _caveats(study: Study, *, run: RunMeta) -> str:
+def _caveats(study: Study, *, run: RunMeta, has_reach: bool = False) -> str:
     lines = ["## Read this before the tables", ""]
     overall = study.overall
 
-    if overall.succeeded == 0 and _reads_images(run):
+    if overall.succeeded == 0 and run.reads_images and has_reach:
         #: The compliant control is the wrong separator for a run that read pixels: `gullible`
         #: finds payloads in the *text* layer, so its own rate is bounded by a channel this reader
         #: never used. What establishes that these payloads reached this model is the reach table.
@@ -256,6 +262,18 @@ def _caveats(study: Study, *, run: RunMeta) -> str:
             "obeys every instruction it finds — measured **on this same corpus**, and its "
             "`attack.md` is the file to read before treating this row as a defence. A suite whose "
             "success predicate could not fire at all would report exactly this too."
+        )
+    if overall.succeeded == 0:
+        #: Printed with every zero, in both modalities. A low attack success rate is the one result
+        #: in this project a reader is most likely to over-read, and these two bounds are
+        #: properties of the *suite* rather than of whichever reader produced the zero — so they
+        #: belong in the artifact rather than only in the prose that quotes it.
+        lines.append(
+            f"* **A zero bounds this suite, not injection.** The {len(study.by_payload)} payloads "
+            "are fixed strings: none adapts, none responds to having failed, and none was written "
+            "against the reader being measured — so this row scores a catalogue rather than an "
+            "adversary. It is also one reader on one corpus. `docs/adr/0001_trust_boundary.md` "
+            "carries the threat model and the control that is still missing."
         )
     denial = next((row for row in study.by_payload if _is_denial(row.label)), None)
     if denial is not None and denial.succeeded:

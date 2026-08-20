@@ -24,7 +24,7 @@ def render(curve: Curve, *, run: RunMeta, directory: str = "") -> str:
         _header(curve, run=run, directory=directory),
         _signals(curve),
         _curve(curve),
-        _caveats(curve),
+        _caveats(curve, run=run),
     ]
     return "\n\n".join(part for part in parts if part) + "\n"
 
@@ -86,8 +86,10 @@ def _curve(curve: Curve) -> str:
     ])
 
 
-def _caveats(curve: Curve) -> str:
+def _caveats(curve: Curve, *, run: RunMeta) -> str:
     lines = ["## Read this before the tables", ""]
+    if run.attacked:
+        lines.append(run.ATTACKED_CAVEAT)
 
     lines.append(
         "* **Coverage is over the values the model asserted, not over the document.** A field it "

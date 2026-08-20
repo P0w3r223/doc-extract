@@ -279,7 +279,7 @@ letting a zero read as a miss.
 | `foreign/` | the same gold on three unfamiliar Polish layouts — how much of a reading was the template |
 | `degrade/`, `source/raster.py` | the same page photographed at three rungs of legibility, and the pixels a model is sent |
 | `degrade/attacked.py` | M6's grid photographed — which channel a payload still reaches a reader by |
-| tests | **733 passing**, ruff clean |
+| tests | **735 passing**, ruff clean |
 
 Milestone 7 has both held-out corpora, the vision path, paid arms reading the scanned corpus and the
 attacked scan as images. What it has **not** got is a paid arm over the *foreign* corpus — a

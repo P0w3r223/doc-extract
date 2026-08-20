@@ -27,7 +27,7 @@ def render(study: Study, *, run: RunMeta, directory: str = "") -> str:
         _matrix(study),
         _rules(study),
         _kinds(study),
-        _caveats(study),
+        _caveats(study, run=run),
     ]
     return "\n\n".join(part for part in parts if part) + "\n"
 
@@ -126,9 +126,13 @@ def _scope(row: KindRecall) -> str:
     return "not asked" if row.out_of_scope else ""
 
 
-def _caveats(study: Study) -> str:
+def _caveats(study: Study, *, run: RunMeta) -> str:
     counts = study.counts
     lines = ["## Read this before the tables", ""]
+    #: First, because it reframes what "wrong" means in every sentence under it — including the
+    #: one that would otherwise call a run with no misreadings a detector that caught nothing.
+    if run.attacked:
+        lines.append(run.ATTACKED_CAVEAT)
 
     if counts.prevalence == 0:
         lines.append(

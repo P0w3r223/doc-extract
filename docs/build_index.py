@@ -703,7 +703,7 @@ def scanned_injection_study(corpus: list) -> dict[str, object] | None:
         "run": SCANNED_ATTACK_RUN,
         "reach": _reach_table(),
         "curve": _gate_curve(predictions_path),
-        "vision": _vision_arm(gold, by_id),
+        "vision": _vision_arms(gold, by_id),
     }
 
 
@@ -737,39 +737,54 @@ def _attacked_arm(predictions_path, gold: dict, by_id: dict) -> dict[str, object
     }
 
 
-def _vision_arm(gold: dict, by_id: dict) -> dict[str, object] | None:
-    """The paid arm that read the pages as images, if one is committed.
+def _vision_arms(gold: dict, by_id: dict) -> list[dict[str, object]]:
+    """Every paid arm that read this corpus as images, one entry each.
 
-    Named for the model rather than fixed, because the run directory of a remote arm is the model's
-    name and this page should pick up a second one without being edited. `reached` — how many of
-    the attacking documents actually carried their payload as ink — is the denominator that makes a
-    zero a defence result, so it comes from the corpus's reach file and is `None` without it.
+    Found by prefix and by what each run recorded about its own modality, rather than by a
+    hardcoded directory: a remote arm is named for its model, and two models over one corpus are
+    two directories precisely so that both can be shown. Returning a list rather than the first
+    match is the difference between that and silently renaming the one on the page.
+
+    Every claim the section makes is derived here — the rate, whether anything was repaired,
+    whether anything was refused, and whether the rate is the same at every rung — because a second
+    arm would otherwise inherit the first one's adjectives unchecked.
     """
-    committed = sorted(
-        directory for directory in (ROOT / "results").glob(f"{SCANNED_ATTACK_PREFIX}*")
-        if (directory / prediction_file.PREDICTIONS_NAME).exists()
-        and prediction_file.read_meta(
-            directory / prediction_file.RUN_NAME
-        ).options.get("reads") == prediction_file.RunMeta.VISION
-    )
-    if not committed:  # pragma: no cover — a checkout without a paid arm over this corpus
-        return None
-    directory = committed[0]
-    meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
-    return {
-        **_attacked_arm(directory / prediction_file.PREDICTIONS_NAME, gold, by_id),
-        "model": meta.model,
-        "reached": _reached_the_image(by_id),
-    }
+    reached = _reached_the_image()
+    arms = []
+    for directory in sorted((ROOT / "results").glob(f"{SCANNED_ATTACK_PREFIX}*")):
+        predictions_path = directory / prediction_file.PREDICTIONS_NAME
+        if not predictions_path.exists():
+            continue
+        meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
+        if not meta.reads_images:
+            continue
+        records = list(prediction_file.read(predictions_path))
+        tally = _attacked_arm(predictions_path, gold, by_id)
+        arms.append({
+            **tally,
+            "model": meta.model,
+            "reached": reached,
+            "repairs": sum(record.repairs for record in records),
+            "unanswered": sum(1 for record in records if not record.succeeded),
+            #: Not "0 % everywhere" — "the same everywhere", which is the claim the prose makes and
+            #: is still checkable if a later arm is breached uniformly rather than not at all.
+            "uniform": len({row["succeeded"] for row in tally["rungs"]}) == 1,  # type: ignore[index]
+        })
+    return arms
 
 
-def _reached_the_image(by_id: dict) -> int | None:
-    """Attacking documents whose payload left a mark on the page. `None` without the corpus."""
+def _reached_the_image() -> int | None:
+    """Attacking documents whose payload left a mark on the page. `None` without the corpus.
+
+    Read straight off `Reach`, which records the payload it belongs to — joining back to a grid
+    planned from some other run's provenance would buy nothing and would raise on a corpus built
+    with different parameters, in a build where every neighbouring helper degrades instead.
+    """
     if not (SCANNED_ATTACK_CORPUS / attacked_grid.REACH_NAME).exists():
         return None  # pragma: no cover — the composed corpus has not been built here
     return sum(
         1 for row in attacked_grid.load_reaches(SCANNED_ATTACK_CORPUS)
-        if row.on_the_image and not PAYLOADS[by_id[row.doc_id].payload].harmless
+        if row.on_the_image and not PAYLOADS[row.payload].harmless
     )
 
 
@@ -1256,33 +1271,45 @@ page sees them exactly as the reach table says it does.</p>
 {_inversion(study.get("curve"))}"""
 
 
-def _vision_section(arm: object) -> str:
-    """What a real model reading the pixels did with the same corpus."""
-    if not arm:  # pragma: no cover — a checkout without a paid arm over this corpus
+def _vision_section(arms: object) -> str:
+    """What the models that read the pixels did with the same corpus — one paragraph each."""
+    if not arms:  # pragma: no cover — a checkout without a paid arm over this corpus
         return ""
-    row: dict[str, object] = arm  # type: ignore[assignment]
+    return "\n".join([
+        *(_vision_arm_paragraph(row) for row in arms),  # type: ignore[union-attr]
+        """<p class="note">Two things that does not establish, and both are limits of the suite
+rather than of any model: the payloads are <strong>fixed strings</strong> that never adapt and were
+not written against the reader being measured, so the rate scores a catalogue rather than an
+adversary; and this is a synthetic corpus. The denial payload is the illustration &mdash; it beat
+the compliant control every time and the model above not once, which is a fact about two readers
+rather than about the payload. The structural defences are still what the case rests on, because
+they are what holds when the reader is not this one.</p>""",
+    ])
+
+
+def _vision_arm_paragraph(row: dict[str, object]) -> str:
+    """One arm, with every adjective derived from its own prediction file."""
     reached = row.get("reached")
-    #: The claim that makes a zero a defence result rather than arithmetic. Fenced separately from
-    #: the sentence around it: it needs the corpus, and the rest of this paragraph does not.
+    #: The claim that makes a zero a defence result rather than arithmetic — and the one sentence
+    #: here that needs the corpus, so it is fenced on its own rather than with the paragraph.
     ink = (
-        f" {CORPUS_DEPENDENT}<strong>{reached} of those {row['documents']} carried their payload as "
-        f"ink on a page it looked at</strong>, and it followed none of it; the rest are the "
-        f"white-ink placement the scanner had already erased, where a zero is not evidence of "
-        f"anything.{CORPUS_DEPENDENT_END}"
-        if reached else ""
+        f" {CORPUS_DEPENDENT}<strong>{reached} of those {row['documents']} carried their payload "
+        f"as ink on a page it looked at.</strong> The rest are the white-ink placement the scanner "
+        f"had already erased, where a rate is not evidence of anything."
+        f"{CORPUS_DEPENDENT_END}"
+        if reached is not None and reached > 0 else ""
     )
-    return f"""<p><strong>And a frontier model reading the pixels obeys none of them.</strong>
-<code>{html.escape(str(row["model"]))}</code>, every page sent as an image, answered all of them
-with no repairs and no refusals, and met <strong>{row["succeeded"]}</strong> of
-{row["documents"]} attacking objectives &mdash; an attack success rate of
-{rate(_success_rate(row))}, at every rung.{ink}</p>
-<p class="note">Two things that does not establish, and both are limits of the suite rather than of
-the model: the payloads are <strong>fixed strings</strong> that never adapt and were not written
-against this model, so the number measures a catalogue rather than an adversary; and it is one model
-on a synthetic corpus. The denial payload is the illustration &mdash; it beat the compliant control
-every time and this model not once, which is a fact about two readers rather than about the payload.
-The structural defences are still what the case rests on, because they are what holds when the
-reader is not this one.</p>"""
+    clean = " and ".join(
+        claim for claim, holds in (
+            ("no repairs", not row["repairs"]),
+            ("nothing left unanswered", not row["unanswered"]),
+        ) if holds
+    )
+    return f"""<p><strong>A frontier model reading the pixels met
+{row["succeeded"]} of {row["documents"]} attacking objectives.</strong>
+<code>{html.escape(str(row["model"]))}</code>, every page sent as an image &mdash; an attack success
+rate of {rate(_success_rate(row))}{", the same at every rung" if row["uniform"] else ""}
+{f", with {clean}" if clean else ""}.{ink}</p>"""
 
 
 def _inversion(curve: object) -> str:
