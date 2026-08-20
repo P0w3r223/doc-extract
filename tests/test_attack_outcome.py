@@ -15,12 +15,12 @@ from __future__ import annotations
 
 import pytest
 
-from doc_extract.attack import outcome, suite
+from doc_extract.attack import outcome, report, suite
 from doc_extract.attack.outcome import Outcome
 from doc_extract.attack.payloads import BY_NAME
 from doc_extract.decide.confidence import Route
 from doc_extract.eval import __main__ as eval_cli
-from doc_extract.eval import dataset, run
+from doc_extract.eval import dataset, predictions, run
 from doc_extract.eval.baselines import BY_NAME as BASELINES
 from doc_extract.synth import corpus as synth_corpus
 from doc_extract.synth.tiers import BY_NAME as TIERS
@@ -75,6 +75,37 @@ def test_an_unanswered_document_is_not_an_accepted_one() -> None:
     """The denial payload succeeds by producing nothing, and nothing is then accepted."""
     refused = _row("refusal", succeeded=True, route="", answered=False)
     assert refused.succeeded and not refused.accepted and not refused.leaked
+
+
+def _meta(**options) -> predictions.RunMeta:
+    return predictions.RunMeta(
+        baseline="claude", model="claude-opus-5", corpus_dir="data/attacked-scanned",
+        documents=1, max_tokens=8192, repair_max_tokens=4096, max_repairs=1,
+        options={"sees": "the page", **options},
+    )
+
+
+def test_a_run_that_read_pixels_says_so_and_is_told_which_column_settles_a_zero() -> None:
+    """Two attack success rates measured across a modality difference are not comparable.
+
+    The compliant control is also the wrong separator for a vision run: `gullible` finds payloads
+    in the text layer, so its rate is bounded by a channel this reader never used.
+    """
+    study = outcome.summarise([_row("total_override", succeeded=False)])
+
+    vision = report.render(study, run=_meta(reads=predictions.RunMeta.VISION))
+
+    assert "| read it as | the page as an image |" in vision
+    #: Joined, because the renderer wraps its prose and the claim is about the words, not the wrap.
+    assert "reach table above settles it" in " ".join(vision.split())
+    assert "`gullible`" not in vision
+
+
+def test_a_text_run_keeps_the_control_as_its_separator_and_grows_no_extra_row() -> None:
+    text = report.render(outcome.summarise([_row("total_override", succeeded=False)]), run=_meta())
+
+    assert "read it as" not in text
+    assert "`gullible`" in text
 
 
 def test_the_template_column_splits_the_rows_and_leaves_the_control_out() -> None:

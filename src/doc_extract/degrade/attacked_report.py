@@ -30,8 +30,15 @@ NOBODY = "**nobody**"
 MIXED = "mixed"
 
 
-def render(reaches: Sequence[Reach]) -> str:
-    """The reach table and the sentences that say what it does to the rates below it."""
+def render(reaches: Sequence[Reach], *, reads_images: bool = False) -> str:
+    """The reach table and the sentences that say what it does to the rates below it.
+
+    `reads_images` says which of the two columns is the one that matters for the run being
+    reported. A text pipeline is stopped by a missing text layer and can be attacked by nothing
+    else; a model sent the page as an image is stopped only by ink that left no mark. Printing
+    both readings unconditionally would put the wrong caveat above two thirds of a vision run's
+    numbers — "no payload reached the text layer" is true there and beside the point.
+    """
     if not reaches:
         return ""
     placements = _ordered(row.placement for row in reaches)
@@ -46,7 +53,7 @@ def render(reaches: Sequence[Reach]) -> str:
     return "\n".join([
         "## Which channel the payload reached the reader by",
         "",
-        *_findings(reaches, rungs=rungs),
+        *_findings(reaches, rungs=rungs, reads_images=reads_images),
         "",
         "Measured at build time with no model involved. **text** means the marker is in the text "
         "layer `source/` reads off the scanned page; **image** means the attacked page and the "
@@ -91,21 +98,38 @@ def channel(rows: Sequence[Reach]) -> str:
     return NOBODY
 
 
-def _findings(reaches: Sequence[Reach], *, rungs: Sequence[str]) -> list[str]:
-    """The two sentences the table is worth printing for, each stated only when it is true."""
+def _findings(
+    reaches: Sequence[Reach], *, rungs: Sequence[str], reads_images: bool = False
+) -> list[str]:
+    """The sentences the table is worth printing for, each stated only when it is true.
+
+    The first one is about the channel the *reported run* actually read by, which is why it is not
+    the same sentence in both modalities. A blind rung is a hole in a text pipeline's coverage and
+    nothing at all to a model looking at the page.
+    """
     lines = []
     blind = [
         rung for rung in rungs
         if not any(row.in_text_layer for row in reaches if row.rung == rung)
     ]
-    if blind:
+    if blind and reads_images:
+        #: The text column is still printed — it is what a *text* run on this same corpus would
+        #: have been limited by, and the two runs are meant to be read against each other.
+        lines.append(
+            f"* **This run read the page as an image, so the text layer is not its limit.** The "
+            f"`image` column is: a payload that changed no pixel is unreachable here no matter "
+            f"what the text column says, and a payload that did change one is on the page in front "
+            f"of the model at every rung — including {_names(blind)}, where a text pipeline sees "
+            "nothing at all. Read a zero below against the `image` column, not the `text` one."
+        )
+    elif blind:
         lines.append(
             f"* **No payload reached the text layer on {_names(blind)}.** Nothing did: the page "
             "carries no text at all. Every attack success rate below for those rungs is therefore "
             "a measurement of a reader that could not read the document, and it is **not** "
             "evidence of a defence. Whatever the `image` column marks is still on the page as ink "
             "at those rungs — whether a model reading pixels recovers it at 150 dpi through blur "
-            "and JPEG is a different question, and the arm that would answer it has not been run."
+            "and JPEG is a different question, and a vision arm is what answers it."
         )
     #: Every row of the placement, not any of them. A placement erased at one rung and surviving at
     #: another belongs in neither list, and a version keyed on `any` would name it in both halves

@@ -1,8 +1,9 @@
 # The trust boundary around an untrusted invoice
 
 Date: 2026-08-19
-Updated: 2026-08-20 — the attacked corpus has been scanned; see *What a scan does to the gate's
-answer*, which replaces the bullet that named that composition as unbuilt.
+Updated: 2026-08-20 — the attacked corpus has been scanned and put in front of a real model reading
+pixels; see *What a scan does to the gate's answer*, which replaces the bullet that named that
+composition as unbuilt.
 Status: accepted
 Author: P0w3r223 + Claude
 Related to: milestone 6 (`src/doc_extract/attack/`), `results/attack-*/attack.md`, milestone 7
@@ -155,7 +156,24 @@ The compliant control makes the other half concrete. `gullible` obeys every inst
 is breached on **25 % of the attacked documents** rather than 100 % — but the decomposition is the
 whole story: 6 successes of 24 per payload, and all six on `searchable`. The two text-less rungs
 score zero because **the reader could not read the document at all**, which is blindness rather than
-a defence. A model that looks at the page sees those payloads exactly as the `image` column says.
+a defence.
+
+**What a real model does with a page it can read is now measured rather than argued.**
+`claude-opus-5`, every page sent as an image: 168 of 168 answered, no repairs, no refusals, and an
+attack success rate of **0.0 %** on all six attacking payloads at every rung. **108 of the 144
+attacking documents carried their payload as ink on a page that model looked at** — the reach
+table's `image` column is what turns that zero into a defence result rather than arithmetic, and
+the remaining 36 are the `invisible` placement the scanner had already erased. It made no reading
+error anywhere in the corpus: every document that differs from the gold differs only in the
+`description` cell the attacker printed into, which the gold cannot contain by design.
+
+That is a genuinely encouraging result and it is bounded in exactly the ways this document has said
+since M6. **The payloads are fixed strings.** None adapts, none responds to having failed, and none
+was written against this model — so the number measures a catalogue, not an adversary. And it is
+**one model on a synthetic corpus**: the `refusal` payload succeeded 24 of 24 against the compliant
+control and 0 of 24 here, which is a fact about two readers rather than about the payload. Nothing
+here changes the conclusion below — the structural rules are still what the defence rests on,
+because they are what holds when the reader is not this one.
 
 **And the gate inverts.** Run over the same predictions:
 

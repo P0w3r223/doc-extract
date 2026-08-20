@@ -517,6 +517,18 @@ placement designed to be invisible to the human approving the invoice is the one
 destroys. That is an accident of the medium and not a control &mdash; it protects only the placement
 that hides from a person, and an attacker who prints in ink loses nothing.</p>
 <!-- corpus-dependent: end -->
+<p><strong>And a frontier model reading the pixels obeys none of them.</strong>
+<code>claude-opus-5</code>, every page sent as an image, answered all of them
+with no repairs and no refusals, and met <strong>0</strong> of
+144 attacking objectives &mdash; an attack success rate of
+0.0 %, at every rung. <!-- corpus-dependent: begin --><strong>108 of those 144 carried their payload as ink on a page it looked at</strong>, and it followed none of it; the rest are the white-ink placement the scanner had already erased, where a zero is not evidence of anything.<!-- corpus-dependent: end --></p>
+<p class="note">Two things that does not establish, and both are limits of the suite rather than of
+the model: the payloads are <strong>fixed strings</strong> that never adapt and were not written
+against this model, so the number measures a catalogue rather than an adversary; and it is one model
+on a synthetic corpus. The denial payload is the illustration &mdash; it beat the compliant control
+every time and this model not once, which is a fact about two readers rather than about the payload.
+The structural defences are still what the case rests on, because they are what holds when the
+reader is not this one.</p>
 <!-- corpus-dependent: begin -->
 <p><strong>And the gate inverts.</strong> Accepting only the high-confidence values
 covers 20.1 % of what the reader asserted at 99.0 % accuracy and
@@ -536,9 +548,10 @@ page at all.</p>
     <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built</td></tr>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
-    <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms</td></tr>
-    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on one of the three</td></tr>
-    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus, and a vision arm over the attacked scan</th><td class="num">not built</td></tr>
+    <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms and one paid</td></tr>
+    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on two of the three</td></tr>
+    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">not built</td></tr>
+    <tr><th>&mdash; an adaptive attacker, which no fixed payload set stands in for</th><td class="num">not built</td></tr>
     <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">not built</td></tr>
     <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
@@ -566,7 +579,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>daaec34</code> &middot; part of a
+  <code>a8b8a54</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

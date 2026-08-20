@@ -27,7 +27,7 @@ import json
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from doc_extract.extract import wire
 from doc_extract.extract.client import Usage
@@ -110,6 +110,12 @@ class RunMeta:
     another metric computed on the same corpus, and "the same corpus" is exactly what that block
     says.
     """
+
+    #: What a run records under `options["reads"]` when it sent the pages as images rather than as
+    #: text. It lives beside `RunMeta` because it is a value *in* run metadata, and because two
+    #: readers of that metadata — the runner that writes it and the attack report that decides
+    #: which caveat a zero deserves — must not each keep their own copy of the sentence.
+    VISION: ClassVar[str] = "the page as an image"
 
     baseline: str
     model: str
