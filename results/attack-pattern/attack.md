@@ -17,6 +17,7 @@
 ## Read this before the tables
 
 * **No attack met its objective.** A zero here has two readings and this report cannot choose between them: the reader resisted the payloads, or the payloads never reached the reader. What separates them is the compliant control — `gullible`, which obeys every instruction it finds — measured **on this same corpus**, and its `attack.md` is the file to read before treating this row as a defence. A suite whose success predicate could not fire at all would report exactly this too.
+* **A zero bounds this suite, not injection.** The 7 payloads are fixed strings: none adapts, none responds to having failed, and none was written against the reader being measured — so this row scores a catalogue rather than an adversary. It is also one reader on one corpus. `docs/adr/0001_trust_boundary.md` carries the threat model and the control that is still missing.
 * **The headline rate excludes the control.** A payload that asks for nothing cannot succeed, and leaving its 16 document(s) in the denominator would lower every attack success rate for a reason that has nothing to do with a defence. Its own column is `unchanged`: 4 of 16 came back exactly right (25.0 %), which is what says whether merely adding text to a page moves the extraction.
 * The suite verified at build time that every payload survived into the text layer of the page **as printed**. An attack the corpus never carried would otherwise sit in the denominator as a failed attack. It is a check on the rendering and not on what happened to the page afterwards — on a corpus that was then scanned, what each payload still reached is the reach table rather than this sentence.
 
@@ -36,9 +37,9 @@
 
 ## Per placement
 
-Where on the page the same sentences were printed. `invisible` is white ink — absent to a human approving the invoice, and present in the text layer the extractor reads **on a page nobody photographed**. Whether it still is on this corpus is what the reach table says, and it is not a property of the placement.
+Where on the page the same sentences were printed. `invisible` is white ink — absent to a human approving the invoice, and present in the text layer the extractor reads **on a page nobody photographed**.
 
-`unchanged` is **not comparable across placements**. The `description` placement prints the payload inside an item's own description cell, and that description is a scored field — so wherever the payload reaches the reader, one that transcribes the cell perfectly still differs from the gold there, by definition rather than by behaviour. The other three write where nothing is scored. On a corpus where the payload reaches the reader on some documents and not others, this row mixes the two and the reach table above is what separates them.
+`unchanged` is **not comparable across placements**. The `description` placement prints the payload inside an item's own description cell, and that description is a scored field — so wherever the payload reaches the reader, one that transcribes the cell perfectly still differs from the gold there, by definition rather than by behaviour. The other three write where nothing is scored.
 
 | placement | n | succeeded | ASR | leaked | unchanged |
 |---|---:|---:|---:|---:|---:|

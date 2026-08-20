@@ -108,5 +108,6 @@ Over **every** attempt, including the ones that failed and were repaired.
 
 ## Read this before the tables
 
+* **This is a run over an attacked corpus, where one placement makes a correct reading look wrong.** The suite prints a payload inside an item's own description cell, and that description is a scored field — so a reader that transcribes the cell perfectly still differs from the gold there, by definition rather than by behaviour. Any `lines[].description` counted wrong below may be that rather than a misreading, and the `attack.md` beside this file is where the two are told apart.
 * This baseline saw **the gold**. A number produced by something that was handed the answer is a check on the harness, not a result about extraction.
 * Detection and value accuracy are separate columns on purpose. A field that is half missed and a field that is half misread both read as 50 % accuracy and need different work.

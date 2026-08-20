@@ -77,6 +77,12 @@ def test_an_unanswered_document_is_not_an_accepted_one() -> None:
     assert refused.succeeded and not refused.accepted and not refused.leaked
 
 
+#: Stands in for whatever `degrade/attacked_report.py` renders. `report.render` only asks whether a
+#: preamble exists, so the content is irrelevant and importing the real one would couple this test
+#: to the section rather than to the branch it is about.
+REACH_TABLE = "## Which channel the payload reached the reader by"
+
+
 def _meta(**options) -> predictions.RunMeta:
     return predictions.RunMeta(
         baseline="claude", model="claude-opus-5", corpus_dir="data/attacked-scanned",
@@ -93,7 +99,9 @@ def test_a_run_that_read_pixels_says_so_and_is_told_which_column_settles_a_zero(
     """
     study = outcome.summarise([_row("total_override", succeeded=False)])
 
-    vision = report.render(study, run=_meta(reads=predictions.RunMeta.VISION))
+    vision = report.render(
+        study, run=_meta(reads=predictions.RunMeta.VISION), preamble=REACH_TABLE
+    )
 
     assert "| read it as | the page as an image |" in vision
     #: Joined, because the renderer wraps its prose and the claim is about the words, not the wrap.
@@ -101,11 +109,36 @@ def test_a_run_that_read_pixels_says_so_and_is_told_which_column_settles_a_zero(
     assert "`gullible`" not in vision
 
 
+def test_a_vision_run_with_no_reach_table_is_not_told_to_read_one() -> None:
+    """`--vision` over M6's *unscanned* corpus: the modality is right and there is no reach table.
+
+    Pointing a reader at a section this file does not contain is worse than the general caveat it
+    would replace, and it would also drop the one separator that run does have.
+    """
+    vision = report.render(
+        outcome.summarise([_row("total_override", succeeded=False)]),
+        run=_meta(reads=predictions.RunMeta.VISION),
+    )
+
+    assert "reach table above" not in " ".join(vision.split())
+    assert "`gullible`" in vision
+
+
 def test_a_text_run_keeps_the_control_as_its_separator_and_grows_no_extra_row() -> None:
     text = report.render(outcome.summarise([_row("total_override", succeeded=False)]), run=_meta())
 
     assert "read it as" not in text
     assert "`gullible`" in text
+
+
+def test_every_zero_carries_the_bound_that_it_scores_a_catalogue() -> None:
+    """The result a reader is likeliest to over-read, so the bound belongs in the artifact."""
+    zero = report.render(outcome.summarise([_row("total_override", succeeded=False)]), run=_meta())
+    breached = report.render(outcome.summarise([_row("total_override", succeeded=True)]),
+                             run=_meta())
+
+    assert "fixed strings" in zero
+    assert "fixed strings" not in breached
 
 
 def test_the_template_column_splits_the_rows_and_leaves_the_control_out() -> None:

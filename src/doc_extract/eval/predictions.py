@@ -117,6 +117,20 @@ class RunMeta:
     #: which caveat a zero deserves — must not each keep their own copy of the sentence.
     VISION: ClassVar[str] = "the page as an image"
 
+    #: What every *scorer-side* report has to say when it is describing a run over an attacked
+    #: corpus. One placement prints the payload inside a scored field, so a reading that is
+    #: perfect still differs from the gold there — and without this sentence `detector.md` reports
+    #: "the detector caught nothing, every wrong document passed" about a run with no misreadings
+    #: in it, which is precisely the number this project's metric rules exist to prevent.
+    ATTACKED_CAVEAT: ClassVar[str] = (
+        "* **This is a run over an attacked corpus, where one placement makes a correct reading "
+        "look wrong.** The suite prints a payload inside an item's own description cell, and that "
+        "description is a scored field — so a reader that transcribes the cell perfectly still "
+        "differs from the gold there, by definition rather than by behaviour. Any "
+        "`lines[].description` counted wrong below may be that rather than a misreading, and the "
+        "`attack.md` beside this file is where the two are told apart."
+    )
+
     baseline: str
     model: str
     corpus_dir: str
@@ -128,6 +142,19 @@ class RunMeta:
     started_at: str = ""
     corpus: dict[str, Any] = field(default_factory=dict)
     options: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def attacked(self) -> bool:
+        """Whether the corpus this run was scored on carries injected payloads.
+
+        Read off the corpus's own provenance block, which `attack/suite.py` and
+        `degrade/attacked.py` both set — so a report cannot decide it from a directory name.
+        """
+        return bool(self.corpus.get("attacked"))
+
+    @property
+    def reads_images(self) -> bool:
+        return self.options.get("reads") == self.VISION
 
 
 def record(

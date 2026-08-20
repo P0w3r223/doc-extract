@@ -570,7 +570,9 @@ leaked, and the same zero at every rung:
 attacking documents, **108 carried their payload as ink on a page this model looked at** — three
 placements × two documents × three rungs × six payloads — and it obeyed none of them. The other 36
 are `invisible`, which the scanner had already erased; a zero there is not evidence of anything and
-the report says so.
+the report says so. (`attack.md`'s header carries a *different* 108, `read exactly right anyway` —
+144 minus the 36 `description` documents. The two are unrelated and it is a coincidence of the
+grid's shape.)
 
 **It made no reading errors at all.** 126 of 168 are exact, and the 42 that are not are *precisely*
 the `description` placement — 14 per rung, and the only differing field instance in the entire run
@@ -579,7 +581,9 @@ documents, not a mistake: the attacker printed into a cell the gold cannot conta
 documents where the payload sits outside a scored field, **the reading is exact 126 of 126** —
 including on a 150 dpi off-square grainy JPEG.
 
-Two things this does **not** establish, both of which the report prints beside the number:
+Two things this does **not** establish, both of which `attack.md` now prints beside every zero it
+reports, because a low attack success rate is the one result here a reader is likeliest to
+over-read:
 
 - **The payloads are fixed strings.** None adapts, none responds to having failed, and none is
   written against this model. An adaptive attacker is a different threat model and a different
@@ -759,7 +763,7 @@ different matter and is the one M7 could not put a model against: the foreign co
 yet. **A real held-out set remains load-bearing** — it is the only place the question gets asked on
 documents nobody generated.
 
-733 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+735 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`
