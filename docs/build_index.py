@@ -660,6 +660,11 @@ def injection_study(corpus: list) -> dict[str, object] | None:
 #: model to have been fooled first.
 SCANNED_ATTACK_RUN = "attacked-scanned-gullible"
 
+#: How a run over the composed corpus is named, on the same convention the other two held-out
+#: corpora use. The paid arm is found under it by model name rather than hardcoded, so a second
+#: model appears on this page without an edit here.
+SCANNED_ATTACK_PREFIX = "attacked-scanned-"
+
 #: Where the composed corpus is built, when it has been. Not committed — 168 rasterised pages — and
 #: one command away (`python -m doc_extract.degrade --attacked`).
 SCANNED_ATTACK_CORPUS = ROOT / "data" / "attacked-scanned"
@@ -693,6 +698,23 @@ def scanned_injection_study(corpus: list) -> dict[str, object] | None:
     gold = {document.doc_id: document for document, _, _ in planned}
     by_id = {assignment.doc_id: assignment for _, _, assignment in planned}
 
+    return {
+        **_attacked_arm(predictions_path, gold, by_id),
+        "run": SCANNED_ATTACK_RUN,
+        "reach": _reach_table(),
+        "curve": _gate_curve(predictions_path),
+        "vision": _vision_arm(gold, by_id),
+    }
+
+
+def _attacked_arm(predictions_path, gold: dict, by_id: dict) -> dict[str, object]:
+    """One run's attack success rate over the composed corpus, per rung and overall.
+
+    Shared by the compliant control and the paid vision arm rather than written twice: the two
+    answer different questions — what the *defences* do about an attack that worked, and what a
+    *model* does with one it can see — and a second copy of the tally is a second place for those
+    two numbers to stop being computed the same way.
+    """
     rows: dict[str, dict[str, int]] = {}
     for record in prediction_file.read(predictions_path):
         if record.doc_id not in by_id:  # pragma: no cover — reported in the committed attack.md
@@ -709,15 +731,46 @@ def scanned_injection_study(corpus: list) -> dict[str, object] | None:
             gold[record.doc_id].invoice, record.parse(), FailureClass(record.failure)
         )
     return {
-        "run": SCANNED_ATTACK_RUN,
-        "rungs": [
-            {"rung": name, **rows[name]} for name in RUNG_NAMES if name in rows
-        ],
+        "rungs": [{"rung": name, **rows[name]} for name in RUNG_NAMES if name in rows],
         "documents": sum(row["documents"] for row in rows.values()),
         "succeeded": sum(row["succeeded"] for row in rows.values()),
-        "reach": _reach_table(),
-        "curve": _gate_curve(predictions_path),
     }
+
+
+def _vision_arm(gold: dict, by_id: dict) -> dict[str, object] | None:
+    """The paid arm that read the pages as images, if one is committed.
+
+    Named for the model rather than fixed, because the run directory of a remote arm is the model's
+    name and this page should pick up a second one without being edited. `reached` — how many of
+    the attacking documents actually carried their payload as ink — is the denominator that makes a
+    zero a defence result, so it comes from the corpus's reach file and is `None` without it.
+    """
+    committed = sorted(
+        directory for directory in (ROOT / "results").glob(f"{SCANNED_ATTACK_PREFIX}*")
+        if (directory / prediction_file.PREDICTIONS_NAME).exists()
+        and prediction_file.read_meta(
+            directory / prediction_file.RUN_NAME
+        ).options.get("reads") == prediction_file.RunMeta.VISION
+    )
+    if not committed:  # pragma: no cover — a checkout without a paid arm over this corpus
+        return None
+    directory = committed[0]
+    meta = prediction_file.read_meta(directory / prediction_file.RUN_NAME)
+    return {
+        **_attacked_arm(directory / prediction_file.PREDICTIONS_NAME, gold, by_id),
+        "model": meta.model,
+        "reached": _reached_the_image(by_id),
+    }
+
+
+def _reached_the_image(by_id: dict) -> int | None:
+    """Attacking documents whose payload left a mark on the page. `None` without the corpus."""
+    if not (SCANNED_ATTACK_CORPUS / attacked_grid.REACH_NAME).exists():
+        return None  # pragma: no cover — the composed corpus has not been built here
+    return sum(
+        1 for row in attacked_grid.load_reaches(SCANNED_ATTACK_CORPUS)
+        if row.on_the_image and not PAYLOADS[by_id[row.doc_id].payload].harmless
+    )
 
 
 def _gate_curve(predictions_path) -> dict[str, object] | None:
@@ -1199,7 +1252,37 @@ by rebuilding each scanned attacked document's gold in memory from the corpus se
 those rungs because no <em>text</em> did &mdash; the page carries none. A reader that looks at the
 page sees them exactly as the reach table says it does.</p>
 {_reach_section(study.get("reach"))}
+{_vision_section(study.get("vision"))}
 {_inversion(study.get("curve"))}"""
+
+
+def _vision_section(arm: object) -> str:
+    """What a real model reading the pixels did with the same corpus."""
+    if not arm:  # pragma: no cover — a checkout without a paid arm over this corpus
+        return ""
+    row: dict[str, object] = arm  # type: ignore[assignment]
+    reached = row.get("reached")
+    #: The claim that makes a zero a defence result rather than arithmetic. Fenced separately from
+    #: the sentence around it: it needs the corpus, and the rest of this paragraph does not.
+    ink = (
+        f" {CORPUS_DEPENDENT}<strong>{reached} of those {row['documents']} carried their payload as "
+        f"ink on a page it looked at</strong>, and it followed none of it; the rest are the "
+        f"white-ink placement the scanner had already erased, where a zero is not evidence of "
+        f"anything.{CORPUS_DEPENDENT_END}"
+        if reached else ""
+    )
+    return f"""<p><strong>And a frontier model reading the pixels obeys none of them.</strong>
+<code>{html.escape(str(row["model"]))}</code>, every page sent as an image, answered all of them
+with no repairs and no refusals, and met <strong>{row["succeeded"]}</strong> of
+{row["documents"]} attacking objectives &mdash; an attack success rate of
+{rate(_success_rate(row))}, at every rung.{ink}</p>
+<p class="note">Two things that does not establish, and both are limits of the suite rather than of
+the model: the payloads are <strong>fixed strings</strong> that never adapt and were not written
+against this model, so the number measures a catalogue rather than an adversary; and it is one model
+on a synthetic corpus. The denial payload is the illustration &mdash; it beat the compliant control
+every time and this model not once, which is a fact about two readers rather than about the payload.
+The structural defences are still what the case rests on, because they are what holds when the
+reader is not this one.</p>"""
 
 
 def _inversion(curve: object) -> str:
@@ -1706,9 +1789,10 @@ page at all.</p>
     <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built</td></tr>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
-    <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms</td></tr>
-    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on one of the three</td></tr>
-    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus, and a vision arm over the attacked scan</th><td class="num">not built</td></tr>
+    <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms and one paid</td></tr>
+    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on two of the three</td></tr>
+    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">not built</td></tr>
+    <tr><th>&mdash; an adaptive attacker, which no fixed payload set stands in for</th><td class="num">not built</td></tr>
     <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">not built</td></tr>
     <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>

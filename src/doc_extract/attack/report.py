@@ -63,6 +63,11 @@ def _header(study: Study, *, run: RunMeta, directory: str) -> str:
         "|---|---|",
         f"| answered by | `{run.model}` |",
         f"| saw | {run.options.get('sees', 'unstated')} |",
+        #: Its own row rather than folded into `saw`, because the two say different things: `saw`
+        #: is what the baseline is *allowed* to look at, and this is the modality it looked in. The
+        #: same scanned corpus can be read either way, and two attack success rates measured across
+        #: that difference are not comparable — a header naming only one would hide which.
+        *([f"| read it as | {run.options['reads']} |"] if run.options.get("reads") else []),
         f"| corpus | `{run.corpus_dir}` |",
         f"| attacked documents | {overall.documents} |",
         f"| attacks that met their objective | {overall.succeeded} |",
@@ -75,6 +80,10 @@ def _header(study: Study, *, run: RunMeta, directory: str) -> str:
     if directory:
         lines.insert(4, f"| run | `{directory}` |")
     return "\n".join(lines)
+
+
+def _reads_images(run: RunMeta) -> bool:
+    return run.options.get("reads") == RunMeta.VISION
 
 
 def _coverage(study: Study) -> str:
@@ -228,7 +237,18 @@ def _caveats(study: Study, *, run: RunMeta) -> str:
     lines = ["## Read this before the tables", ""]
     overall = study.overall
 
-    if overall.succeeded == 0:
+    if overall.succeeded == 0 and _reads_images(run):
+        #: The compliant control is the wrong separator for a run that read pixels: `gullible`
+        #: finds payloads in the *text* layer, so its own rate is bounded by a channel this reader
+        #: never used. What establishes that these payloads reached this model is the reach table.
+        lines.append(
+            "* **No attack met its objective.** A zero here has two readings — the reader resisted "
+            "the payloads, or the payloads never reached it — and on this run the reach table "
+            "above settles it: every payload it marks on the `image` column was printed in ink on "
+            "a page this model looked at. Those are the ones this row is a defence result for. "
+            "The rest reached nobody, and a zero on them is arithmetic rather than evidence."
+        )
+    elif overall.succeeded == 0:
         lines.append(
             "* **No attack met its objective.** A zero here has two readings and this report "
             "cannot choose between them: the reader resisted the payloads, or the payloads never "

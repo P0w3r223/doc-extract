@@ -61,6 +61,21 @@ def test_a_rung_with_no_text_layer_is_called_blindness_rather_than_a_defence() -
     assert "not** evidence of a defence" in body
 
 
+def test_a_vision_run_is_told_to_read_the_other_column() -> None:
+    """The same corpus limits two readers differently, and the caveat has to follow the reader.
+
+    "No payload reached the text layer" is true on a vision run and beside the point: the model is
+    looking at the page, so a zero there is a defence result rather than blindness. Printing the
+    text-pipeline sentence above a vision run's numbers would invert what they mean.
+    """
+    body = attacked_report.render(SCANNED, reads_images=True)
+
+    assert "read the page as an image" in body
+    assert "not** evidence of a defence" not in body
+    #: The table keeps both columns — the two runs are meant to be read against each other.
+    assert f"| `footer` | {attacked_report.BOTH} | {attacked_report.IMAGE_ONLY} |" in body
+
+
 def test_the_erased_placement_is_named_and_the_surviving_ones_are_too() -> None:
     body = attacked_report.render(SCANNED)
 

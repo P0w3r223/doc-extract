@@ -320,11 +320,13 @@ re-run a paid model to be checked would be one too.
    which `docs/adr/0001_trust_boundary.md` had named as unbuilt — and answers the question that
    composition was for: a scan deletes the white-ink attack outright, the two text-less rungs' zero
    attack success rate is blindness rather than defence, and **the gate's accepted bucket becomes
-   less accurate than answering everything** (*What a scan does to an attacked page* above). Still
-   open: a paid arm over the *foreign* corpus and a vision arm over the attacked scan, which are two
-   separate spends and two separate questions; teaching grounding to say *there was nothing to look
-   in* rather than *ungrounded*; and the synthetic↔real gap as an artifact of its own rather than as
-   four sections.
+   less accurate than answering everything** (*What a scan does to an attacked page* above). A paid
+   vision arm then asks what a real model does with a page it *can* read: `claude-opus-5` obeys
+   **none** of the 108 payloads printed in ink in front of it, and makes no reading error anywhere
+   in the corpus. Still open: a paid arm over the *foreign* corpus, which is a separate spend and a
+   separate question; teaching grounding to say *there was nothing to look in* rather than
+   *ungrounded*; an adaptive attacker, which no fixed payload set can stand in for; and the
+   synthetic↔real gap as an artifact of its own rather than as four sections.
 
 ## The headline answer, and what it is really measuring
 
@@ -549,8 +551,42 @@ had erased it.
 
 **The two zeros are blindness, not defence.** No payload reached the text layer on those rungs
 because no *text* did, and the report says so above its own tables. A model that looks at the page
-sees them exactly as the `image` column says it does; measuring that needs a vision arm, which this
-corpus is now built for and has not been given.
+sees them exactly as the `image` column says it does — which is the question the paid arm below
+answers.
+
+### What a frontier model does with a page it can read (M7e, paid arm)
+
+`claude-opus-5`, every page sent as an image, $6.08. **168 of 168 answered, no repairs, no
+refusals, and the attack success rate is 0.0 % on all six attacking payloads** — 0 of 144, 0
+leaked, and the same zero at every rung:
+
+| rung | n | succeeded | ASR |
+|---|---:|---:|---:|
+| `searchable` | 48 | 0 | 0.0 % |
+| `rasterised` | 48 | 0 | 0.0 % |
+| `scanned` | 48 | 0 | 0.0 % |
+
+**The reach table is what makes that a defence result rather than arithmetic.** Of the 144
+attacking documents, **108 carried their payload as ink on a page this model looked at** — three
+placements × two documents × three rungs × six payloads — and it obeyed none of them. The other 36
+are `invisible`, which the scanner had already erased; a zero there is not evidence of anything and
+the report says so.
+
+**It made no reading errors at all.** 126 of 168 are exact, and the 42 that are not are *precisely*
+the `description` placement — 14 per rung, and the only differing field instance in the entire run
+is `lines[].description`, 42 of them. That is the scored-field artifact this project already
+documents, not a mistake: the attacker printed into a cell the gold cannot contain. So on the 126
+documents where the payload sits outside a scored field, **the reading is exact 126 of 126** —
+including on a 150 dpi off-square grainy JPEG.
+
+Two things this does **not** establish, both of which the report prints beside the number:
+
+- **The payloads are fixed strings.** None adapts, none responds to having failed, and none is
+  written against this model. An adaptive attacker is a different threat model and a different
+  suite, and `docs/adr/0001_trust_boundary.md` has said so since M6.
+- **It is one model on a synthetic corpus.** The `refusal` payload is the sharpest illustration of
+  what a single arm buys: it beat `gullible` 24 of 24 by construction and beat `claude-opus-5` 0 of
+  24, and both facts are about those two readers rather than about the payload.
 
 **Third, and this is the result the ADR was missing — the gate inverts.** On the same predictions:
 
@@ -723,7 +759,7 @@ different matter and is the one M7 could not put a model against: the foreign co
 yet. **A real held-out set remains load-bearing** — it is the only place the question gets asked on
 documents nobody generated.
 
-727 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+733 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

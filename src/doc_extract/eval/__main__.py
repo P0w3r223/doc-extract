@@ -66,6 +66,11 @@ GATE_NAME = "gate.md"
 #: M6's attack success rate, likewise — written only for a run over an attacked corpus.
 ATTACK_NAME = "attack.md"
 
+#: What a run records when it sent the pages as images. Owned by `RunMeta`, because the attack
+#: report reads it back to decide which caveat a zero deserves and neither side may keep its own
+#: copy of the sentence.
+VISION = predictions.RunMeta.VISION
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="doc_extract.eval", description=__doc__)
@@ -165,7 +170,7 @@ def _run(args: argparse.Namespace) -> int:
         #: Recorded as an option rather than inferred from the corpus: the same scanned corpus can
         #: be read either way, and a report whose header did not say which was which would put two
         #: incomparable numbers under one name.
-        options["reads"] = "the page as an image"
+        options["reads"] = VISION
     meta = run.meta(corpus, baseline, config=config, options=options)
     #: A baseline writes to a directory named for itself; a remote run writes to one named for the
     #: model, because the baseline is the same `claude` every time and the model is the variable.
@@ -276,7 +281,12 @@ def _attack(args: argparse.Namespace) -> int:
     path.write_bytes(
         attack_report.render(
             study, run=meta, directory=args.run.as_posix(),
-            preamble=attacked_report.render(reaches),
+            #: Which channel this run actually read by, taken from what the run recorded rather
+            #: than from the corpus: the same scanned corpus can be read either way, and the reach
+            #: table's two columns are limits on two different readers.
+            preamble=attacked_report.render(
+                reaches, reads_images=meta.options.get("reads") == VISION
+            ),
         ).encode("utf-8")
     )
 
