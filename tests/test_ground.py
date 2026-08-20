@@ -125,6 +125,46 @@ def test_a_field_the_invoice_does_not_carry_is_absent_not_ungrounded(rendered):
     assert all(g.coverage is None and not g.measured and not g.suspicious for g in absent)
 
 
+def test_a_page_with_no_text_is_answered_no_text_and_never_ungrounded(rendered):
+    """M7c's 3989 false alarms, at the unit that produced them.
+
+    A rasterised scan carries no text layer, so there is nothing to search — and the first version
+    answered `UNGROUNDED` for every value anyway, which claims the value is *missing from the page*
+    when the page is missing. On a correct reading that is a false alarm per asserted value, and
+    `oracle` drew 3989 of them. Not one may survive.
+    """
+    #: What `degrade/page.py` actually produces on a rung with no text layer: no words, so no
+    #: lines, so nothing to assemble. Built through `assemble` rather than stubbed, so the test
+    #: fails if that ever stops being the shape a scan comes back as.
+    blank = source_document.assemble(())
+    assert not blank.text.strip(), "the fixture has to be the page this test is about"
+
+    case = rendered.cases[0]
+    grounded = resolve(blank, case.gold())
+    asked = [g for g in grounded if g.support is not Support.ABSENT]
+
+    assert asked, "a real invoice asserts values, blank page or not"
+    assert not any(g.support is Support.UNGROUNDED for g in asked), "no page, so no accusation"
+    assert not any(g.measured or g.suspicious for g in asked)
+    assert {g.support for g in asked} == {Support.NO_TEXT, Support.NOT_PRINTED}
+
+
+def test_a_code_the_page_never_prints_stays_not_printed_even_when_there_is_no_page(rendered):
+    """The two exclusions are orthogonal, and the order in `_ground` is what keeps them so.
+
+    `NOT_PRINTED` is a property of the field: `kind` is unanswerable on any page at all. Letting
+    `NO_TEXT` swallow it would make a scanned run's two exclusion counts incomparable with a clean
+    run's, and subtracting one from the other is exactly what a reader of the two reports does.
+    """
+    case = rendered.cases[0]
+    on_a_real_page = {(g.field, g.key) for g in resolve(case.source(), case.gold())
+                      if g.support is Support.NOT_PRINTED}
+    on_no_page = {(g.field, g.key) for g in resolve(source_document.assemble(()), case.gold())
+                  if g.support is Support.NOT_PRINTED}
+
+    assert on_a_real_page and on_no_page == on_a_real_page
+
+
 # --------------------------------------------------------------------------- the search itself
 
 

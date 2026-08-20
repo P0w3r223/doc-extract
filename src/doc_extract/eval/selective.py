@@ -17,6 +17,13 @@ beside the numbers rather than buried: the curve answers *"of the values it gave
 trust"*, and a model that answered less would score better on it. `missed` is reported alongside
 for exactly that reason — it is the count the curve cannot see.
 
+**Nor is a value on a page with no text to search.** Grounding returns `NO_TEXT` there rather than
+`UNGROUNDED`, so a scan's values leave the curve instead of filling it with false alarms. What that
+changed is in `Excluded.without_text`: the figure a text-less run reports is now over the values the
+pipeline could actually assess, and the count of the ones it could not is printed beside it. The
+alternative was measured before it was fixed — on M7e's attacked scans, keeping them in made the
+high-confidence bucket *less* accurate than accepting everything.
+
 **The two signals are also measured apart.** Grounding and the arithmetic are reported as their own
 field-level detectors before the curve combines them, because they are complements with very
 different shapes and a reader who sees only the combination cannot tell which did the work.
@@ -30,6 +37,7 @@ from dataclasses import dataclass
 from doc_extract.decide.confidence import Assessment, Confidence, assess
 from doc_extract.eval import detector
 from doc_extract.eval.scorer import Outcome, compare
+from doc_extract.ground.resolve import Support
 from doc_extract.schema import invariants
 from doc_extract.schema.invariants import Severity
 from doc_extract.schema.ksef import Invoice
@@ -44,6 +52,28 @@ MISSED = Outcome.MISSED
 LEVELS: tuple[Confidence, ...] = (
     Confidence.HIGH, Confidence.MEDIUM, Confidence.LOW, Confidence.NONE
 )
+
+
+@dataclass(frozen=True, slots=True)
+class Excluded:
+    """The ways an asserted or expected value stays out of the curve, counted apart.
+
+    Three different statements, and pooling them would lose the one a reader needs. `missed` is the
+    model's silence, `unassessable` is a question grounding declines on principle, and
+    `without_text` is a question it could not put because the page had no text. A single "excluded"
+    total would make a scanned run look like a talkative model with an odd schema.
+    """
+
+    missed: int = 0
+    unassessable: int = 0
+    without_text: int = 0
+
+    def __add__(self, other: Excluded) -> Excluded:
+        return Excluded(
+            missed=self.missed + other.missed,
+            unassessable=self.unassessable + other.unassessable,
+            without_text=self.without_text + other.without_text,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,11 +144,12 @@ class Curve:
     unassessable: int
     #: Documents that produced no invoice at all, so no field of them was ever assessed.
     without_prediction: int
-    #: Values judged on a page that carries **no text at all**, where grounding had nothing to
-    #: resolve against and returned `UNGROUNDED` for every one of them. Counted separately because
-    #: the curve cannot tell that apart from a value the page genuinely does not carry: both arrive
-    #: as the same verdict, and on a corpus of scans the second reading is the wrong one. A gate
-    #: whose headline number is computed mostly over these is measuring the absence of a text layer.
+    #: Values the prediction asserted on a page carrying **no text at all**. Grounding answers
+    #: `NO_TEXT` rather than `UNGROUNDED`, so they sit outside the curve with `unassessable` rather
+    #: than inside it as false alarms — and they are counted apart from it because they mean
+    #: something else: not *this is not a question I ask* but *this page gave me nothing to ask
+    #: with*. A run where this is most of the corpus has a curve over the remainder, and the report
+    #: says which remainder.
     without_text: int = 0
 
     @property
@@ -135,18 +166,17 @@ def judge(
     gold: Invoice,
     prediction: Invoice,
     document: SourceDocument,
-) -> tuple[tuple[Judged, ...], int, int]:
-    """One document: the gate's verdict on each asserted field, and the two counts it cannot judge.
+) -> tuple[tuple[Judged, ...], Excluded]:
+    """One document: the gate's verdict on each asserted field, and the values it cannot judge.
 
-    Returns the rows, the gold values the prediction never asserted, and the asserted values
-    grounding declines to ask about. Both counts are returned rather than dropped because each is
+    Returns the rows and an `Excluded`. The counts are returned rather than dropped because each is
     an exclusion from the curve's denominator, and an exclusion the report does not print is the
     subset the metric rules exist to forbid.
     """
     assessments = {(a.field, a.key): a for a in assess(document, prediction)}
     named = _named(prediction)
     rows: list[Judged] = []
-    missed = unassessable = 0
+    missed = unassessable = without_text = 0
     seen: set[tuple[str, str]] = set()
 
     for result in compare(gold, prediction):
@@ -165,7 +195,13 @@ def judge(
 
         assessment = assessments.get(identity)
         if assessment is None or not assessment.assessed:
-            unassessable += 1
+            #: Split by *why* grounding stayed silent, because the two are different findings: a
+            #: page with no text layer excludes every value on it, and pooling that with `kind`
+            #: would report a scanner as a schema quirk.
+            if assessment is not None and assessment.support is Support.NO_TEXT:
+                without_text += 1
+            else:
+                unassessable += 1
             continue
         rows.append(Judged(
             doc_id=doc_id,
@@ -179,7 +215,9 @@ def judge(
             #: would undercount the arithmetic signal precisely where it is the only one talking.
             accused=result.field in named,
         ))
-    return tuple(rows), missed, unassessable
+    return tuple(rows), Excluded(
+        missed=missed, unassessable=unassessable, without_text=without_text
+    )
 
 
 def _confidence(assessment: Assessment) -> Confidence:

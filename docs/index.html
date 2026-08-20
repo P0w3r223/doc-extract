@@ -319,32 +319,43 @@ damage to the image.</p>
 <!-- corpus-dependent: begin -->
 <p><strong>The column above is not the finding. What a scan does to the
 <em>gate</em> is.</strong> Run the oracle &mdash; a perfect reading, nothing wrong anywhere &mdash;
-over the scanned corpus, and grounding raises 3989 false alarms:</p>
-<table><thead><tr><th>rung</th><th class="num">grounded</th><th class="num">ungrounded</th></tr></thead>
+over the scanned corpus, and grounding has nothing to resolve against on two of the three
+rungs:</p>
+<table><thead><tr><th>rung</th><th class="num">could ask</th><th class="num">false alarms</th><th class="num">no text to search</th></tr></thead>
 <tbody>
-    <tr><th><code>searchable</code></th><td class="num">1903</td><td class="num">0</td></tr>
-    <tr><th><code>rasterised</code></th><td class="num">0</td><td class="num">2010</td></tr>
-    <tr><th><code>scanned</code></th><td class="num">0</td><td class="num">1979</td></tr>
+    <tr><th><code>searchable</code></th><td class="num">1903</td><td class="num">0</td><td class="num">0</td></tr>
+    <tr><th><code>rasterised</code></th><td class="num">0</td><td class="num">0</td><td class="num">2010</td></tr>
+    <tr><th><code>scanned</code></th><td class="num">0</td><td class="num">0</td><td class="num">1979</td></tr>
 </tbody></table>
-<p class="note">Grounding resolves a value to a span of page text, and there is no page text. It
-does not degrade &mdash; it inverts, and it inverts <em>silently</em>: an ungrounded correct value
-looks exactly like an ungrounded fabricated one. Of the two signals the routing gate is built on,
-only the arithmetic survives a scan &mdash; and that is the one an adversary can satisfy on
-purpose.</p>
+<p class="note">The last column was the finding, and it was a defect. Grounding resolves a value to
+a span of page text; where there is none it used to answer <code>UNGROUNDED</code> anyway, so every
+one of those 3989 values arrived as a <strong>false alarm on a reading with nothing wrong in
+it</strong>. That does not degrade, it <em>inverts</em>, and silently: an ungrounded correct value
+looks exactly like an ungrounded fabricated one. It now answers <em>I could not ask</em>, so those
+values leave the curve rather than filling it, and the count is printed above every affected
+<code>gate.md</code>. The false alarms are gone entirely &mdash; not one on this run. <strong>Of the two signals the routing gate is built
+on, only the arithmetic survives a scan</strong>, and that is the one an adversary can satisfy on
+purpose &mdash; so what changed is that the gate reports having no opinion where it used to report
+a wrong one. A better instrument, and the same missing capability.</p>
 <p>And the mirror of it, on a population of real mistakes: <code>claude-haiku-4-5</code>
 reading the same pages as images.</p>
-<table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
+<table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th><th class="num">could not ask</th></tr></thead>
 <tbody>
-    <tr><th><code>searchable</code></th><td class="num">136</td><td class="num">0</td><td class="num">9</td><td class="num">100&nbsp;%</td><td class="num">93.8&nbsp;%</td></tr>
-    <tr><th><code>rasterised</code></th><td class="num">167</td><td class="num">1665</td><td class="num">0</td><td class="num">9.1&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
-    <tr><th><code>scanned</code></th><td class="num">140</td><td class="num">1820</td><td class="num">0</td><td class="num">7.1&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
+    <tr><th><code>searchable</code></th><td class="num">136</td><td class="num">0</td><td class="num">9</td><td class="num">100&nbsp;%</td><td class="num">93.8&nbsp;%</td><td class="num">0</td></tr>
+    <tr><th><code>rasterised</code></th><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">1832</td></tr>
+    <tr><th><code>scanned</code></th><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">1960</td></tr>
 </tbody></table>
 <p class="note">Read the first row against the other two. Where a text layer survives, grounding is
 at its <em>most</em> precise measurement anywhere in this project &mdash; it catches almost every
-wrong value and raises no false alarm at all. Where there is none it flags everything, so its recall
-is 100&nbsp;% by vacuity and its precision collapses. <strong>The gate does not survive a scan; it
-survives an OCR</strong> &mdash; which is a usable engineering conclusion rather than a negative
-one: put a recogniser in front of the model and the signal comes back.</p>
+wrong value and raises no false alarm at all, on a real population of vision errors rather than an
+injected one. On <code>rasterised</code> and <code>scanned</code> it does not answer: every value falls in the last column, and the row is
+empty because <strong>the signal is absent there rather than weak</strong>. That is the honest
+shape, and it is also the reason the confusion cells are worth printing per rung instead of pooled
+&mdash; pooled over the whole corpus, this signal once looked barely precise at all, which was a
+measurement of the missing text layer wearing the reader's name. <strong>The gate does not survive
+a scan; it
+survives an OCR</strong> &mdash; a usable engineering conclusion rather than a negative one: put a
+recogniser in front of the model and the signal comes back.</p>
 <!-- corpus-dependent: end -->
 
 <h2>The gap this fills</h2>
@@ -530,14 +541,14 @@ the compliant control every time and the model above not once, which is a fact a
 rather than about the payload. The structural defences are still what the case rests on, because
 they are what holds when the reader is not this one.</p>
 <!-- corpus-dependent: begin -->
-<p><strong>And the gate inverts.</strong> Accepting only the high-confidence values
-covers 20.1 % of what the reader asserted at 99.0 % accuracy and
-lets 18 wrong values through; accepting <em>everything</em> is
-99.2 % accurate. <strong>The gate's own bucket is the less accurate one.</strong>
-The only values that ground are those on a page that kept a text layer &mdash; which is exactly the
-rung where the attacks worked &mdash; so the gate concentrates the attacked-and-obeyed values into
-the bucket it calls high confidence. On a population of model <em>errors</em> the same gate raised
-accuracy instead of lowering it, and the committed <code>gate.md</code> files hold both curves.</p>
+<p><strong>And the gate is selective again</strong> &mdash; more accurate on less work, which is what a gate is for. Accepting only the high-confidence values covers 65.3 % of what this
+pipeline could assess at 99.0 % accuracy and lets 18 wrong values
+through; accepting <em>everything</em> is 97.6 % accurate and leaks
+66. It was not, until grounding learned to say <em>I could not ask</em>. While a value on a page with no text came back as <code>UNGROUNDED</code>, the only values that could reach the confident bucket were those on the rung that kept a text layer &mdash; which is exactly the rung where the attacks worked &mdash; so the gate collected the attacked-and-obeyed values into the bucket it called high confidence, and auto-accepting that bucket scored <em>worse</em> than accepting everything. The inversion was the instrument, and fixing the instrument was the milestone after this one.</p>
+<p class="note">Both figures are over the 2697 values the gate could form an opinion
+about. The other 6048 sit on a page with no text layer, and it has
+<strong>no signal on them at all</strong> &mdash; not a low one. That is the cost a scan actually
+imposes here, and it is a property of the page rather than of the reader.</p>
 <!-- corpus-dependent: end -->
 
 <h2>What is not built yet</h2>
@@ -550,9 +561,10 @@ page at all.</p>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
     <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms and one paid</td></tr>
     <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on two of the three</td></tr>
+    <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">built</td></tr>
     <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">not built</td></tr>
     <tr><th>&mdash; an adaptive attacker, which no fixed payload set stands in for</th><td class="num">not built</td></tr>
-    <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a check that a grounded value sits where the page would <em>print</em> it</th><td class="num">not built</td></tr>
     <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
 </table>
@@ -579,7 +591,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>f8db00e</code> &middot; part of a
+  <code>851f901</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

@@ -81,9 +81,11 @@ src/doc_extract/
 
   ground/            # M5 — value -> source span provenance, the complement to the arithmetic
     surface.py       # a normalised value -> the forms a Polish invoice could have printed it in
-    resolve.py       # substring search over a projected page; three levels of support per field
+    resolve.py       # substring search over a projected page; three levels of support per field,
+                     # and `NO_TEXT` for the page that gave it nothing to search
   decide/            # M5 — the runtime gate. Reads a prediction against its page, never the gold
-    confidence.py    # four levels from the two measured signals, and accept / review / reject
+    confidence.py    # four levels from the two measured signals, and accept / review / reject;
+                     # a value it could not check is reviewed, never accepted
   foreign/           # M7 — the same gold on a page whose vocabulary nothing here has seen
     dialect.py       # three Polish label sets, number formats and column orders, as data
     render.py        # three unfamiliar layouts; imports nothing from `synth/render.py`
@@ -319,14 +321,21 @@ re-run a paid model to be checked would be one too.
    survive a scan. `degrade/attacked.py` then composes M6 with M7c — the attacked grid photographed,
    which `docs/adr/0001_trust_boundary.md` had named as unbuilt — and answers the question that
    composition was for: a scan deletes the white-ink attack outright, the two text-less rungs' zero
-   attack success rate is blindness rather than defence, and **the gate's accepted bucket becomes
+   attack success rate is blindness rather than defence, and **the gate's accepted bucket became
    less accurate than answering everything** (*What a scan does to an attacked page* above). A paid
    vision arm then asks what a real model does with a page it *can* read: `claude-opus-5` obeys
    **none** of the 108 payloads printed in ink in front of it, and makes no reading error anywhere
-   in the corpus. Still open: a paid arm over the *foreign* corpus, which is a separate spend and a
-   separate question; teaching grounding to say *there was nothing to look in* rather than
-   *ungrounded*; an adaptive attacker, which no fixed payload set can stand in for; and the
-   synthetic↔real gap as an artifact of its own rather than as four sections.
+   in the corpus. **M7g then took that inversion apart and it was the instrument**: grounding said
+   `UNGROUNDED` where it meant *there was nothing to look in*, so `ground/` grew a third verdict,
+   `decide/` routes such a value to review rather than accepting it, and the curve is computed over
+   what the pipeline could actually assess. That removed **3989 false alarms raised against a
+   perfect reading** of the scanned corpus, made the gate selective again on the attacked one
+   (65.3 % coverage at 99.0 % against 97.6 % for answering everything), and moved no leaked value at
+   all — fixing a measurement defends nothing, and that is the point of recording it as one. Still
+   open: a paid arm over the *foreign* corpus, which is a separate spend and a separate question; a
+   check that a grounded value sits where the page would *print* it and not merely somewhere on it;
+   an adaptive attacker, which no fixed payload set can stand in for; and the synthetic↔real gap as
+   an artifact of its own rather than as four sections.
 
 ## The headline answer, and what it is really measuring
 
@@ -446,18 +455,23 @@ the reason they fail on the clean page, so 74 `schema_invalid` in all.
 **But the column is not the finding. What a scan does to the gate is.** Run `oracle` — a *perfect*
 reading, nothing wrong anywhere — over the scanned corpus:
 
-| rung | grounded | ungrounded |
-|---|---:|---:|
-| `searchable` | 1903 | 0 |
-| `rasterised` | 0 | 2010 |
-| `scanned` | 0 | 1979 |
+| rung | could ask | false alarms | no text to search |
+|---|---:|---:|---:|
+| `searchable` | 1903 | 0 | 0 |
+| `rasterised` | 0 | 0 | 2010 |
+| `scanned` | 0 | 0 | 1979 |
 
-Grounding resolves a value to a span of page text and there is none, so it returns `UNGROUNDED` for
-every value on both text-less rungs: **3989 false alarms out of 5892 asserted values, on a reading
-with nothing wrong in it**, and high-confidence coverage of 32.3 %. It does not degrade — it
-inverts, and it inverts *silently*, since an ungrounded correct value is indistinguishable from an
-ungrounded fabricated one. Of the gate's two signals only the arithmetic survives a scan, and M6
-already showed that is the one an adversary can satisfy on purpose.
+Grounding resolves a value to a span of page text and on two rungs there is none. **The last column
+used to be the second**: the signal answered `UNGROUNDED` regardless, which made every one of those
+3989 values a false alarm against a reading with nothing wrong in it, out of 5892 asserted, and left
+high-confidence coverage at 32.3 %. It did not degrade — it inverted, and *silently*, since an
+ungrounded correct value is indistinguishable from an ungrounded fabricated one. **M7g gave it a
+third verdict** (`Support.NO_TEXT`, *I could not ask*), so those values leave the curve instead of
+filling it and the count is printed above every affected `gate.md`. The alarms are gone; the signal
+is not back. Of the gate's two signals only the arithmetic survives a scan, and M6 already showed
+that is the one an adversary can satisfy on purpose — so what M7g bought is a gate that reports
+having **no opinion** where it used to report a wrong one, over the 67.7 % of this corpus it cannot
+see into.
 
 ### What a model reads off it, and what the gate can still tell it
 
@@ -485,25 +499,34 @@ mirror of the baseline table, where it decides everything.
 Then split the same run's grounding by whether the page kept a text layer, and the picture reverses
 again:
 
-| rung | TP | FP | FN | precision | recall |
-|---|---:|---:|---:|---:|---:|
-| `searchable` | 136 | **0** | 9 | **100 %** | 93.8 % |
-| `rasterised` | 167 | 1665 | 0 | 9.1 % | 100 % |
-| `scanned` | 140 | 1820 | 0 | 7.1 % | 100 % |
+| rung | TP | FP | FN | precision | recall | could not ask |
+|---|---:|---:|---:|---:|---:|---:|
+| `searchable` | 136 | **0** | 9 | **100 %** | 93.8 % | 0 |
+| `rasterised` | 0 | 0 | 0 | — | — | 1832 |
+| `scanned` | 0 | 0 | 0 | — | — | 1960 |
 
 That first row is grounding's **most precise measurement anywhere in this project** — not one false
 alarm on 1902 asserted values, on a real vision-error population rather than an injected one. It is
 the precision that row establishes and not the recall: nine wrong values there grounded anyway. The
-other two rungs flag everything, so their recall is 100 % by vacuity. **The gate does not survive
-a scan; it survives an OCR**, and that is a usable engineering conclusion rather than a negative
-result: a recogniser in front of the model brings the signal back. It is also why the `searchable`
-rung is a control and not a curiosity — it is the pipeline anyone would actually deploy.
+other two rungs are **empty rather than bad**, which is M7g: before it they read 9.1 % and 7.1 %
+precision at a recall of 100 % — a signal flagging everything, whose recall was vacuous and whose
+precision was a measurement of the missing text layer wearing the reader's name. That is also what
+made the *pooled* figure worth distrusting: `gate.md` reported this signal at **11.3 % precision**
+over the whole corpus, and it now reports 100 %, which is the `searchable` row because that is the
+only rung with anything in it. **The gate does not survive a scan; it survives an OCR**, and that is
+a usable engineering
+conclusion rather than a negative result: a recogniser in front of the model brings the signal back.
+It is also why the `searchable` rung is a control and not a curiosity — it is the pipeline anyone
+would actually deploy.
 
-**The coverage is paid whether or not the model needed watching.** `claude-opus-5` gets one value
-wrong in the whole corpus and still reaches only **32.3 %** high-confidence coverage — the oracle's
-figure to the printed precision, because only the `searchable` third can ground at all — against
-**100 %** for the same model on a clean page. Two thirds of a nearly perfect reading is routed to
-review by a signal that had nothing to say about it.
+**And the coverage figure was itself an artifact.** `claude-opus-5` gets one value wrong in the
+whole corpus and used to reach **32.3 %** high-confidence coverage, because the two thirds of the
+corpus grounding could not see into were counted as values it had *rejected*. They are now counted
+as values it was never asked about: coverage at `high` is **99.9 %** of the 1903 values this
+pipeline can assess, and the 3989 it cannot are reported beside it rather than inside it. The
+capability that is missing did not change — the gate still has nothing to say about two thirds of a
+scanned corpus — but *nothing to say* and *reject* are different claims and only one of them was
+true.
 
 The vision path is what is left when the text layer is gone, and it is one pipeline rather than two:
 `images` on the request chooses the modality, and the schema, the repair loop with its own budget,
@@ -592,28 +615,38 @@ over-read:
   what a single arm buys: it beat `gullible` 24 of 24 by construction and beat `claude-opus-5` 0 of
   24, and both facts are about those two readers rather than about the payload.
 
-**Third, and this is the result the ADR was missing — the gate inverts.** On the same predictions:
+**Third, and this is the result the ADR was missing — the gate inverted. M7g found out why, and it
+was the instrument.** On the same predictions, before and after:
 
-| accept down to | coverage | accuracy | leaked |
-|---|---:|---:|---:|
-| `high` | **20.1 %** | **99.0 %** | 18 |
-| `none` (answer everything) | 100 % | **99.2 %** | 66 |
+| accept down to | coverage | accuracy | leaked | | coverage | accuracy | leaked |
+|---|---:|---:|---:|---|---:|---:|---:|
+| `high` | 20.1 % | **99.0 %** | 18 | | **65.3 %** | **99.0 %** | 18 |
+| `none` (answer everything) | 100 % | **99.2 %** | 66 | | 100 % | **97.6 %** | 66 |
 
-**Auto-accepting only the high-confidence values is less accurate than accepting everything**, while
-doing a fifth of the work. The mechanism is not subtle once stated: the only values that ground are
-the ones on a page that kept a text layer, and that is exactly the rung where the attacks worked, so
-the gate concentrates the attacked-and-obeyed values into the bucket it calls high confidence. On
-M5's population of model *errors* the same gate turned 98.7 % into 99.96 %. Here it is
-anti-selective, and *`grounding` returning `UNGROUNDED` where it means "there was no text to look
-in" is the reason* — `decide/` cannot tell those two apart, and separating them is the first thing
-to build next.
+*Left: as M7e reported it. Right: after M7g.* Auto-accepting only the high-confidence values used to
+be **less accurate than accepting everything**, while doing a fifth of the work. The mechanism was
+not subtle once stated: the only values that grounded were the ones on a page that kept a text
+layer, and that is exactly the rung where the attacks worked, so the gate concentrated the
+attacked-and-obeyed values into the bucket it called high confidence. On M5's population of model
+*errors* the same gate turned 98.7 % into 99.96 %; here it was anti-selective — and
+*`grounding` returning `UNGROUNDED` where it meant "there was no text to look in" was the reason*.
 
-**Until it is, the gate report says so about itself.** `selective.Curve.without_text` counts the
-assessed values sitting on a page with no text layer, and `selective_report` prints the share above
-its tables when it is non-zero: **69.2 % here, and 67.7 % on M7c's clean scanned corpus**, whose
-`gate.md` had previously reported a coverage figure without mentioning that two thirds of its
-denominator had nothing to resolve against. Counting it does not fix the signal; it stops a curve
-from reading as a property of the reader when most of it is a property of the page.
+**So that is what M7g separated, and the anti-selectivity was an artifact of the conflation.**
+`Support.NO_TEXT` is now its own verdict: a value on a page carrying no text is not judged, leaves
+every denominator, and is routed `review` rather than `accept` — an absent field is a question that
+never arose, while this one arose and could not be put. Both columns on the right are over the same
+2697 values of 8745 asserted, which is what makes them comparable, and the gate behaves as a gate
+again: more accurate on less work. **Not one leaked value moved.** Fixing a measurement defended
+nothing, and the whole content of the correction is that the earlier reading — *routing makes an
+attacked scan worse* — was never a fact about the pipeline.
+
+**What did not change is the capability.** `selective.Curve.without_text` counts the values sitting
+on a page with no text layer and `selective_report` prints the share above its tables: **69.2 %
+here, and 67.7 % on M7c's clean scanned corpus**. The gate has *no signal at all* on those, which is
+still the thing to fix; it now says so instead of reporting a verdict it did not have. The candidate
+next step is the geometric check M5 already named — grounding records spans, so it could ask whether
+a value sits where the page would print it — but that needs a text layer too, and the honest reading
+is that a scan is where a recogniser belongs rather than where a better grounding rule does.
 
 ## The heuristic half, and what it took to measure it
 
@@ -763,7 +796,7 @@ different matter and is the one M7 could not put a model against: the foreign co
 yet. **A real held-out set remains load-bearing** — it is the only place the question gets asked on
 documents nobody generated.
 
-735 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+741 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

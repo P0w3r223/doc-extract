@@ -13,11 +13,18 @@ from decimal import Decimal
 
 import pytest
 
-from doc_extract.decide.confidence import Confidence, Route, assess, route
+from doc_extract.decide.confidence import (
+    UNASSESSED_ROUTES,
+    Confidence,
+    Route,
+    assess,
+    route,
+)
 from doc_extract.eval import selective_report
 from doc_extract.eval.format import DASH, rate
 from doc_extract.eval.predictions import RunMeta
 from doc_extract.eval.selective import Judged, summarise
+from doc_extract.ground.resolve import MEASURED, Support
 from doc_extract.source import document as source_document
 from doc_extract.source.layout import Cell, Line
 from doc_extract.source.words import Word
@@ -96,6 +103,43 @@ def test_a_value_the_page_cannot_be_asked_about_carries_no_confidence(invoice):
     assert assessed.confidence is None
     assert not assessed.assessed
     assert assessed.reasons == ("unassessed:not_printed",)
+    assert assessed.route is Route.ACCEPT, "a question that never arose is not a reason to stop"
+
+
+# ------------------------------------------------------------------ a page there was nothing to ask
+
+
+def test_a_value_on_a_page_with_no_text_is_reviewed_rather_than_rejected(invoice):
+    """The correction M7e forced, and the distinction it turns on.
+
+    A rejection asserts evidence against the value; there is none here, only the absence of an
+    instrument. So the value carries no confidence — it leaves the curve rather than filling it
+    with a false alarm — and it is routed `review`, because the question did arise and could not
+    be put. Accepting it would report a missing text layer as a clean reading.
+    """
+    assessed = _by_field(assess(source_document.assemble(()), invoice))["buyer.name"]
+
+    assert assessed.confidence is None
+    assert not assessed.assessed
+    assert assessed.route is Route.REVIEW
+    assert assessed.reasons == ("unassessed:no_text",)
+    assert not assessed.suspicious, "grounding did not doubt the value; it never looked at it"
+
+
+def test_a_document_this_pipeline_cannot_read_is_flagged_rather_than_refused(invoice):
+    """Was `reject` before, and the difference is the claim being made rather than the caution.
+
+    `reject` said *these values are not on this page*. On a scan it meant *this page is a picture*,
+    and it was the same verdict either way — which is how the gate came to sort M7e's
+    attacked-and-obeyed values into its most confident bucket.
+    """
+    assert route(assess(source_document.assemble(()), invoice)) is Route.REVIEW
+
+
+def test_every_verdict_that_carries_no_confidence_has_a_route_and_they_are_not_all_the_same():
+    """A `KeyError` here is the right failure — a new verdict must be given a route deliberately."""
+    assert set(UNASSESSED_ROUTES) == set(Support) - MEASURED
+    assert set(UNASSESSED_ROUTES.values()) == {Route.ACCEPT, Route.REVIEW}
 
 
 # --------------------------------------------------------------------------- the gate is a gate
@@ -156,18 +200,20 @@ def test_values_the_model_never_asserted_stay_out_of_the_curve():
     assert curve.points[0].total == 1, "the denominator is what was asserted"
 
 
-def test_a_curve_computed_on_pages_with_no_text_says_so_above_its_tables():
-    """The limit M7e made concrete: grounding cannot tell *absent from the page* from *no page*.
+def test_a_curve_that_dropped_values_for_want_of_a_page_says_so_above_its_tables():
+    """The limit M7e measured, now corrected: those values are outside the curve, and counted.
 
-    Reported rather than corrected — correcting it means teaching `ground/` a third verdict — and
-    reported only when it applies, so a corpus of ordinary pages does not carry the sentence.
+    The denominator the sentence quotes is what the model *asserted* — the judged rows plus the
+    ones dropped — because a share taken over the survivors alone would grow as the exclusion did.
+    Printed only when it applies, so a corpus of ordinary pages does not carry the sentence.
     """
     rows = _rows((Confidence.HIGH, False), (Confidence.NONE, True))
-    curve = summarise(rows, missed=0, without_prediction=0, without_text=1)
+    curve = summarise(rows, missed=0, without_prediction=0, without_text=2)
 
     body = selective_report.render(curve, run=_meta(), directory="results/x")
-    assert "1 of the 2 assessed value(s)" in body
-    assert "no text layer at all" in body
+    assert "2 of the 4 asserted value(s) (50.0 %)" in body
+    assert "outside the curve" in body
+    assert "`NO_TEXT`" in body
 
     silent = summarise(rows, missed=0, without_prediction=0)
     assert silent.without_text == 0

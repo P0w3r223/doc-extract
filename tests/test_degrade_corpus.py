@@ -25,7 +25,8 @@ import pytest
 
 from doc_extract.degrade import corpus as degraded
 from doc_extract.degrade.rungs import RUNGS, SEARCHABLE
-from doc_extract.eval import dataset
+from doc_extract.eval import dataset, run
+from doc_extract.eval.baselines import BY_NAME as BASELINES
 from doc_extract.source import document as source_document
 from doc_extract.synth import corpus as synth_corpus
 from doc_extract.synth import render as synth_render
@@ -120,3 +121,31 @@ def test_a_searchable_page_of_the_corpus_reads_as_its_clean_page_did(built):
     for case in dataset.load(built).cases:
         if case.template == SEARCHABLE.name:
             assert case.source().text == printed[case.doc_id], case.doc_id
+
+
+# --------------------------------------------------------------- what the gate can say about a scan
+
+
+def test_a_perfect_reading_of_a_scan_raises_no_alarm_and_is_measured_only_where_it_could_be(built):
+    """M7c's finding at its source, and the correction to it, on the corpus that produced both.
+
+    `oracle` reads every document exactly right. Before grounding could say *there was nothing to
+    look in*, the two text-less rungs answered `UNGROUNDED` for every asserted value and the run
+    drew 3989 false alarms on a reading with nothing wrong in it — inverting rather than degrading,
+    because an ungrounded correct value looks exactly like an ungrounded fabricated one.
+
+    Now those values leave the curve instead. Two claims, and the second is what keeps the first
+    from being satisfiable by measuring nothing: no alarm anywhere, **and** the survivors are
+    exactly the rung that kept a text layer.
+    """
+    corpus = dataset.load(built)
+    records = run.predict(corpus, BASELINES["oracle"])
+    curve = run.gate(corpus, records)
+
+    assert curve.wrong == 0, "the premise: a perfect reading"
+    assert all(signal.false_positive == 0 for signal in curve.signals)
+    assert curve.without_text > 0, "two of the three rungs carry no text layer"
+
+    searchable = {case.doc_id for case in corpus.cases if case.template == SEARCHABLE.name}
+    assert {row.doc_id for row in curve.judged} == searchable
+    assert curve.points[0].coverage == 1.0, "and on that rung the reading grounds completely"
