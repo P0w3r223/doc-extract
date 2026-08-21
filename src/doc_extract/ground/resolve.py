@@ -355,8 +355,13 @@ class _Page:
         makes the rule usable rather than merely stricter, and it is measured rather than assumed —
         treating *any* alphanumeric group beyond a separator as a continuation fails the control on
         216 of 305 gold identifiers, because `NIP 1130220189 Nabywca` and `PL` at the head of an
-        account both put a word next to one. Digits-only costs no correct identifier on gold for the
-        synthetic, foreign or attacked corpus, and takes all five of M7i's false groundings.
+        account both put a word next to one. Digits-only costs no correct identifier on gold for any
+        of the five corpora, and takes all five of M7i's false groundings.
+
+        It does newly reject one shape, and no corpus here contains it: a correct identifier with a
+        bare group of digits one separator away on the same line. A tab and a newline are outside
+        the separator set, so the rule never reaches across a cell or a line —
+        `docs/adr/0002_placement.md` carries what that bounds and what it does not.
         """
         before = projection.origin[start] - 1
         after = projection.origin[end - 1] + 1

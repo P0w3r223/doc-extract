@@ -12,9 +12,18 @@ Related to: `CLAUDE.md` (the rules these results were produced under), `results/
 These sections lived in `CLAUDE.md` until they were 64 % of it. They are the project's results,
 not its rules: a session that adds a renderer or a source-layer test does not need them, and a
 session that writes up a milestone needs almost all of them. `CLAUDE.md` keeps an index saying
-which is which. **The numbers here are the committed artifacts' numbers** — every one is
-reproducible from `results/` by a command in `CLAUDE.md`, and where a later milestone narrowed an
-earlier claim the narrowing is written into the earlier section rather than appended after it.
+which is which. Where a later milestone narrowed an earlier claim, the narrowing is written into
+the earlier section rather than appended after it.
+
+**Two kinds of number appear here and they are not equally reproducible.** Anything sourced from a
+run — every rate, every confusion matrix, every curve — comes from a committed artifact under
+`results/` and a command in `CLAUDE.md` reproduces it. The rest are **one-off controls**: figures
+measured against a rule that was considered and *not shipped*, so no artifact holds them and no
+command reproduces them. They are what a decision was made on, and each says what was measured —
+`216 of 305` gold identifiers under a boundary rule that was rejected, `52.1 %` under cell-anchoring,
+`1462/5892` and its two siblings for geometric rules that do not exist in the code, `8.9 %` for the
+column-region variant, and the four-mechanism split of M7i's discounts. Re-deriving one means
+re-instrumenting the layer, which is the price of recording a rejected alternative at all.
 
 ---
 
@@ -196,8 +205,8 @@ fail mod-97, the check-digit rule flags all 11, and they route 6 `reject` / 5 `r
 further group of digits continues an identifier, a word ends one.** The asymmetry is measured rather
 than assumed — treating any alphanumeric group as a continuation fails the gold control on 216 of
 305 identifiers, because `NIP 1130220189 Nabywca` and an account's own `PL` head both put a word one
-space away. Digits-only costs no correct identifier on gold for the synthetic, foreign or attacked
-corpus and takes all five false groundings, so grounding's recall on this arm goes **34.8 % →
+space away. Digits-only costs no correct identifier on gold for any of the five corpora and takes
+all five false groundings, so grounding's recall on this arm goes **34.8 % →
 38.3 %** at precision **still 100 %**. It moved exactly what the diagnosis predicted and nothing
 else: of 31 committed artifacts, one changed, and in it the `medium` and `low` rows only — five
 values from `review` to `reject`, `high` and its leak count untouched.
@@ -694,7 +703,7 @@ printed on. An attack the model never saw would otherwise land in the denominato
 attack, which is the one direction an attack success rate must not be wrong in.
 
 All of the above is on a page nobody photographed. What a scan does to it — including to the
-`invisible` placement, which it deletes — is *What a scan does to an attacked page* below.
+`invisible` placement, which it deletes — is *What a scan does to an attacked page*, above.
 
 ## The corpus is saturated, and that is also a finding
 

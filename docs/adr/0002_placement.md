@@ -277,8 +277,9 @@ through once, and a further group of digits continues an identifier while a word
 The asymmetry is the whole content, and it is measured. Treating *any* alphanumeric group beyond a
 separator as a continuation fails the gold control on **216 of 305** identifiers — `NIP 1130220189
 Nabywca` puts a word one space after a NIP, and an account's own `PL` head puts one before the
-digits. Digits-only costs **no** correct identifier on gold for the synthetic, foreign or attacked
-corpus, and takes all five false groundings. The hyphen joins the four grouping spaces in the
+digits. Digits-only costs **no** correct identifier on gold for any of the five corpora — 305, 305
+and 315 identifiers on `synthetic`, `foreign` and `attacked`, and 99 and 154 on the `searchable`
+rung of the two scanned ones — and takes all five false groundings. The hyphen joins the four grouping spaces in the
 separator set for the same reason a space is there: a NIP is written `231-346-08-32`.
 
 It behaved exactly as the paragraph above predicted, which is the useful part of having predicted
@@ -292,3 +293,14 @@ normalised past the separators, and it now compensates for that by re-reading th
 ends. A projection that carried its separators would answer directly and is the better shape; it was
 not built, because the compensation clears the control on three corpora and the difference would be
 invisible on all of them.
+
+**And one shape it newly rejects, which no corpus here contains.** Looking through a separator makes
+a *correct* identifier ungrounded when a bare group of digits sits one separator away from it on the
+same line: `NIP 1130220189 2026` and `kwota 1234 PL61…` both go `GROUNDED` → `UNGROUNDED` on a page
+built to have them. It costs nothing here — gold loses **zero** identifiers on all five corpora
+(`synthetic`, `foreign`, `attacked`, and the `searchable` rung of `scanned` and `attacked-scanned`)
+— and the blast radius is bounded by what is *not* in the separator set: a tab and a newline are
+not, so the rule never reaches across a cell or a line. But a real held-out set is milestone 7's
+named open item, and this is the shape that would show up there as grounding's first false alarm in
+this project's history. A projection that carried its separators would not have it, which is the
+second reason to prefer that shape over the compensation.

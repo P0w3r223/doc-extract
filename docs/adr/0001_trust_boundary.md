@@ -129,10 +129,14 @@ rules above, whose value is that they hold regardless of what the page says.
   whichever occurrence of each word came first, not a location — and `docs/adr/0002_placement.md`
   records what that cost and what fixing it did and did not buy. A text value now resolves to one
   place, and **the half of the geometric check that needs no knowledge of which column is which is
-  built**: `ground/joint.py` refuses a reading whose values cannot each be given a place of their
-  own, which on this corpus names the amount fields of every injected row. The half in this bullet
-  — *payment block or footnote* — is not, and the ADR above argues it is out of `ground/`'s reach
-  rather than pending, because deciding it means knowing what the block is called.
+  built**: `ground/joint.py` names any value the reading cannot give a place of its own, and
+  `decide/` demotes it one level to `review`. It refuses nothing and its unit is the value, not the
+  document. On `data/attacked` that names the `net` and `unit_price_net` of all 16 `line_injected`
+  breaches — a property of that payload stating a *single* amount, which a compliant reader books as
+  a row of quantity 1, rather than a detector of injected rows in general. Its operational effect is
+  small and measured: one curve row across 24 committed runs. The half in this bullet — *payment
+  block or footnote* — is not built, and the ADR above argues it is out of `ground/`'s reach rather
+  than pending, because deciding it means knowing what the block is called.
 * **The suite measures placements, not adaptivity.** Every payload is a fixed string; none of them
   responds to a failed attempt. An adaptive attacker is a different threat model and a different
   suite — and the section below sharpens what that costs: an attacker who knows the invoice will be

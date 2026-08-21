@@ -233,8 +233,14 @@ def test_an_account_missing_its_last_group_does_not_ground_on_the_groups_it_kept
     alphanumerics. Five of `claude-haiku-4-5`'s dropped accounts grounded that way on the foreign
     corpus, while one truncated **mid**-group did not — the grouping boundary was the determinant,
     not the layout.
+
+    **The value has to stop exactly where a group does, and this test's first version did not.** It
+    dropped a digit *inside* a group, whose next source character is another digit — which the
+    old rule already rejected, so the test passed against both rules and pinned nothing. Here the
+    account keeps every group but the last, so what follows it is the space the old rule read as a
+    boundary.
     """
-    truncated = invoice.model_copy(update={"payment_account": "PL61109010140000071219"})
+    truncated = invoice.model_copy(update={"payment_account": "PL6110901014000007121981"})
     page = _page([["Rachunek:", "PL", "61", "1090", "1014", "0000", "0712", "1981", "2874"]])
     assert {g.field: g for g in resolve(page, truncated)}["payment_account"].support \
         is Support.UNGROUNDED
