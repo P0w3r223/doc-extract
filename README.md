@@ -46,10 +46,12 @@ the detector has nothing to detect. What it does establish is that the gate neve
 work — **0 false positives on 108 correct documents**. The question itself is answered on a second
 arm: the same corpus, the same pipeline, a weaker model. Milestone 7 adds two more corpora that vary
 the page without touching the gold — the same invoices printed in an unfamiliar vocabulary, and the
-same page photographed — and reads the photographs as pixels. **Neither un-saturates it for a frontier
-model, and only one of the two has been asked to:** `claude-opus-5` reads a 150 dpi scan at 99.98 %,
-while the regex baseline drops to 0 % on every rung that loses the text layer. The foreign corpus
-has no model arm.
+same page photographed — and reads the photographs as pixels. **Both have now been put to a model,
+and neither un-saturates the corpus:** `claude-opus-5` reads a 150 dpi scan at 99.98 % and an
+unfamiliar layout at 100 %, while the regex baseline drops to 0 % on every rung that loses the text
+layer and to 0 % on every foreign page. Neither axis this project can synthesise is what a frontier
+model is short on. What the foreign arm *did* buy is an error population of a different **shape** —
+a column shift the gate is structurally blind to — which is the more useful result and is below.
 
 The scanner is then pointed at the attacked corpus, and that produced the sharpest negative in the
 project: **on an attacked scan, auto-accepting the gate's high-confidence values is less accurate
@@ -157,11 +159,13 @@ puts the description **last**), other number and date formats, and a layout that
 **before** the rows they summarise. Same seed, same invoices, document for document — so a
 difference between the two columns is the **page**, because nothing else moved.
 
-| baseline | its own page | an unfamiliar page | read at all |
+| reader | its own page | an unfamiliar page | read at all |
 |---|---:|---:|---:|
 | `oracle` | 100 % | 100 % | 108 / 108 |
 | `constant` | 3.0 % | 3.0 % | 108 / 108 |
 | `pattern` | **86.3 %** | **0.0 %** | **0 / 108** |
+| `claude-opus-5` | 100 % | **100 %** | 108 / 108 |
+| `claude-haiku-4-5` | 97.8 % | **98.1 %** | 108 / 108 |
 
 `pattern` did not read the page badly — it could not *begin*. Not one of the 108 documents produced
 an invoice the schema would accept, every one recorded as `schema_invalid`. Of the eleven fields its
@@ -177,6 +181,19 @@ at the page and scores *identically* on both, which is what a paired comparison 
 that reads nothing. And the gold grounds against its own foreign page **0 ungrounded of 5892** — the
 same control that caught four defects when `ground/` was built, so the corpus is not merely
 different, it is still solvable.
+
+**Both model rows are paid arms over the same corpus, $4.10 in all — and neither model pays for the
+unfamiliar layout.** `claude-opus-5` reads all 108 exactly; `claude-haiku-4-5` scores *above* its
+own-page figure. Presentation is what a parser is made of and very nearly nothing to a model.
+
+The accuracy column hides the finding, though. haiku's **exactly-right documents** fall 60.2 % →
+48.1 % and its schema repairs go 1 → 7: the same error rate, spread over more documents. And its
+errors change shape into a **column shift** — of 58 spurious discounts, 50 are that row's own `net`,
+and all 58 are on the two dialects that reorder columns. A value one column over is on the page, in
+the right row, so grounding resolves it and stays silent: its recall falls **85.7 % → 34.8 %** with
+precision still 100 %. The gate still helps (97.6 % → 98.9 % on 82.3 % of the work) but leaks 53
+values where it leaked 2. This is the wrong-column blind spot, measured on a real model instead of a
+regex — see [`docs/adr/0002_placement.md`](docs/adr/0002_placement.md).
 
 **It is not a real held-out set and does not claim to be.** It holds the semantics fixed on purpose,
 which is what lets it attribute a drop to presentation and nothing else; real invoices also bring
@@ -308,14 +325,14 @@ letting a zero read as a miss.
 | `foreign/` | the same gold on three unfamiliar Polish layouts — how much of a reading was the template |
 | `degrade/`, `source/raster.py` | the same page photographed at three rungs of legibility, and the pixels a model is sent |
 | `degrade/attacked.py` | M6's grid photographed — which channel a payload still reaches a reader by |
-| tests | **744 passing**, ruff clean |
+| tests | **762 passing**, ruff clean |
 
-Milestone 7 has both held-out corpora, the vision path, paid arms reading the scanned corpus and the
-attacked scan as images. What it has **not** got is a paid arm over the *foreign* corpus — a
-separate spend and a separate question — a grounding signal that can say *there was nothing to look
-in* rather than *ungrounded*, an adaptive attacker that no fixed payload set can stand in for, and
-the synthetic↔real gap collected into an artifact of its own rather than reported as four sections
-above.
+Milestone 7 has both held-out corpora, the vision path, and paid arms over every one of them — the
+scanned corpus, the attacked scan as images, and now the foreign corpus. What it has **not** got is
+a grounding signal that can tell a value in the *wrong column* from one in the right one (the
+foreign arm is the population that shows why that matters), an adaptive attacker that no fixed
+payload set can stand in for, and the synthetic↔real gap collected into an artifact of its own
+rather than reported as four sections above.
 
 ## What an attacker gets, and what the gate does about it
 
