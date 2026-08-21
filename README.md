@@ -106,9 +106,10 @@ those contend — 24 move the value and leave `net` empty, and 4 shift the whole
 The last two leave the page consistent and only the arithmetic sees them.
 
 The signal contends on **nothing** in any perfect reading — the synthetic, foreign and attacked
-corpora, and both frontier-model arms. It is the only field-level catch of an injected line item
-anywhere here (all 16 breaches on the compliant control, no false positives). And **it moves one row
-of one curve out of 24**, because a duplicated discount breaks the row arithmetic too, so the value
+corpora, and both frontier-model arms. On the compliant control it names the *amount* fields of all
+16 injected rows with no false positives, which grounding cannot see because the payload prints the
+figure; grounding names the same 16 rows by their description, so the two are two views of one
+injected row. And **it moves one row of one curve out of 24**, because a duplicated discount breaks the row arithmetic too, so the value
 was already demoted. What it adds is the *attribution* — two named fields where a violation names
 the whole `lines` collection — and the report derives that per run rather than asserting it.
 

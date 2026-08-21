@@ -96,10 +96,11 @@ def _signals(curve: Curve) -> str:
         "",
         "Field-level detectors of a wrong asserted value. They are complements with very different "
         "shapes, and a reader who saw only their combination could not tell which did the work. "
-        "`contention` is the one whose precision is bounded by construction: when two of a "
-        "reading's values claim one printed figure it flags **both**, because no label-free fact "
-        "says which of the two is the intruder, so about half of what it flags is the correct "
-        "sibling of a wrong value.",
+        "`contention` is the one that accuses a **pair**: when two of a reading's values claim one "
+        "printed figure it flags both, because no label-free fact says which of the two is the "
+        "intruder. Where the sibling is a correct reading that caps its precision near a half; "
+        "where both belong to a row the page never printed, nothing it flags is correct and the "
+        "row below says which of the two this run is.",
         "",
         "| signal | TP | FP | FN | TN | precision | recall |",
         "|---|---:|---:|---:|---:|---:|---:|",

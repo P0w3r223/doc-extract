@@ -354,11 +354,11 @@ re-run a paid model to be checked would be one too.
    independent forms, and grounding's recall falls 85.7 % → 34.8 % at unchanged precision (*What a
    model reads off an unfamiliar page* below). **M7j** then built the **joint placement** M7h scoped
    and M7i gave a population to: `ground/joint.py` asks whether a reading's grounded values can each
-   be given a place of their own, and the population turned out to be three mechanisms rather than
+   be given a place of their own, and the population turned out to be four mechanisms rather than
    one — only *duplication* is a contradiction about the page (*Two fields cannot read one figure*
-   below). Its control is clean on every perfect reading, it is the only field-level catch of an
-   injected line item anywhere here, and **it moves one row of one curve**: the arithmetic had
-   already demoted almost everything it names. Still open: the continuation-aware **completeness**
+   below). Its control is clean on every perfect reading, it names the amount fields of every
+   injected row on the attacked corpus where grounding can only name the description, and **it moves
+   one row of one curve**: the arithmetic had already demoted almost everything it names. Still open: the continuation-aware **completeness**
    check, in `docs/adr/0002_placement.md`; the wrong-column read that asserts nothing else wanting
    the same figure, which M7j leaves exactly where it found it; an adaptive attacker, which no fixed
    payload set can stand in for; and the synthetic↔real gap as an artifact of its own rather than as
@@ -920,16 +920,21 @@ its own.** The ADR recorded the 58 spurious `lines[].discount` values as one fai
 exactly that row's own net*. Split by what the same reading did with the `net` as well, they are
 three mechanisms:
 
-| what the reading did to the row | foreign | own page |
-|---|---:|---:|
-| **duplication** — `discount` := the row's net, and `net` still reads that net | 24 | 9 |
-| **the field moved** — `discount` := the row's net, and `net` is `null` | 24 | 0 |
-| **the column shifted** — `discount` := the row's net, and `net` := the row's vat | 4 | 0 |
-| the discount is not that row's net at all | 6 | 2 |
+| what the reading did to the row | foreign | of those, contend | own page |
+|---|---:|---:|---:|
+| **duplication** — `discount` := the row's net, and `net` still reads that net | 24 | **24** | 9 |
+| **the field moved** — `discount` := the row's net, and `net` is `null` | 24 | 0 | 0 |
+| **the column shifted** — `discount` := the row's net, and `net` := the row's vat | 4 | 0 | 0 |
+| `discount` := the row's net, and `net` is a third figure | 1 | 0 | 0 |
+| the discount is not that row's net at all | 5 | 1 | 2 |
 
-Only the first is a contradiction *about the page*. A moved field leaves nothing behind to contend
-with; a shifted column gives every value a place of its own. Both are invisible here, both are
-caught by the arithmetic, and that is the M5 complementarity on a third population.
+The first four rows are the 53 M7i counted as *exactly that row's own net*. **Duplication is the
+only one of them that leaves a contradiction on the page**, and the signal catches every one: a
+moved field leaves nothing behind to contend with, and a shifted column gives every value a place of
+its own. Both are invisible here, both are caught by the arithmetic, and that is the M5
+complementarity on a third population. The one further catch comes from the last row rather than
+from any of the four — a discount that is not the row's net can still duplicate something else on
+the page — so 25 of the 58 contend and 24 of those are the duplication row entire.
 
 **The control is clean, and getting it clean is where the work was.** Zero contentions on a perfect
 reading of the synthetic, foreign and attacked corpora, and on `pattern` and `noisy` besides. The
@@ -966,8 +971,10 @@ price` too, so the arithmetic has already demoted the value. `selective_report` 
 rather than stating it here: on three of the four runs where the signal fires, **every** contended
 value was already named by a hard rule; on the fourth, 7 were not. What contention adds is the
 **attribution** — it names the two fields sharing a figure where an arithmetic violation names the
-whole `lines` collection and demotes 529 correct values with it — and on the attacked corpus it is
-the only signal in this project that says *which* fields an injected row occupies.
+whole `lines` collection and demotes 529 correct values with it. On the attacked corpus it names
+the injected row's **amount** fields, which grounding cannot: the payload prints its figure, so the
+figure grounds. Grounding names that row too, by its *description*, on the identical 16 rows — so
+the two are two views of one injected row and neither is the only field-level catch of it.
 
 **Two limits.** It needs page text, so it is as silent as grounding on a scan's two text-less rungs.
 And it is not the wrong-column detector: `pattern`'s 292 wrong values still produce **0** catches,
