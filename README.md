@@ -81,9 +81,18 @@ a description wraps across a page break.
 
 That was the case for the grounding layer, arrived at by measurement rather than assumed — and the
 layer, once built, does what the measurement predicted. At the **field** level it scores precision
-100.0 % and recall 84.4 %, with **zero false alarms across 11 652 correctly-read field instances**.
-Its twelve misses are nine wrong discounts, which is exactly what the row arithmetic catches; put
+100.0 % and recall 85.7 %, with **zero false alarms across 11 652 correctly-read field instances** —
+and not one false positive on any of the 22 committed runs. Its eleven misses are nine wrong
+discounts, which is exactly what the row arithmetic catches, plus the two truncated names; put
 together the two leave two wrong fields standing out of 5837.
+
+A value has to be found in **one place** on the page for that to mean anything. It did not used to
+be: grounding walked a text value word by word and took each word's first occurrence anywhere, so a
+buyer's `sp. z o.o.` resolved against the *seller's* legal form and the name came back fully
+supported on another company's ink. Fixing it cost no correct value on any of four populations and
+turned 19 of `pattern`'s previously invisible errors into flagged ones — and it disproved the claim
+this project had been making about what the recorded spans made possible. See
+[`docs/adr/0002_placement.md`](docs/adr/0002_placement.md).
 
 ## What the gate buys
 
@@ -103,8 +112,10 @@ while still doing 89.7 % of the work, and lets two wrong values through instead 
 Three limits, printed beside the numbers rather than left to be found. Coverage is over values the
 model **asserted** — a field it left `null` cannot be grounded, so a model that answered less would
 score better here. Grounding asks whether a value is on the page, **not whether it is in the right
-place**: on the regex baseline it flags nothing at all while 292 values are wrong, because a column
-shift lifts real figures out of the wrong column and every one of them grounds. And `100 %` means
+place**: on the regex baseline it flags 19 of 292 wrong values, because a column shift lifts real
+figures out of the wrong column and almost every one of them grounds. It used to flag *none*, and
+what closed the gap by those 19 was requiring the value to sit in one place; what would close the
+rest is a check nobody here has a control for yet. And `100 %` means
 exactly 100 % — the formatter grows its precision rather than rounding, after an early version
 printed `100.0 %` in a row whose next column said two wrong values had been accepted.
 

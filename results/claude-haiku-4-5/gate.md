@@ -20,7 +20,7 @@ Field-level detectors of a wrong asserted value. They are complements with very 
 
 | signal | TP | FP | FN | TN | precision | recall |
 |---|---:|---:|---:|---:|---:|---:|
-| `grounding` | 65 | 0 | 12 | 5760 | 100 % | 84.4 % |
+| `grounding` | 66 | 0 | 11 | 5760 | 100 % | 85.7 % |
 | `arithmetic` | 42 | 529 | 35 | 5231 | 7.4 % | 54.5 % |
 | `either` | 75 | 529 | 2 | 5231 | 12.4 % | 97.4 % |
 
@@ -31,7 +31,7 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 | accept down to | route | coverage | accuracy | accepted | leaked |
 |---|---|---:|---:|---:|---:|
 | `high` | `accept` | 89.7 % | 99.96 % | 5233 | 2 |
-| `medium` | `review` | 98.9 % | 99.8 % | 5772 | 12 |
+| `medium` | `review` | 98.9 % | 99.8 % | 5771 | 11 |
 | `low` | `review` | 99.5 % | 99.2 % | 5809 | 49 |
 | `none` | `reject` | 100 % | 98.7 % | 5837 | 77 |
 

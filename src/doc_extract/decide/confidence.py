@@ -3,9 +3,9 @@
 `eval/detector.py` and `ground/` each answered half of "is this value right", and the measurements
 say exactly how to combine them — which is the only reason this module is shaped the way it is:
 
-* **Grounding is the field-level signal.** Precision 100 %, recall 84.4 %, and zero false alarms
+* **Grounding is the field-level signal.** Precision 100 %, recall 85.7 %, and zero false alarms
   across 11 652 correctly-read field instances. When it says a value is not on the page, it has
-  been right every time it has been asked.
+  been right every time it has been asked — on all 22 committed runs, not one false positive.
 * **An arithmetic violation is a document-level signal that makes a poor field-level accusation.**
   Its `fields` name a *collection* — `lines` — so attributing it to every field of every row scores
   7.4 % precision against 529 false positives. It is kept, because it catches wrong discounts that

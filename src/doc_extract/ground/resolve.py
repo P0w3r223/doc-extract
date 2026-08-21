@@ -20,6 +20,16 @@ a plain space and the decimal comma a point, or alphanumerics only and uppercase
 a substring, every projected character remembering the offset it came from so a hit maps back to
 spans on the page. The candidate goes through the *same* function as the page.
 
+**A text value is located, not tallied.** Asking of each word separately whether it is anywhere on
+the page grounds a value against evidence belonging to other fields: the buyer's `sp. z o.o.`
+resolved to the *seller's* legal form, because that is where those words occur first. `place.Sheet`
+answers the question this module actually means — is the whole value in **one place** — and the
+spans that come back are that place rather than a bag of occurrences. It cost nothing to impose:
+no correct value on gold, on `claude-opus-5`, on `claude-haiku-4-5` or on `pattern` stopped being
+grounded, while 19 of `pattern`'s wrong descriptions did. The **value** side of a non-text match is
+still every occurrence of the winning candidate, and `docs/adr/0002_placement.md` carries why
+narrowing that one needs a criterion this layer is not allowed to have.
+
 **Three levels of support, because two would lie.** A value is `GROUNDED` when everything it claims
 is on the page, `UNGROUNDED` when none of it is, and `PARTIAL` in between. The middle level is not
 hedging: a wrapped description whose first half was read and whose second half was invented is a
@@ -57,6 +67,7 @@ from enum import StrEnum
 from doc_extract.eval import fields
 from doc_extract.eval.fields import BY_NAME, Match
 from doc_extract.ground import surface
+from doc_extract.ground.place import Place, Sheet, bare
 from doc_extract.schema.ksef import Invoice
 from doc_extract.source.document import SourceDocument, Span
 
@@ -174,9 +185,9 @@ def _ground(field: str, key: str, value: object | None, page: _Page) -> Groundin
         #: Tokens that are pure punctuation carry nothing to look for. The renderer draws an en
         #: dash inside a description as its own word, and asking the page for it would dock every
         #: such description a seventh of its coverage for a character no reading could get wrong.
-        wanted = tuple(t for t in surface.tokens(str(value)) if _bare(t))
-        spans = page.find_words(wanted)
-        coverage = len(spans) / len(wanted) if wanted else 1.0
+        wanted = tuple(t for t in map(bare, surface.tokens(str(value))) if t)
+        place = page.locate(wanted)
+        spans, coverage = place.spans, place.coverage
     else:
         spans = page.find_value(surface.candidates(field, value), BY_NAME[field].match)
         coverage = 1.0 if spans else 0.0
@@ -204,7 +215,7 @@ class _Projection:
 class _Page:
     """One document, projected the ways a lookup needs it. Built once; asked sixty-odd questions."""
 
-    __slots__ = ("_amounts", "_identifiers", "_literal", "_source", "_spans", "_words")
+    __slots__ = ("_amounts", "_identifiers", "_literal", "_sheet", "_source", "_spans")
 
     def __init__(self, document: SourceDocument) -> None:
         self._source = document.text
@@ -214,10 +225,7 @@ class _Page:
         #: Built here like the other two: `_Page` exists to be built once and asked sixty
         #: times, and rebuilding the identity map per lookup quietly undid that.
         self._literal = _Projection(document.text, tuple(range(len(document.text))))
-
-        self._words: dict[str, list[Span]] = {}
-        for span in document.words:
-            _add(self._words, _bare(document.text_of(span)), span)
+        self._sheet = Sheet(document)
 
     @property
     def readable(self) -> bool:
@@ -288,21 +296,15 @@ class _Page:
     def _covering(self, start: int, end: int) -> Iterable[Span]:
         return (span for span in self._spans if span.start < end and span.end > start)
 
-    def find_words(self, wanted: tuple[str, ...]) -> tuple[Span, ...]:
-        """The spans of those of a text value's words that are on the page, with multiplicity.
+    def locate(self, wanted: tuple[str, ...]) -> Place:
+        """The one place on the page holding most of a text value's words, and how much of it.
 
-        Counted with multiplicity: a description claiming a word twice needs it on the page twice,
-        or one of the two is unaccounted for. Without that, a fabricated repetition would ground
-        against a single occurrence elsewhere on the invoice.
+        Delegated rather than done here because it is a different question from the three
+        projections above. Those ask whether a string occurs in the page's text; this asks *where*
+        a value sits, and the answer has to respect the page's cells and columns. `place.Sheet`
+        carries what the distinction cost to discover.
         """
-        remaining: dict[str, list[Span]] = {}
-        found: list[Span] = []
-        for token in wanted:
-            bare = _bare(token)
-            available = remaining.setdefault(bare, list(self._words.get(bare, ())))
-            if available:
-                found.append(available.pop(0))
-        return tuple(found)
+        return self._sheet.locate(wanted)
 
 
 def _amount_boundary(projection: _Projection, start: int, end: int) -> bool:
@@ -348,22 +350,3 @@ def _as_identifier(character: str) -> str | None:
     return character.upper() if character.isalnum() else None
 
 
-#: Punctuation a line-join or a sentence puts around a word. The last three are written as code
-#: points because an ellipsis and the two dashes are hard to tell apart from a hyphen in a diff, and
-#: the difference decides whether a description's dash is stripped or looked for on the page.
-_EDGE_PUNCTUATION = ".,;:()[]\"'" + "".join(map(chr, (0x2026, 0x2013, 0x2014)))
-
-
-def _bare(token: str) -> str:
-    """A word without the punctuation a line-join or a sentence put around it.
-
-    The gold joins an address's lines with a comma, so its second token is `4,` while the page drew
-    `4`. Stripping the edges makes the two the same word, and keeps `50-106` and `m²` intact, which
-    a blanket alphanumeric filter would not.
-    """
-    return token.strip(_EDGE_PUNCTUATION)
-
-
-def _add(table: dict[str, list[Span]], key: str, span: Span) -> None:
-    if key:
-        table.setdefault(key, []).append(span)

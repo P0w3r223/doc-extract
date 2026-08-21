@@ -4,6 +4,8 @@ Date: 2026-08-19
 Updated: 2026-08-20 — the attacked corpus has been scanned and put in front of a real model reading
 pixels; see *What a scan does to the gate's answer*, which replaces the bullet that named that
 composition as unbuilt.
+Updated: 2026-08-21 — the grounding bullet under *What follows from it* claimed the recorded spans
+already supported a geometric check. They did not; see `0002_placement.md`.
 Status: accepted
 Author: P0w3r223 + Claude
 Related to: milestone 6 (`src/doc_extract/attack/`), `results/attack-*/attack.md`, milestone 7
@@ -121,9 +123,12 @@ rules above, whose value is that they hold regardless of what the page says.
   this supplier is the check that catches `account_redirect`, and it is a property of the buyer's
   own records rather than of the document — which is why no amount of reading the page can supply
   it. Named here so that the gap is a decision rather than an oversight.
-* **Grounding asks whether a value is on the page, not whether it belongs there.** The spans are
-  recorded, so a geometric check could ask whether an account number was printed in the payment
-  block or in a footnote. It is not built.
+* **Grounding asks whether a value is on the page, not whether it belongs there.** A geometric
+  check would ask whether an account number was printed in the payment block or in a footnote, and
+  this bullet used to say the recorded spans already made that possible. They did not — they held
+  whichever occurrence of each word came first, not a location — and `docs/adr/0002_placement.md`
+  records what that cost and what fixing it did and did not buy. A text value now resolves to one
+  place; the geometric check is still not built.
 * **The suite measures placements, not adaptivity.** Every payload is a fixed string; none of them
   responds to a failed attempt. An adaptive attacker is a different threat model and a different
   suite — and the section below sharpens what that costs: an attacker who knows the invoice will be
