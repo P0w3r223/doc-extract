@@ -1,4 +1,4 @@
-# Where a grounded value sits, and why the geometric check is still not built
+# Where a grounded value sits, and which half of the geometric check turned out to be reachable
 
 Date: 2026-08-21
 Status: accepted
@@ -79,7 +79,10 @@ choose the occurrence consistent with the row and column its siblings chose — 
 see below.
 
 **4. The geometric check is still not built, and now for a stated reason.** Placement is a
-precondition for it, not an implementation of it.
+precondition for it, not an implementation of it. *(Superseded in part by the M7j addendum below:
+the half of it that is decidable without knowing which column holds which field — two values
+claiming one printed figure — is built. The half that needs that knowledge is not, and the addendum
+argues it is out of this package's reach rather than merely pending.)*
 
 ## What the fix bought, and what it did not
 
@@ -147,7 +150,7 @@ errors become *right value, wrong field* in two independent forms:
 - **23 wrong dates**, all on that third layout, 19 of them exactly the other date printed on the
   same invoice.
 
-Grounding's recall against the whole population is **34.8 %**, against 85.7 % on the same model's
+Grounding's recall against the whole population is **38.3 %**, against 85.7 % on the same model's
 own-page errors, with precision **100 %** on both. A value one column over is on the page, in the
 right row; the other date is on the page, in the right block. Both are textually indistinguishable
 from a correct reading and geometrically distinguishable from one.
@@ -171,9 +174,10 @@ compares has been normalised past the thing that would have answered.
 
 **Nothing leaked, and the reason is the design.** All 11 wrong accounts fail mod-97 and the
 check-digit rule flags all 11 — 6 route `reject`, 5 `review`, **0 `accept`**. Grounding's silence
-cost nothing because the arithmetic covers exactly what it missed. Fixing the boundary rule (compare
-against a projection that remembers where the separators were) is worth doing and is **not urgent**:
-it would move values from `review` to `reject`, not from `accept` to caught.
+cost nothing because the arithmetic covers exactly what it missed. Fixing the boundary rule was
+therefore worth doing and **not urgent**: it would move values from `review` to `reject`, not from
+`accept` to caught. *(Fixed — see the M7j addendum's closing section, where it behaved exactly as
+that sentence predicted.)*
 
 ## Addendum, 2026-08-21: joint placement, built — and the population was three failures (M7j)
 
@@ -262,3 +266,29 @@ of injected rows.
   holds which field, which is the knowledge this package does not have — so the honest position is
   that it is out of `ground/`'s reach rather than merely unbuilt. The **completeness** check scoped
   above is untouched and remains the open item with a control to clear.
+
+### The grouping-boundary defect, fixed
+
+The M7i addendum above recorded `_source_boundary` grounding five truncated accounts and argued the
+fix was worth doing and not urgent. It is now `resolve._identifier_boundary`, and it is here rather
+than in its own ADR because the decision it records is one line long: **a separator is looked
+through once, and a further group of digits continues an identifier while a word ends one.**
+
+The asymmetry is the whole content, and it is measured. Treating *any* alphanumeric group beyond a
+separator as a continuation fails the gold control on **216 of 305** identifiers — `NIP 1130220189
+Nabywca` puts a word one space after a NIP, and an account's own `PL` head puts one before the
+digits. Digits-only costs **no** correct identifier on gold for the synthetic, foreign or attacked
+corpus, and takes all five false groundings. The hyphen joins the four grouping spaces in the
+separator set for the same reason a space is there: a NIP is written `231-346-08-32`.
+
+It behaved exactly as the paragraph above predicted, which is the useful part of having predicted
+it. Of 31 committed artifacts one changed — `results/foreign-claude-haiku-4-5/gate.md`, where
+grounding's recall goes 34.8 % → **38.3 %** at precision still 100 %, and the `medium` and `low`
+rows each lose five values to `reject`. The `high` row and its leak count did not move, because the
+values involved were never accepted.
+
+**What it does not fix.** The rule still asks about the page while the value it compares has been
+normalised past the separators, and it now compensates for that by re-reading the source at the two
+ends. A projection that carried its separators would answer directly and is the better shape; it was
+not built, because the compensation clears the control on three corpora and the difference would be
+invisible on all of them.

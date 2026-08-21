@@ -301,7 +301,9 @@ class _Page:
             return self._scan(self._amounts, surface.amount_form(candidate), _amount_boundary)
         if match is Match.IDENTIFIER:
             return self._scan(
-                self._identifiers, surface.normalise_identifier(candidate), self._source_boundary
+                self._identifiers,
+                surface.normalise_identifier(candidate),
+                self._identifier_boundary,
             )
         return self._scan(self._literal, candidate, self._source_boundary)
 
@@ -335,6 +337,46 @@ class _Page:
             or (after < len(self._source) and self._source[after].isalnum())
         )
 
+    def _identifier_boundary(self, projection: _Projection, start: int, end: int) -> bool:
+        """An identifier hit must not sit inside a longer *grouped* identifier on the page.
+
+        `_source_boundary` asks whether the neighbouring character is alphanumeric, which is the
+        whole question for an identifier the page prints as one run. It is not the whole question
+        for one the page **groups**, and M7i found the gap on a real population: every foreign
+        dialect prints an IBAN in groups of six, so `claude-haiku-4-5` dropping the last group of
+        `PL 049911 602207 394837 519847 27` produced a value whose next source character is a
+        *space*. Five truncated accounts grounded, and an account truncated **mid**-group on another
+        dialect did not — the determinant was the grouping boundary, not the dialect. The rule was
+        not wrong; it was asking about the page while the value it compares had been normalised past
+        the separators that would have answered.
+
+        So a separator is looked *through*, once, and what decides is the group beyond it: **a
+        further group of digits continues an identifier, a word ends one.** That asymmetry is what
+        makes the rule usable rather than merely stricter, and it is measured rather than assumed —
+        treating *any* alphanumeric group beyond a separator as a continuation fails the control on
+        216 of 305 gold identifiers, because `NIP 1130220189 Nabywca` and `PL` at the head of an
+        account both put a word next to one. Digits-only costs no correct identifier on gold for the
+        synthetic, foreign or attacked corpus, and takes all five of M7i's false groundings.
+        """
+        before = projection.origin[start] - 1
+        after = projection.origin[end - 1] + 1
+        return not (self._continues(before, -1) or self._continues(after, 1))
+
+    def _continues(self, at: int, step: int) -> bool:
+        """Whether the source at `at` continues an identifier rather than ending it.
+
+        Named apart from the module-level `_runs_on`, which asks the same shape of question for an
+        *amount*: there a decimal point continues a figure, here a grouping space continues a
+        number only when a further group of digits follows it. Two rules, two neighbourhoods.
+        """
+        if not 0 <= at < len(self._source):
+            return False
+        if self._source[at].isalnum():
+            return True
+        if self._source[at] not in _IDENTIFIER_SEPARATORS:
+            return False
+        return _group_beyond(self._source, at + step, step).isdigit()
+
     def _covering(self, start: int, end: int) -> Iterable[Span]:
         return (span for span in self._spans if span.start < end and span.end > start)
 
@@ -351,6 +393,27 @@ class _Page:
     def places(self, wanted: tuple[str, ...]) -> tuple[tuple[Span, ...], ...]:
         """Every place on the page that holds the whole of a text value. See `Sheet.places`."""
         return tuple(place.spans for place in self._sheet.places(wanted))
+
+
+#: What a Polish invoice puts *between the groups of one identifier*: the four spaces
+#: `surface.GROUPING` already names, plus the hyphen a NIP is written with — `231-346-08-32`, and
+#: an IBAN in groups of four or six. Anything else ends the identifier.
+_IDENTIFIER_SEPARATORS = surface.GROUPING + "-"
+
+
+def _group_beyond(source: str, at: int, step: int) -> str:
+    """The maximal run of alphanumerics starting at `at`, read in the direction `step`.
+
+    Returned as a string rather than tested in place because the caller's question is about the
+    whole group — *are these all digits* — and a character-at-a-time test would answer it about the
+    first character only, which is exactly the distinction between a further group of an account
+    number and the word after it.
+    """
+    out: list[str] = []
+    while 0 <= at < len(source) and source[at].isalnum():
+        out.append(source[at])
+        at += step
+    return "".join(out)
 
 
 def _amount_boundary(projection: _Projection, start: int, end: int) -> bool:

@@ -62,6 +62,15 @@ no page text to search* — and a third verdict for that removed **3989 false al
 reading** without moving a single leaked value. The finding narrowed; it did not go away. See *Now
 photograph the attacked page* below.
 
+The one item of milestone 7 still open is the one its title names first: a **real held-out set**,
+on documents nobody here generated. The two corpora above hold the semantics fixed on purpose,
+which is what lets them attribute a drop to presentation or to legibility and nothing else — and is
+also what stops either of them being the thing they stand in for.
+
+This README is the tour. The working record — every measurement, what each one is really saying,
+and where a later result narrowed an earlier one — is [`docs/findings.md`](docs/findings.md), with
+the decisions behind them in [`docs/adr/`](docs/adr).
+
 ## Does "the arithmetic holds" predict "the fields are right"?
 
 `claude-haiku-4-5` gets 42 of 107 documents wrong, which is a real and unlabelled model-error
@@ -212,10 +221,10 @@ The size is not the finding, though; the **shape** is. haiku's exactly-right doc
 → 48.1 % and its repairs go 1 → 7, and its errors become *right value, wrong field* in two
 independent forms: 58 spurious discounts, **53 of them exactly that row's own `net`**, and 23 wrong
 dates that are the other date on the same invoice. Both are on the page, in the right row or the
-right block, so grounding resolves them and stays silent — its recall falls **85.7 % → 34.8 %** with
+right block, so grounding resolves them and stays silent — its recall falls **85.7 % → 38.3 %** with
 precision still 100 %. (The discount error already exists on the own page, 11 of them; the foreign
 corpus amplifies it fivefold rather than inventing it.) The gate still helps — 97.9 % → 98.9 % on
-82.3 % of the work — but leaks 53 values where it leaked 2. This is the wrong-column blind spot,
+82.2 % of the work — but leaks 52 values where it leaked 2. This is the wrong-column blind spot,
 measured on a real model instead of a regex — see
 [`docs/adr/0002_placement.md`](docs/adr/0002_placement.md).
 

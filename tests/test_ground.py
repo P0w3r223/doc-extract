@@ -225,6 +225,43 @@ def test_an_identifier_does_not_ground_inside_a_longer_run_of_digits(invoice):
     assert grounded["seller.nip"].support is Support.UNGROUNDED
 
 
+def test_an_account_missing_its_last_group_does_not_ground_on_the_groups_it_kept(invoice):
+    """M7i's defect, on the shape that produced it: a truncation landing on a grouping boundary.
+
+    The projection has already thrown away the separators, so a prefix ending where a group ends has
+    a *space* after it in the source and passed a boundary rule that only rejects adjacent
+    alphanumerics. Five of `claude-haiku-4-5`'s dropped accounts grounded that way on the foreign
+    corpus, while one truncated **mid**-group did not — the grouping boundary was the determinant,
+    not the layout.
+    """
+    truncated = invoice.model_copy(update={"payment_account": "PL61109010140000071219"})
+    page = _page([["Rachunek:", "PL", "61", "1090", "1014", "0000", "0712", "1981", "2874"]])
+    assert {g.field: g for g in resolve(page, truncated)}["payment_account"].support \
+        is Support.UNGROUNDED
+
+
+def test_a_word_after_an_identifier_ends_it_rather_than_continuing_it(invoice):
+    """The control for the test above, and the reason the rule asks what the next group *is*.
+
+    A separator is looked through, but only a further group of **digits** continues an identifier.
+    Treating any alphanumeric group as a continuation fails the corpus control on 216 of 305 gold
+    identifiers, because a NIP is followed by the next party's label and an account begins with
+    `PL` — both put a word one space away from a perfectly good identifier.
+    """
+    page = _page([["NIP", "1130220189", "Nabywca"], ["REGON", "123456789"]])
+    assert {g.field: g for g in resolve(page, invoice)}["seller.nip"].support is Support.GROUNDED
+
+
+def test_a_hyphenated_identifier_is_one_run_across_its_hyphens(invoice):
+    """A NIP is written `231-346-08-32`, so the hyphen groups it exactly as a space does."""
+    truncated = invoice.model_copy(update={
+        "seller": invoice.seller.model_copy(update={"nip": "1130220189"}),
+    })
+    page = _page([["NIP", "113-022-01-89-7"]])
+    assert {g.field: g for g in resolve(page, truncated)}["seller.nip"].support \
+        is Support.UNGROUNDED
+
+
 # --------------------------------------------------------------------------- text and coverage
 
 
