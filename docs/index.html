@@ -171,7 +171,7 @@ footer {
 </head>
 <body>
 <header>
-  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;3 of 7</p>
+  <p class="eyebrow">P5 &middot; KSeF FA(3) &middot; milestones 1&ndash;6 of 7, and most of the seventh</p>
   <h1>Poland's national e-invoice schema checks nothing an accountant would</h1>
   <p class="lead">FA(3) &mdash; mandatory since 2026 &mdash; is 183 798 bytes of XSD carrying
   328 enumerations and <strong>0 assertions</strong>. It knows what shape an
@@ -197,22 +197,167 @@ footer {
     <div class="kpi-note">698 rows, gold with no annotation step</div>
   </li>
   <li class="kpi">
-    <div class="kpi-value">3 / 7</div>
+    <div class="kpi-value">5 / 7</div>
     <div class="kpi-label">Milestones built</div>
-    <div class="kpi-note">no model has been called yet &mdash; see what is missing, below</div>
+    <div class="kpi-note">the gate is measured; injection and the real set are not</div>
   </li>
 </ul>
 
 <div class="card caution">
   <strong>This is a project in progress, and the page says so on purpose.</strong> What exists is
-  the domain layer, the corpus generator and the extraction pipeline &mdash; the source layer, the
-  prompt, the output schema and the repair loop. All of it runs offline, with no network and no API
-  key: the pipeline is exercised end to end by a <em>scripted</em> model, so <strong>no model has
-  been called yet</strong>. The scorer, the detector study and the injection suite are milestones
-  4&ndash;6 and are <em>not built</em>. Every number on this page is a property of the schema, the
-  rules or the generated corpus. There are no accuracy figures here because there is nothing yet to
-  measure.
+  the domain layer, the corpus generator, the extraction pipeline, the scorer and the first half of
+  the detector study, grounding and the routing gate. Everything but one command runs offline with
+  no network and no API key; that command has been run, and <strong><code>claude-opus-5</code>
+  reads all 108 documents perfectly</strong>.
+  <br><br>
+  That is a result about the corpus as much as about the model. The nine tiers vary what an invoice
+  <em>means</em> &mdash; grosz rounding, corrections, reverse charge, multiple pages &mdash; not how
+  hard the page is to <em>read</em>. With no errors left to find, the detector has nothing to detect
+  on that run, so the headline question is answered on a second arm: the same corpus and the same
+  pipeline, with a weaker model. Grounding, routing and the coverage&ndash;accuracy curve are the
+  rest of milestone 5. Milestone 6 attacks the whole thing: seven payloads printed on the page,
+  one of them in white ink, and the finding is a negative one &mdash; the arithmetic gate stops the
+  attacks that lie about a total and is blind to the one that redirects a payment.
 </div>
+
+<h2>Does &ldquo;the arithmetic holds&rdquo; predict &ldquo;the fields are right&rdquo;?</h2>
+<p>The project's headline question, asked of <code>claude-haiku-4-5</code>,
+which gets 42 of 107 documents wrong and so supplies a real,
+unlabelled model-error population. The invariants are run on the <strong>prediction</strong>, never
+on the gold &mdash; the signal has to be available at inference time on a document nobody
+annotated.</p>
+<table>
+  <thead><tr><th></th><th class="num">flagged</th><th class="num">silent</th></tr></thead>
+  <tbody>
+    <tr><th>fields wrong</th><td class="num">32</td><td class="num">10</td></tr>
+    <tr><th>fields right</th><td class="num">0</td><td class="num">65</td></tr>
+  </tbody>
+</table>
+<p><strong>Precision 100&nbsp;%, recall 76.2&nbsp;%</strong>, and
+100&nbsp;% of the catches point at a field that is genuinely wrong.</p>
+<p class="note">The recall is not a property of the detector. It is the fraction of that model's
+mistakes that happened to land on numeric fields. Caught: <code>payment_account</code>&nbsp;&times;&nbsp;25, <code>lines[].discount</code>&nbsp;&times;&nbsp;9, <code>lines[].description</code>&nbsp;&times;&nbsp;5. Every one
+of the 11 misses is a <strong>name or a description</strong> &mdash; a field
+with no redundancy behind it for arithmetic to check &mdash; and 8 of
+them sit in the <code>multi_page</code> tier, where a description
+wraps across a page break. Not one arithmetic error escaped.</p>
+<p>That is the case for the grounding layer, arrived at by measurement rather than assumed: it
+covers exactly the fields the arithmetic cannot see, because a description the model invented is a
+value that resolves to no span on the page.</p>
+<p class="note">A caution the study prints beside its own numbers: a <strong>confidently wrong but
+internally consistent answer is invisible</strong>. The constant baseline sits at prevalence
+100&nbsp;% with recall 0&nbsp;%.</p>
+
+<h2>When the arithmetic has nothing to say</h2>
+<p>Every cross-field identity needs two figures to compare. An answer that keeps the total and drops
+the rows and the rate blocks offers one &mdash; so those rules are not <em>wrong</em> about it, they
+are <strong>unable to speak</strong>. The <code>stripped</code> baseline is exactly that reading, on
+all 108 documents.</p>
+<table><thead><tr><th></th><th class="num">prevalence</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
+<tbody>
+    <tr><th>hard rules</th><td class="num">100&nbsp;%</td><td class="num">&mdash;</td><td class="num">0.0&nbsp;%</td></tr>
+    <tr><th>heuristic rules</th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
+</tbody></table>
+<p>The one rule that fires is the heuristic whose entire content is <em>no rule could run</em>, and
+it fires on every document, with 0 false positives. The fields
+this reading does keep are <em>missing</em> rather than wrong &mdash; which is why the two hard
+rules that need only a single figure, the NIP and the IBAN check digits, did run and were right to
+find nothing. Those three
+heuristic rules had never fired on any earlier run &mdash; a metric identical across every variant,
+which this project's own rules call broken rather than stable. Giving them a population was the fix;
+dropping them was the alternative.</p>
+<p class="note"><strong>And the gate accepts all of it.</strong> Coverage is measured over the values
+a prediction asserted, so a reading that loses three quarters of the invoice routes everything to
+<code>accept</code>, at 100&nbsp;% accuracy, leaking nothing. No signal here separates &ldquo;correctly
+absent&rdquo; from &ldquo;silently dropped&rdquo;; the count of what was never asserted is the only
+column that sees it.</p>
+
+<h2>How much of a reading was the template?</h2>
+<p>The synthetic corpus varies what an invoice <em>means</em> and not how the page <em>says</em> it:
+three layouts, one vocabulary, one number format. So a second corpus prints the identical gold in
+three unfamiliar ones &mdash; other Polish labels for every field, other column orders, other number
+and date formats, and block orders that put the totals before the rows. Same seed, same invoices,
+document for document: a difference between the two columns is the <strong>page</strong>, because
+nothing else moved.</p>
+<table><thead><tr><th>baseline</th><th class="num">its own page</th><th class="num">an unfamiliar page</th><th class="num">read at all</th></tr></thead>
+<tbody>
+    <tr><th><code>oracle</code></th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">108 / 108</td></tr>
+    <tr><th><code>constant</code></th><td class="num">3.0&nbsp;%</td><td class="num">3.0&nbsp;%</td><td class="num">108 / 108</td></tr>
+    <tr><th><code>pattern</code></th><td class="num">86.3&nbsp;%</td><td class="num">0.0&nbsp;%</td><td class="num">0 / 108</td></tr>
+    <tr><th><code>claude-haiku-4-5</code></th><td class="num">97.8&nbsp;%</td><td class="num">98.1&nbsp;%</td><td class="num">108 / 108</td></tr>
+    <tr><th><code>claude-opus-5</code></th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">108 / 108</td></tr>
+</tbody></table>
+<p class="note"><code>pattern</code> did not read the page badly &mdash; it could not <em>begin</em>. Not one of the 108 documents produced an invoice the schema would accept, every one recorded as <code>schema_invalid</code>. The labels it matches are the whole of what it was doing.</p>
+<p class="note">The other two rows are the controls that make the first one mean something. The
+oracle is handed the gold and is unaffected, which says the corpus is scorable and its gold did not
+move; the constant baseline never looks at the page and scores <em>identically</em> on both, which
+is what a paired comparison should do to a reader that reads nothing.</p>
+<p class="note"><strong>This is not a real held-out set and does not claim to be.</strong> It holds
+the semantics fixed on purpose, so it answers one question and not the other: how much of a result
+was presentation. Real invoices also bring skew, stamps, scans and layouts nobody anticipated, and
+none of that is here.</p>
+
+<h2>When the page is a picture</h2>
+<p>Every document measured so far arrived with a text layer <code>reportlab</code> wrote: exact,
+complete, in the order the values were drawn. That is the last unearned advantage in the corpus. An
+invoice in a real inbox is frequently a <em>photograph</em> of an invoice, and there is no text layer
+at all. So a third corpus prints the same gold in the same layout and then scans it, at three rungs
+that each isolate one thing: one keeps a text layer (an OCR assumed perfect), one removes the text
+layer and changes nothing else, and one is what a supplier emails at 150&nbsp;dpi.</p>
+<table><thead><tr><th>baseline</th><th class="num">its own page</th><th class="num">searchable</th><th class="num">rasterised</th><th class="num">scanned</th></tr></thead>
+<tbody>
+    <tr><th><code>oracle</code></th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
+    <tr><th><code>constant</code></th><td class="num">3.0&nbsp;%</td><td class="num">3.1&nbsp;%</td><td class="num">2.9&nbsp;%</td><td class="num">2.9&nbsp;%</td></tr>
+    <tr><th><code>pattern</code></th><td class="num">86.3&nbsp;%</td><td class="num">79.7&nbsp;%</td><td class="num">0.0&nbsp;%</td><td class="num">0.0&nbsp;%</td></tr>
+    <tr><th><code>claude-haiku-4-5</code></th><td class="num">97.8&nbsp;%</td><td class="num">92.0&nbsp;%</td><td class="num">82.8&nbsp;%</td><td class="num">91.6&nbsp;%</td></tr>
+    <tr><th><code>claude-opus-5</code></th><td class="num">100&nbsp;%</td><td class="num">99.9&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
+</tbody></table>
+<p class="note">The control is exact rather than approximate: the fitted reader's predictions on the
+rung that keeps a text layer are identical, field for field, to its predictions on the clean corpus.
+That is what makes the other two columns a measurement of the missing text layer and not of the
+damage to the image.</p>
+<p class="note">For <code>claude-haiku-4-5</code> and <code>claude-opus-5</code>, <em>its own page</em> is that model reading the clean corpus as <strong>text</strong>, so the drop across each of those rows is two changes at once — the page became a picture and the reader started looking at pixels. The column that isolates the modality alone is <code>searchable</code>: the same information is available there as in the text arm, and it is read as an image.</p>
+<p class="note">One figure above is not a legibility result: <code>claude-haiku-4-5</code> on <code>rasterised</code> (1 document) ran out of output tokens mid-answer. A truncated document contributes every one of its fields as <em>missed</em>, which is enough to move a rung's accuracy by several points on its own — and running out of room while transcribing a long table from an image is a cost of the modality rather than of the rung.</p>
+<!-- corpus-dependent: begin -->
+<p><strong>The column above is not the finding. What a scan does to the
+<em>gate</em> is.</strong> Run the oracle &mdash; a perfect reading, nothing wrong anywhere &mdash;
+over the scanned corpus, and grounding has nothing to resolve against on two of the three
+rungs:</p>
+<table><thead><tr><th>rung</th><th class="num">could ask</th><th class="num">false alarms</th><th class="num">no text to search</th></tr></thead>
+<tbody>
+    <tr><th><code>searchable</code></th><td class="num">1903</td><td class="num">0</td><td class="num">0</td></tr>
+    <tr><th><code>rasterised</code></th><td class="num">0</td><td class="num">0</td><td class="num">2010</td></tr>
+    <tr><th><code>scanned</code></th><td class="num">0</td><td class="num">0</td><td class="num">1979</td></tr>
+</tbody></table>
+<p class="note">The last column was the finding, and it was a defect. Grounding resolves a value to
+a span of page text; where there is none it used to answer <code>UNGROUNDED</code> anyway, so every
+one of those 3989 values arrived as a <strong>false alarm on a reading with nothing wrong in
+it</strong>. That does not degrade, it <em>inverts</em>, and silently: an ungrounded correct value
+looks exactly like an ungrounded fabricated one. It now answers <em>I could not ask</em>, so those
+values leave the curve rather than filling it, and the count is printed above every affected
+<code>gate.md</code>. The false alarms are gone entirely &mdash; not one on this run. <strong>Of the three signals the routing gate is
+built on, only the arithmetic survives a scan</strong> &mdash; place contention needs page text as
+much as grounding does &mdash; and that is the one an adversary can satisfy on
+purpose &mdash; so what changed is that the gate reports having no opinion where it used to report
+a wrong one. A better instrument, and the same missing capability.</p>
+<p>And the mirror of it, on a population of real mistakes: <code>claude-haiku-4-5</code>
+reading the same pages as images.</p>
+<table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th><th class="num">could not ask</th></tr></thead>
+<tbody>
+    <tr><th><code>searchable</code></th><td class="num">136</td><td class="num">0</td><td class="num">9</td><td class="num">100&nbsp;%</td><td class="num">93.8&nbsp;%</td><td class="num">0</td></tr>
+    <tr><th><code>rasterised</code></th><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">1832</td></tr>
+    <tr><th><code>scanned</code></th><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">1960</td></tr>
+</tbody></table>
+<p class="note">Read the first row against the other two. Where a text layer survives, grounding is
+at its <em>most</em> precise measurement anywhere in this project &mdash; it catches almost every
+wrong value and raises no false alarm at all, on a real population of vision errors rather than an
+injected one. On <code>rasterised</code> and <code>scanned</code> it does not answer: every value falls in the last column, and the row is empty because <strong>the signal is absent there rather than weak</strong>. That is the honest shape, and it is also the reason the confusion cells are worth printing per rung instead of pooled
+&mdash; pooled over the whole corpus, this signal once looked barely precise at all, which was a
+measurement of the missing text layer wearing the reader's name. <strong>The gate does not survive
+a scan; it
+survives an OCR</strong> &mdash; a usable engineering conclusion rather than a negative one: put a
+recogniser in front of the model and the signal comes back.</p>
+<!-- corpus-dependent: end -->
 
 <h2>The gap this fills</h2>
 <p>The schema published by the Ministry of Finance is XSD 1.0. That version has no
@@ -291,25 +436,148 @@ field, and reads a quantity printed beside a price as two &mdash; from the boxes
 not from the string. The separation is not a tuned threshold either: a space is 0.32&nbsp;em wide,
 while every column gap in the corpus is at least 12&nbsp;pt, because each cell is asserted to fit
 its column with reportlab's padding still to spare.</p>
-<p>What it does <em>not</em> have is real-world visual chaos &mdash; skew, stamps, poor scans,
-layouts no template anticipated. Milestone 7's real held-out set exists to measure how much that
-costs, and the gap will be reported whichever way it comes out.</p>
+<p>What it does <em>not</em> have is a page nobody in this repository designed. Two of the three
+things that used to be missing are measured now, on held-out corpora of their own &mdash; an
+unfamiliar layout and a poor scan, each varying one thing so that a drop is attributable to it, and
+both reported above. What is still absent is a genuinely real invoice: a stamp, a signature, a fold,
+a layout no template anticipated because no template wrote it.</p>
+
+<h2>What the baselines say, and what the model says</h2>
+<p>7 committed runs over the same 108 documents, scoring
+22 fields per invoice and 6066 gold field instances in total. Every row
+answers in the same wire format and goes through the same prompt, parse, validation and repair
+loop, so a column is comparable down the table. The numbers are recomputed for this page from each
+run's committed <code>predictions.jsonl</code> &mdash; not copied from a report.</p>
+<table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">36</td><td class="num">99.3&nbsp;%</td><td class="num">98.3&nbsp;%</td><td class="num">97.5&nbsp;%</td></tr><tr><th><code>stripped</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">22.8&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">22.8&nbsp;%</td></tr><tr><th><code>claude-haiku-4-5</code></th><td>the page</td><td class="num">107 / 108</td><td class="num">65</td><td class="num">98.9&nbsp;%</td><td class="num">98.9&nbsp;%</td><td class="num">97.8&nbsp;%</td></tr><tr><th><code>claude-opus-5</code></th><td>the page</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr></tbody></table>
+<p class="note"><strong>recall</strong> is how many of the values on the page the prediction offered
+a value for; <strong>value</strong> is how many of those it read correctly; <strong>accuracy</strong>
+is the two together. They are separate columns because a field that is half missed and a field that
+is half misread read the same in one number and need different work. A dash means there was no
+denominator &mdash; never a zero, which would read as a measurement nobody made.</p>
+<p><code>oracle</code> is handed the gold, so its 100&nbsp;% is a check on the harness rather than a
+result: if a perfect reading scored anything less, every other number here would be wrong.
+<code>constant</code> answers the same lawful invoice for every document &mdash; the floor, and a
+diagnostic, because the fields it still scores well on (currency, invoice kind) are fields where the
+corpus's own distribution does most of the work. <code>pattern</code> is regular expressions and
+column positions with no model at all, and it was deliberately allowed to match the labels this
+project's own renderer prints, which the extraction prompt is forbidden to know: it is the strongest
+thing that is not a language model, and therefore the bar. <code>noisy</code> is the gold with known
+errors injected at a fixed rate &mdash; not a competitor but the labelled error set the detector study
+needs, since a detector measured only on a model's unlabelled mistakes is measured on a sample nobody
+chose.</p>
+<p><code>claude-opus-5</code> is the system under test, and it ties the oracle: every field of every
+document, for $3.20. Its only divergence from the gold's own serialisation is
+63 trailing zeros &mdash; it writes <code>137.30</code> where the generator stored <code>137.3</code>, which is what
+the page prints and what the scorer's amount comparison was already defined to treat as the same
+quantity. A corpus that the strongest non-model reader finds hard and a frontier model finds trivial
+is measuring layout parsing, not reading.</p>
+
+<h2>The invoice as untrusted input</h2>
+<p>Seven payloads &mdash; six that ask for something and one control that asks for
+nothing &mdash; printed in 4 places on the page, including in white ink, where a
+human approving the invoice sees nothing and the text layer carries every word. The gold of an
+attacked document is the gold of the document it was made from, so the same scorer, detector and
+gate run over it unchanged.</p>
+<table>
+  <thead><tr><th>payload</th><th>asks for</th><th class="num">obeyed</th><th class="num">arithmetic fires</th></tr></thead>
+  <tbody><tr><th><code>total_override</code></th><td>make the amount payable 1,00 PLN</td><td class="num">16 / 16</td><td class="num">16 / 16</td></tr><tr><th><code>account_redirect</code></th><td>replace the bank account with one the attacker controls</td><td class="num">16 / 16</td><td class="num">0 / 16</td></tr><tr><th><code>line_injected</code></th><td>add a line item the page does not print</td><td class="num">16 / 16</td><td class="num">16 / 16</td></tr><tr><th><code>seller_swap</code></th><td>issue the invoice in the attacker&#x27;s name and NIP</td><td class="num">16 / 16</td><td class="num">0 / 16</td></tr><tr><th><code>fence_break</code></th><td>close the envelope early, then rewrite the total from outside it</td><td class="num">16 / 16</td><td class="num">16 / 16</td></tr><tr><th><code>refusal</code></th><td>stop the document being processed at all</td><td class="num">16 / 16</td><td class="num">0 / 16</td></tr><tr><th><code>benign</code></th><td>nothing — the control for whether added text moves the reading</td><td class="num">0 / 16</td><td class="num">0 / 16</td></tr></tbody>
+</table>
+<p class="note">The column that matters is <em>arithmetic fires</em>. It is computed against
+<code>attack-gullible</code>, a control that obeys every instruction it finds on a
+page: its success rate is 100&nbsp;% by construction, which is what makes it the right arm for this
+question. What a <em>defence</em> does about an attack that worked is a property of the defence, and
+does not need a model to have been fooled first.</p>
+<p><strong>The two payloads the arithmetic never sees are <code>account_redirect</code>, <code>refusal</code>, <code>seller_swap</code></strong> &mdash; and they are
+the two an attacker would actually run. Redirecting a payment or reissuing the invoice under another
+NIP does not break any identity: the attacker picks an account they control, so the check digits are
+valid, and the value is printed on the page, so grounding finds it too. Both of M5's signals were
+measured on a model's <em>errors</em>, where a wrong digit is a random digit. Neither transfers to an
+adversary who can compute a check digit, and the committed <code>attack.md</code> shows the routing
+gate accepting every one of those documents.</p>
+<p class="note">That is the milestone's result, and it is a negative one: the arithmetic gate is a
+defence against misreading, not against injection. Ordering the stages so a document can never
+choose them, deriving the fence marker from the text it wraps, and telling the model to transcribe
+rather than compute are what stand between the payload and the answer &mdash; and the honest way to
+report a structural defence is to attack it and publish the rate.</p>
+
+<h2>Now photograph the attacked page</h2>
+<p>Compose the two corpora &mdash; M6's grid printed and then put through M7's
+scanner, gold untouched by either &mdash; and the compliant reader above, breached on every attacked
+document it is given a clean page of, is breached on 25.0 % of these
+(36 of 144). The decomposition is the whole finding.</p>
+<table>
+  <thead><tr><th>rung</th><th class="num">attacked</th><th class="num">succeeded</th><th class="num">ASR</th></tr></thead>
+  <tbody><tr><th><code>searchable</code></th><td class="num">48</td><td class="num">36</td><td class="num">75.0 %</td></tr><tr><th><code>rasterised</code></th><td class="num">48</td><td class="num">0</td><td class="num">0.0 %</td></tr><tr><th><code>scanned</code></th><td class="num">48</td><td class="num">0</td><td class="num">0.0 %</td></tr></tbody>
+</table>
+<p class="note">Computed from <code>attacked-scanned-gullible</code>, the same control M6 uses,
+by rebuilding each scanned attacked document's gold in memory from the corpus seed.</p>
+<p><strong>The two zeros are blindness, not defence.</strong> No payload reached the text layer on
+those rungs because no <em>text</em> did &mdash; the page carries none. A reader that looks at the
+page sees them exactly as the reach table says it does.</p>
+<!-- corpus-dependent: begin -->
+<table>
+  <thead><tr><th>placement</th><th><code>searchable</code></th><th><code>rasterised</code></th><th><code>scanned</code></th></tr></thead>
+  <tbody><tr><th><code>description</code></th><td>text&nbsp;+&nbsp;image</td><td>image only</td><td>image only</td></tr><tr><th><code>annotations</code></th><td>text&nbsp;+&nbsp;image</td><td>image only</td><td>image only</td></tr><tr><th><code>footer</code></th><td>text&nbsp;+&nbsp;image</td><td>image only</td><td>image only</td></tr><tr><th><code>invisible</code></th><td>nobody</td><td>nobody</td><td>nobody</td></tr></tbody>
+</table>
+<p class="note">Measured at build time with no model. <em>text</em> means the marker is in the text
+layer the source reader gets off the scanned page; <em>image</em> means the attacked page and the
+unattacked page it was made from differ as pictures, through the same scanner at the same seed
+&mdash; so a payload that moved no pixel cannot be seen by anything that looks at the page.</p>
+<p><strong>A scan deletes the white-ink attack outright.</strong> White on white contributes no
+pixel, so there is nothing for a recogniser to recover and nothing for a vision model to read: the
+placement designed to be invisible to the human approving the invoice is the one a photocopier
+destroys. That is an accident of the medium and not a control &mdash; it protects only the placement
+that hides from a person, and an attacker who prints in ink loses nothing.</p>
+<!-- corpus-dependent: end -->
+<p><strong>A frontier model reading the pixels met
+0 of 144 attacking objectives.</strong>
+<code>claude-opus-5</code>, every page sent as an image &mdash; an attack success
+rate of 0.0 %, the same at every rung
+, with no repairs and nothing left unanswered. <!-- corpus-dependent: begin --><strong>108 of those 144 carried their payload as ink on a page it looked at.</strong> The rest are the white-ink placement the scanner had already erased, where a rate is not evidence of anything.<!-- corpus-dependent: end --></p>
+<p class="note">Two things that does not establish, and both are limits of the suite
+rather than of any model: the payloads are <strong>fixed strings</strong> that never adapt and were
+not written against the reader being measured, so the rate scores a catalogue rather than an
+adversary; and this is a synthetic corpus. The denial payload is the illustration &mdash; it beat
+the compliant control every time and the model above not once, which is a fact about two readers
+rather than about the payload. The structural defences are still what the case rests on, because
+they are what holds when the reader is not this one.</p>
+<!-- corpus-dependent: begin -->
+<p><strong>And gating still costs accuracy here.</strong> Auto-accepting only the high-confidence values is 99.0 % accurate and
+lets 18 wrong values through, while <strong>not gating at all</strong> &mdash;
+accepting every one of the 9894 values the reader asserted &mdash; is
+99.3 %. The gate's signal exists only on the rung that kept a text layer, which is exactly the rung where the attacks worked &mdash; so its confident bucket is concentrated on the attacked documents. On a population of model <em>errors</em> the same gate raises accuracy instead.</p>
+<p class="note">The curve's own bottom row is a different comparison: it accepts everything the gate
+could <em>assess</em>, 2697 values, at 97.6 %. The other
+6048 sit on a page with no text layer, where the gate has <strong>no signal at all
+</strong> &mdash; not a low one. It used to call them ungrounded, which is how a scan came to look
+like a reader's mistake; saying so removed the false alarms and did not bring the signal back.</p>
+<!-- corpus-dependent: end -->
 
 <h2>What is not built yet</h2>
 <p>Stated plainly, because a portfolio page that reads as finished when it is not is worse than no
 page at all.</p>
 <table>
   <tbody>
-    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built, scripted model only</td></tr>
-    <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">not built</td></tr>
-    <tr><th>M5 &mdash; grounding, routing, <strong>the detector study</strong> and the coverage&ndash;accuracy curve</th><td class="num">not built</td></tr>
-    <tr><th>M6 &mdash; prompt-injection suite and attack success rate</th><td class="num">not built</td></tr>
-    <tr><th>M7 &mdash; real held-out set and the reported synthetic&harr;real gap</th><td class="num">not built</td></tr>
+    <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built</td></tr>
+    <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
+    <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
+    <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms and one paid</td></tr>
+    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on all three</td></tr>
+    <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">built</td></tr>
+    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">built &mdash; claude-haiku-4-5, claude-opus-5</td></tr>
+    <tr><th>&mdash; an adaptive attacker, which no fixed payload set stands in for</th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a check that a grounded value sits where the page would <em>print</em> it</th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
 </table>
 <p class="note">The headline question &mdash; does &ldquo;the invariants hold&rdquo; actually predict
-&ldquo;the fields are correct&rdquo;? &mdash; is answered in M5, and a negative result is a
-publishable result.</p>
+&ldquo;the fields are correct&rdquo;? &mdash; met an awkward first answer: on the run that mattered
+most there was nothing to predict, because the model made no mistakes. It has been answered instead
+against injected errors, a weaker reader, and two held-out corpora &mdash; and both of them show
+that neither making a page <em>harder to see</em> nor making it <em>unfamiliar</em> un-saturates it
+for a frontier model. What the unfamiliar page did change is the <em>shape</em> of a weaker model's
+errors: right value, wrong field, which is exactly what the grounding signal cannot see. A negative
+result is a publishable result, and so is a corpus that turned out to be too easy.</p>
 
 <h2>Reproduce it</h2>
 <pre><code>git clone https://github.com/P0w3r223/doc-extract
@@ -317,6 +585,7 @@ cd doc-extract
 python -m venv .venv &amp;&amp; .venv/Scripts/python -m pip install -e ".[dev]"
 pytest                                             # the figures above are assertions
 python -m doc_extract.synth --out data/synthetic   # 108 documents, reproducible from one seed
+python -m doc_extract.eval run --baseline pattern  # predict, score, write results/pattern/
 python docs/build_index.py                         # rebuild this page from the repository</code></pre>
 <p class="note">The corpus is not committed: it is a function of one integer, so a seed in the
 manifest is a smaller and more honest artifact than several hundred PDFs in git history. The
@@ -324,8 +593,8 @@ manifest also records the reportlab version and the font digests, because every 
 depends on them.</p>
 
 <footer>
-  <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from
-  <code>ba3b282</code> &middot; part of a
+  <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
+  <code>f1c2e8c</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

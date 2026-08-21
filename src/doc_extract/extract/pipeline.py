@@ -28,7 +28,14 @@ from typing import Any
 from pydantic import ValidationError
 
 from doc_extract.extract import prompt, wire
-from doc_extract.extract.client import LLMClient, LLMError, LLMRequest, LLMResponse, Usage
+from doc_extract.extract.client import (
+    LLMClient,
+    LLMError,
+    LLMRequest,
+    LLMResponse,
+    PageImage,
+    Usage,
+)
 from doc_extract.extract.result import REPAIRABLE, Attempt, Extraction, FailureClass, Stage
 from doc_extract.schema.ksef import Invoice
 from doc_extract.source.document import SourceDocument
@@ -38,20 +45,26 @@ from doc_extract.source.document import SourceDocument
 DEFAULT_MODEL = "claude-opus-5"
 
 #: Extraction and repair carry separate budgets, so "ran out of tokens" can be attributed to a
-#: stage. The extraction budget is generous because current models think before answering and
-#: `max_tokens` bounds the thinking and the answer together — a budget sized to the JSON alone
-#: truncates mid-object and charges the loss to the extractor.
-EXTRACTION_MAX_TOKENS = 8192
-REPAIR_MAX_TOKENS = 4096
+#: stage. Both are generous because current models think before answering and `max_tokens` bounds
+#: the thinking and the answer together — a budget sized to the JSON alone truncates mid-object and
+#: charges the loss to the extractor. The sizing is not a guess: the corpus's `multi_page` tier
+#: prints 26 to 34 rows, and one row is eight fields, so the answer alone runs to several thousand
+#: tokens before a single token of reasoning. 16000 also keeps a non-streaming request inside the
+#: SDK's HTTP timeout, which a larger ceiling would not.
+EXTRACTION_MAX_TOKENS = 16000
+REPAIR_MAX_TOKENS = 8192
 
 #: How many validator errors travel back to the model. A malformed answer can produce one error per
 #: line item; the cap keeps a repair prompt from being mostly complaint, and the errors are ordered
 #: by field path so the ones that are cut are not systematically the same fields.
 MAX_REPORTED_ERRORS = 20
 
-#: `stop_reason` values that decide the outcome before the body is even read.
-_REFUSAL = "refusal"
-_TRUNCATED = "max_tokens"
+#: `stop_reason` values that decide the outcome before the body is even read. Public because a
+#: caller that needs to *produce* one — M6's compliant control answers a denial payload with a
+#: refusal — must use the same literal this function compares against, and two private copies of a
+#: protocol string are two things that can drift while every test still passes.
+REFUSAL = "refusal"
+TRUNCATED = "max_tokens"
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,22 +88,36 @@ def extract(
     client: LLMClient,
     *,
     config: ExtractionConfig = DEFAULT_CONFIG,
+    images: tuple[PageImage, ...] = (),
 ) -> Extraction:
-    """One document, at most `1 + max_repairs` calls, always a result and never an exception."""
+    """One document, at most `1 + max_repairs` calls, always a result and never an exception.
+
+    `images` chooses the modality and nothing else. Supplied, the request carries the pages and the
+    system prompt for reading them; left out, it carries the sealed text exactly as before. The
+    stage order, the repair budget, the failure taxonomy and the usage accounting are one code path
+    for both — a vision arm that ran through a pipeline of its own would report a failure taxonomy
+    that could not be compared with the text arm's, which is the whole of what M7d is for.
+
+    `document` is still the source of the *text* turn, and on a scanned page it is empty. That is
+    not a special case to guard: a scanned document read as text is a document with nothing in it,
+    and the pipeline reports what that produces rather than refusing to try.
+    """
     schema = wire.invoice_schema()
     attempts: list[Attempt] = []
-    message = prompt.extraction_message(document)
+    vision = bool(images)
+    message = prompt.vision_message(len(images)) if vision else prompt.extraction_message(document)
     stage = Stage.EXTRACT
     max_tokens = config.max_tokens
 
     for _ in range(config.max_repairs + 1):
         request = LLMRequest(
             model=config.model,
-            system=prompt.SYSTEM,
+            system=prompt.SYSTEM_VISION if vision else prompt.SYSTEM,
             user=message,
             schema=schema,
             max_tokens=max_tokens,
             effort=config.effort,
+            images=images,
         )
         try:
             response = client.complete(request)
@@ -112,7 +139,11 @@ def extract(
         if failure not in REPAIRABLE:
             break
 
-        message = prompt.repair_message(document, previous=response.text, errors=detail)
+        message = (
+            prompt.vision_repair_message(previous=response.text, errors=detail)
+            if vision
+            else prompt.repair_message(document, previous=response.text, errors=detail)
+        )
         stage = Stage.REPAIR
         max_tokens = config.repair_max_tokens
 
@@ -127,9 +158,9 @@ def read(response: LLMResponse) -> tuple[Invoice | None, FailureClass, str]:
     first would report a JSON error where the real finding is that the model declined or ran out of
     room. The failure class has to name what actually happened, because M4 counts these.
     """
-    if response.stop_reason == _REFUSAL:
+    if response.stop_reason == REFUSAL:
         return None, FailureClass.REFUSED, "the model declined the request"
-    if response.stop_reason == _TRUNCATED:
+    if response.stop_reason == TRUNCATED:
         return None, FailureClass.TRUNCATED, (
             "generation stopped at the token ceiling, so the body is a prefix of an answer"
         )

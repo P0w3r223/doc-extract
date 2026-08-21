@@ -26,6 +26,7 @@ from doc_extract.schema import vocab
 from doc_extract.schema.ksef import Invoice, LineItem, Party, RateTotal
 from doc_extract.synth import pools
 from doc_extract.synth.money import apportion, round_money, total_of
+from doc_extract.synth.overlay import Overlay
 from doc_extract.synth.rate_slots import order_of
 from doc_extract.synth.tiers import Tier
 
@@ -79,7 +80,15 @@ class Context:
 
 @dataclass(frozen=True, slots=True)
 class Document:
-    """One generated invoice: its gold, its trimmings, and the provenance of both."""
+    """One generated invoice: its gold, its trimmings, and the provenance of both.
+
+    `overlay` is the fourth thing a page can carry and the only one that is not a function of the
+    other three: text a third party put on the document. It is `None` for every document of the
+    synthetic corpus and set only by M6's attack suite — and it deliberately does **not** touch the
+    gold, because an injected instruction does not change what the correct reading of the invoice
+    is. That is what makes an attacked document scorable at all: the right answer is still the right
+    answer, and the attack either moved the prediction away from it or did not.
+    """
 
     doc_id: str
     tier: str
@@ -87,6 +96,7 @@ class Document:
     seed: int
     invoice: Invoice
     context: Context
+    overlay: Overlay | None = None
 
 
 def build(tier: Tier, *, seed: int, doc_id: str, template: str) -> Document:

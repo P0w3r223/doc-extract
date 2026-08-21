@@ -21,10 +21,11 @@ from __future__ import annotations
 import hashlib
 import json
 import zlib
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from importlib import metadata
 from pathlib import Path
+from typing import Any, Protocol
 
 from doc_extract.schema.generate_vocab import XSD_PATH
 from doc_extract.synth import fa3_xml, render
@@ -36,6 +37,23 @@ DEFAULT_PER_TIER = 12
 
 MANIFEST_NAME = "manifest.jsonl"
 PROVENANCE_NAME = "manifest.meta.json"
+
+
+class Page(Protocol):
+    """A rendered document: the bytes, and the one fact about them the manifest needs.
+
+    Structural rather than a shared base class, so M7's foreign renderer satisfies it by having the
+    right shape instead of by importing this module. `render.Rendered` is the implementation M2 and
+    M6 pass; the foreign package has its own, and that separation is the point.
+    """
+
+    data: bytes
+    pages: int
+
+
+#: How a document becomes a page. Anything returning bytes and a page count satisfies it, which is
+#: what lets M7's foreign renderer reuse the manifest machinery without sharing a line of layout.
+Draw = Callable[[Document], Page]
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,36 +143,52 @@ def generate(out_dir: Path, *, seed: int = DEFAULT_SEED, per_tier: int = DEFAULT
              tiers: tuple[Tier, ...] = TIERS) -> list[Entry]:
     """Write the corpus and its manifest, returning the index that was written."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    entries = [_write(document, out_dir) for document in
+    entries = [write_document(document, out_dir) for document in
                documents(seed=seed, per_tier=per_tier, tiers=tiers)]
+    built = provenance(seed=seed, per_tier=per_tier, tiers=tiers, documents=len(entries))
+    write_index(out_dir, entries, asdict(built))
+    return entries
 
-    #: Regenerating with fewer documents, or with a tier dropped, used to leave the old files in
-    #: place with nothing in the manifest describing them. Anything globbing `*.pdf` would then
-    #: read a corpus larger than the one the manifest attests to — the failure the manifest exists
-    #: to make impossible.
+
+def write_index(out_dir: Path, entries: Sequence[Entry], built: Mapping[str, Any], *,
+                keep: Sequence[str] = ()) -> None:
+    """The manifest, the provenance block, and the removal of anything neither describes.
+
+    Shared with M6's attack suite, which writes a corpus of its own into a directory of its own and
+    has exactly the same obligation: regenerating with fewer documents used to leave the old files
+    in place with nothing in the manifest describing them, and anything globbing `*.pdf` would then
+    read a corpus larger than the one the manifest attests to — the failure the manifest exists to
+    make impossible. `keep` names the extra files a caller writes beside the corpus, which are
+    described by that caller rather than by the manifest.
+    """
     described = {entry.xml for entry in entries} | {entry.pdf for entry in entries}
-    described |= {MANIFEST_NAME, PROVENANCE_NAME}
+    described |= {MANIFEST_NAME, PROVENANCE_NAME, *keep}
     for stale in out_dir.iterdir():
         if stale.is_file() and stale.name not in described:
             stale.unlink()
 
-    manifest = out_dir / MANIFEST_NAME
-    manifest.write_bytes(
+    (out_dir / MANIFEST_NAME).write_bytes(
         "".join(json.dumps(asdict(entry), ensure_ascii=False) + "\n" for entry in entries)
         .encode("utf-8")
     )
     #: Kept beside the rows rather than as a header line, so `manifest.jsonl` stays one shape per
     #: line and anything reading it can go on treating every line as a document.
-    built = provenance(seed=seed, per_tier=per_tier, tiers=tiers, documents=len(entries))
     (out_dir / PROVENANCE_NAME).write_bytes(
-        (json.dumps(asdict(built), ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        (json.dumps(built, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     )
-    return entries
 
 
-def _write(document: Document, out_dir: Path) -> Entry:
+def write_document(document: Document, out_dir: Path, *, draw: Draw = render.render) -> Entry:
+    """One document's XML and PDF on disk, plus the manifest row that attests to both.
+
+    `draw` is how a corpus other than M2's gets written by this function rather than beside it. M6's
+    attacked corpus keeps the default — an attacked page is this renderer's page with a string added
+    — and M7's foreign corpus passes its own, because the whole of what it varies is the page. The
+    manifest, the hashing and the byte-level write are not presentation and are not worth a second
+    copy: a second one is a second place for a corpus to become undescribed by its own index.
+    """
     xml_text = fa3_xml.to_xml(document)
-    pdf = render.render(document)
+    pdf = draw(document)
 
     xml_path = out_dir / f"{document.doc_id}.xml"
     pdf_path = out_dir / f"{document.doc_id}.pdf"
