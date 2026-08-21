@@ -17,9 +17,10 @@ does not move — the same discipline `foreign/` follows, applied to the other a
 this corpus can answer that no earlier one could:
 
 * how much of the text pipeline's accuracy was the text layer, measured rather than assumed;
-* whether the two signals the gate is built on survive a scan — **grounding cannot**, because it
-  resolves a value to a span of page text and there is no page text, so on a scanned document the
-  gate is left with arithmetic alone;
+* whether the signals the gate is built on survive a scan — **grounding cannot**, because it
+  resolves a value to a span of page text and there is no page text, and neither can the place
+  contention M7j added, for the same reason, so on a scanned document the gate is left with
+  arithmetic alone;
 * what a model reading the *image* recovers instead, which is the only reader left when the text
   layer is gone, and the one M7d puts a price on.
 

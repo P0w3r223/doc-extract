@@ -333,7 +333,7 @@ def test_grounding_knows_nothing_about_the_renderer():
 
     package = Path("src") / Path(resolve.__module__.replace(".", "/")).parent
     modules = sorted(package.glob("*.py"))
-    assert len(modules) >= 4, f"{package} yielded {len(modules)}; the glob is not reading it"
+    assert len(modules) >= 5, f"{package} yielded {len(modules)}; the glob is not reading it"
 
     for path in modules:
         text = path.read_text(encoding="utf-8")

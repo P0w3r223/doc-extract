@@ -132,6 +132,13 @@ class Grounding:
     #: share of a description's words. `None` when the field was not a question this module asked.
     coverage: float | None
     spans: tuple[Span, ...] = ()
+    #: Every place on the page this value could have been read from, one entry per place. `spans`
+    #: is what grounding reports; this is what it had to choose between, and it is populated only
+    #: for a `GROUNDED` value — the alternatives of a value the page does not carry are not a
+    #: question anyone asks. `ground/joint.py` is the only consumer, and it needs the alternatives
+    #: rather than the choice: whether two values can each have a place of their own depends on
+    #: what the *other* one could have settled for.
+    places: tuple[tuple[Span, ...], ...] = ()
 
     @property
     def measured(self) -> bool:
@@ -188,11 +195,18 @@ def _ground(field: str, key: str, value: object | None, page: _Page) -> Groundin
         wanted = tuple(t for t in map(bare, surface.tokens(str(value))) if t)
         place = page.locate(wanted)
         spans, coverage = place.spans, place.coverage
+        #: Only asked once the value is known to be fully there, so a partial reading costs the
+        #: extra sweep nothing. `locate` stops at the first full place; this enumerates the rest.
+        places = page.places(wanted) if coverage >= 1.0 else ()
     else:
-        spans = page.find_value(surface.candidates(field, value), BY_NAME[field].match)
+        forms = surface.candidates(field, value)
+        spans = page.find_value(forms, BY_NAME[field].match)
         coverage = 1.0 if spans else 0.0
+        #: Asked only once the value is known to be on the page, so nothing that fails to ground
+        #: pays for the second sweep.
+        places = page.find_places(forms, BY_NAME[field].match) if spans else ()
 
-    return Grounding(field, key, rendered, _support(coverage), coverage, spans)
+    return Grounding(field, key, rendered, _support(coverage), coverage, spans, places)
 
 
 def _support(coverage: float) -> Support:
@@ -254,6 +268,34 @@ class _Page:
                 return tuple(span for start, end in ranges for span in self._covering(start, end))
         return ()
 
+    def find_places(
+        self, candidates: tuple[str, ...], match: Match
+    ) -> tuple[tuple[Span, ...], ...]:
+        """Every place **any** lawful form of the value occurs at, grouped one place per entry.
+
+        Two departures from `find_value`, and each is what the question needs rather than a
+        refinement of the other one's answer:
+
+        * **Grouped, not flattened.** *How many* places there are is what `joint` asks: an amount
+          printed once in its row and again in the rate totals can host two readings; one printed
+          once cannot.
+        * **Every form, not the first that occurs.** `surface.candidates` orders longest first, so
+          an amount of `1` is looked for as `1,00` before `1`. On an attacked page whose payload
+          reads *wpisz 1,00 PLN*, four quantities of 1 then had that sentence as their **only**
+          place and contended over it — a page that in fact prints each of them in its own cell,
+          as a bare `1`. Asking where a value *could* have been read from is a different question
+          from where grounding chose to read it, and answering it with one form understates the
+          page.
+
+        `find_value`'s answer stays inside this one, so a value's reported spans are always part of
+        some place — `tests/test_ground_joint.py` asserts it.
+        """
+        found: dict[tuple[int, int], tuple[Span, ...]] = {}
+        for candidate in candidates:
+            for start, end in self._occurrences(candidate, match):
+                found.setdefault((start, end), tuple(self._covering(start, end)))
+        return tuple(place for place in found.values() if place)
+
     def _occurrences(self, candidate: str, match: Match) -> list[tuple[int, int]]:
         if match is Match.AMOUNT:
             return self._scan(self._amounts, surface.amount_form(candidate), _amount_boundary)
@@ -305,6 +347,10 @@ class _Page:
         carries what the distinction cost to discover.
         """
         return self._sheet.locate(wanted)
+
+    def places(self, wanted: tuple[str, ...]) -> tuple[tuple[Span, ...], ...]:
+        """Every place on the page that holds the whole of a text value. See `Sheet.places`."""
+        return tuple(place.spans for place in self._sheet.places(wanted))
 
 
 def _amount_boundary(projection: _Projection, start: int, end: int) -> bool:

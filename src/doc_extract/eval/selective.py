@@ -24,9 +24,11 @@ pipeline could actually assess, and the count of the ones it could not is printe
 alternative was measured before it was fixed — on M7e's attacked scans, keeping them in made the
 high-confidence bucket *less* accurate than accepting everything.
 
-**The two signals are also measured apart.** Grounding and the arithmetic are reported as their own
-field-level detectors before the curve combines them, because they are complements with very
-different shapes and a reader who sees only the combination cannot tell which did the work.
+**The three signals are also measured apart.** Grounding, the arithmetic and place contention are
+reported as their own field-level detectors before the curve combines them, because they are
+complements with very different shapes and a reader who sees only the combination cannot tell which
+did the work — and on most runs the third is entirely inside the second, which is a fact the
+combination hides and the report derives.
 """
 
 from __future__ import annotations
@@ -97,9 +99,13 @@ class Judged:
     key: str
     confidence: Confidence
     wrong: bool
-    #: Whether each signal flagged this instance, kept apart so either can be scored alone.
+    #: Whether each signal flagged this instance, kept apart so each can be scored alone.
     ungrounded: bool
     accused: bool
+    #: Whether the reading could not give this value a place of its own on the page. Third and
+    #: newest of the three, and the only one that can fire while the other two are silent — see
+    #: `ground/joint.py` for the population that made it worth having.
+    contended: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,6 +270,7 @@ def judge(
             #: `rule:` reason only when grounding already said `GROUNDED`, so reading the reasons
             #: would undercount the arithmetic signal precisely where it is the only one talking.
             accused=result.field in named,
+            contended=assessment.contended,
         ))
     return tuple(rows), Excluded(
         missed=missed, unassessable=unassessable, without_text=without_text,
@@ -304,7 +311,9 @@ def summarise(
         signals=(
             _signal("grounding", rows, lambda row: row.ungrounded),
             _signal("arithmetic", rows, lambda row: row.accused),
-            _signal("either", rows, lambda row: row.ungrounded or row.accused),
+            _signal("contention", rows, lambda row: row.contended),
+            _signal("any of the three", rows,
+                    lambda row: row.ungrounded or row.accused or row.contended),
         ),
         missed=missed,
         unassessable=unassessable,

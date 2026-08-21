@@ -1,16 +1,26 @@
-"""Per-field confidence, from the two signals this project measured rather than assumed.
+"""Per-field confidence, from the three signals this project measured rather than assumed.
 
-`eval/detector.py` and `ground/` each answered half of "is this value right", and the measurements
+`eval/detector.py` and `ground/` each answered part of "is this value right", and the measurements
 say exactly how to combine them — which is the only reason this module is shaped the way it is:
 
 * **Grounding is the field-level signal.** Precision 100 %, recall 85.7 %, and zero false alarms
   across 11 652 correctly-read field instances. When it says a value is not on the page, it has
-  been right every time it has been asked — on all 22 committed runs, not one false positive.
+  been right every time it has been asked — on all 24 committed runs, not one false positive.
 * **An arithmetic violation is a document-level signal that makes a poor field-level accusation.**
   Its `fields` name a *collection* — `lines` — so attributing it to every field of every row scores
   7.4 % precision against 529 false positives. It is kept, because it catches wrong discounts that
   ground perfectly well (the model read a real number out of the wrong column), but it demotes only
   the fields it actually names and never overrides grounding.
+* **A contention names two fields and one of them is wrong.** `ground/joint.py` asks whether a
+  reading's grounded values can each be given a place of their own on the page; when two of them
+  claim one printed figure, both are flagged, because no label-free fact says which is the intruder.
+  Precision is therefore about a half by construction — six times the arithmetic's field-level
+  figure and nowhere near grounding's — so it demotes on the same terms as a hard rule and for the
+  same reason.
+
+**Two demotions do not stack.** A value that is both contended and named by a hard rule falls one
+level, not two. They are two ways of noticing one kind of failure — a real figure read into the
+wrong field — and compounding them would let the coarser signal borrow the finer one's confidence.
 
 **Deterministic, not fitted.** Every rule below is a statement about the signals, and no threshold
 was tuned on the corpus it is measured against. The cost is a coarse ordering — four levels, so the
@@ -42,6 +52,7 @@ from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 
 from doc_extract.eval import detector
+from doc_extract.ground import joint
 from doc_extract.ground.resolve import Grounding, Support, resolve
 from doc_extract.schema import invariants
 from doc_extract.schema.invariants import Severity
@@ -93,8 +104,14 @@ class Assessment:
     #: all-negative the day a token is renamed, and a measurement failure that looks like a
     #: finding is the worst kind.
     support: Support = Support.ABSENT
+    #: Whether this reading had to share a place on the page with another of its own. Carried
+    #: structurally for the same reason `support` is: `eval/selective.py` scores the signal on its
+    #: own, and recovering it by prefix-matching `reasons` would go silently all-negative the day a
+    #: token is renamed.
+    contended: bool = False
     #: Stable tokens naming what drove the verdict, for a report to group by: `ungrounded`,
-    #: `partial:0.60`, `rule:lines.net_matches_quantity_times_price`, `document:flagged`.
+    #: `partial:0.60`, `contended`, `rule:lines.net_matches_quantity_times_price`,
+    #: `document:flagged`.
     reasons: tuple[str, ...] = ()
 
     @property
@@ -117,13 +134,21 @@ def assess(document: SourceDocument, invoice: Invoice) -> tuple[Assessment, ...]
     """
     named = _named_fields(invoice)
     flagged = bool(_hard(invoice))
+    groundings = resolve(document, invoice)
+    contested = joint.contended(groundings)
     return tuple(
-        _assess(grounding, named=named, flagged=flagged)
-        for grounding in resolve(document, invoice)
+        _assess(grounding, named=named, flagged=flagged, contested=contested)
+        for grounding in groundings
     )
 
 
-def _assess(grounding: Grounding, *, named: frozenset[str], flagged: bool) -> Assessment:
+def _assess(
+    grounding: Grounding,
+    *,
+    named: frozenset[str],
+    flagged: bool,
+    contested: frozenset[tuple[str, str]],
+) -> Assessment:
     if not grounding.measured:
         return _unassessed(grounding)
 
@@ -138,12 +163,24 @@ def _assess(grounding: Grounding, *, named: frozenset[str], flagged: bool) -> As
     if grounding.support is Support.PARTIAL:
         return _at(grounding, Confidence.LOW, [*reasons, f"partial:{grounding.coverage:.2f}"])
 
+    #: Both remaining signals demote by one step and neither decides, so a value carrying both is
+    #: demoted once rather than twice. That is deliberate: they are two ways of noticing the same
+    #: kind of failure — a real figure read into the wrong field — and a value the arithmetic
+    #: already accuses is not made more doubtful by the page also being short of places for it.
+    if (grounding.field, grounding.key) in contested:
+        return _at(grounding, Confidence.MEDIUM, [*reasons, "contended"], contended=True)
     if grounding.field in named:
         return _at(grounding, Confidence.MEDIUM, [*reasons, f"rule:{grounding.field}"])
     return _at(grounding, Confidence.HIGH, reasons)
 
 
-def _at(grounding: Grounding, confidence: Confidence, reasons: list[str]) -> Assessment:
+def _at(
+    grounding: Grounding,
+    confidence: Confidence,
+    reasons: list[str],
+    *,
+    contended: bool = False,
+) -> Assessment:
     return Assessment(
         field=grounding.field,
         key=grounding.key,
@@ -151,6 +188,7 @@ def _at(grounding: Grounding, confidence: Confidence, reasons: list[str]) -> Ass
         confidence=confidence,
         route=ROUTES[confidence],
         support=grounding.support,
+        contended=contended,
         reasons=tuple(reasons),
     )
 

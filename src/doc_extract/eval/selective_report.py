@@ -92,10 +92,14 @@ def _with_wrong(total: int, wrong: int) -> str:
 def _signals(curve: Curve) -> str:
     """Each signal alone, before the gate combines them."""
     return "\n".join([
-        "## The two signals, scored apart",
+        "## The three signals, scored apart",
         "",
         "Field-level detectors of a wrong asserted value. They are complements with very different "
-        "shapes, and a reader who saw only their combination could not tell which did the work.",
+        "shapes, and a reader who saw only their combination could not tell which did the work. "
+        "`contention` is the one whose precision is bounded by construction: when two of a "
+        "reading's values claim one printed figure it flags **both**, because no label-free fact "
+        "says which of the two is the intruder, so about half of what it flags is the correct "
+        "sibling of a wrong value.",
         "",
         "| signal | TP | FP | FN | TN | precision | recall |",
         "|---|---:|---:|---:|---:|---:|---:|",
@@ -178,6 +182,7 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
         if curve.wrong and signal.true_positive == 0 and signal.false_positive == 0
     }
     lines.extend(_grounding_misses(curve))
+    lines.extend(_contention_added(curve))
     if "arithmetic" in silent:
         lines.append(
             f"* **`arithmetic` flagged nothing at all**, while {curve.wrong} asserted value(s) "
@@ -186,11 +191,41 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
             "like from the arithmetic's side."
         )
     lines.append(
-        "* The confidence levels are produced by fixed rules over the two signals, not by weights "
-        "fitted to this corpus. That is why there are four of them and not a smooth sweep: a "
+        "* The confidence levels are produced by fixed rules over the three signals, not by "
+        "weights fitted to this corpus. That is why there are four and not a smooth sweep: a "
         "fitted score would draw a better curve here and would be measuring its own training set."
     )
     return "\n".join(lines)
+
+
+def _contention_added(curve: Curve) -> list[str]:
+    """What the third signal contributed **beyond** the arithmetic, from this run's own counts.
+
+    The two overlap by construction: a row whose discount duplicates its net breaks
+    `lines.net_matches_quantity_times_price` as well, so the arithmetic has usually already named
+    the field by the time a contention does. Whether that leaves the newer signal doing anything is
+    a question about a particular run, and the answer is derived here rather than settled in prose —
+    the same reason `ungated_accuracy` is computed: a sentence in a docstring survives the day the
+    counts stop supporting it.
+    """
+    flagged = [row for row in curve.judged if row.contended]
+    if not flagged:
+        return []
+    alone = [row for row in flagged if not row.accused]
+    wrong_alone = sum(1 for row in alone if row.wrong)
+    verdict = (
+        f"{len(alone)} of them ({wrong_alone} wrong) carried **no** arithmetic accusation, so the "
+        "gate would not have demoted them otherwise"
+        if alone else
+        "**every one of them was already named by a hard rule**, so the gate reached the same "
+        "verdict without it and what this signal adds here is the attribution, not the routing"
+    )
+    return [
+        f"* `contention` flagged {len(flagged)} asserted value(s), and {verdict}. It names the two "
+        "fields that share a printed figure, where an arithmetic violation names the whole `lines` "
+        "collection; the two catch overlapping populations and only the narrower one says *which* "
+        "values are involved."
+    ]
 
 
 def _grounding_misses(curve: Curve) -> list[str]:
@@ -221,9 +256,10 @@ def _grounding_misses(curve: Curve) -> list[str]:
         "grounded and completely wrong, and one that borrows a word from the other party's address "
         "is too. A **text** value is now resolved to one place rather than to whichever occurrence "
         "of each word came first, which is what makes its recorded spans a location at all; an "
-        "amount or an identifier still resolves to every occurrence of itself. The geometric check "
-        "that would use either is not built, and `docs/adr/0002_placement.md` carries what it "
-        "turned out to need."
+        "amount or an identifier still resolves to every occurrence of itself. `contention` uses "
+        "those places to catch the one wrong-column shape that is decidable without knowing which "
+        "column is which — two values claiming one figure — and `docs/adr/0002_placement.md` "
+        "carries the two shapes that leaves standing."
     ]
 
 
@@ -235,7 +271,7 @@ def summary_lines(curve: Curve) -> Iterable[str]:
     )
     for signal in curve.signals:
         yield (
-            f"  {signal.name:<11} precision {_rate(signal.precision)}   "
+            f"  {signal.name:<16} precision {_rate(signal.precision)}   "
             f"recall {_rate(signal.recall)}"
         )
     for point in curve.points:
