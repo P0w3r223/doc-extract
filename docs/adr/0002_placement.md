@@ -127,3 +127,35 @@ label-free structural signal and it is a different piece of work, with its own c
   reading's field instances, which is what would let the value path choose an occurrence and would
   answer the wrong-column question directly. Both need a control that clears gold, and the naive
   version of each has now been measured failing one.
+
+## Addendum, 2026-08-21: the foreign arm supplies the population (M7i)
+
+Two paid arms over `data/foreign` turned the wrong-column question from a property of a regex
+baseline into a property of a **real model's errors**, and added one blind spot nobody predicted.
+
+**The population.** `claude-haiku-4-5` reads the foreign corpus at 98.1 % — no worse than the 97.8 %
+it scores on the page it was tuned against — but its errors change shape. Of 58 spurious
+`lines[].discount` values, **50 are that row's own `net`**, 56 are some column of that same row, and
+2 match nothing; all 58 fall on the two dialects that reorder columns, and none on the one that does
+not. Grounding's recall against that population is **34.8 %**, against 85.7 % on the same model's
+own-page errors, with precision **100 %** on both. A value one column over is on the page, in the
+right row — textually indistinguishable from a correct reading, and geometrically obvious.
+
+That is what makes joint placement worth building rather than merely coherent: a `discount` whose
+only occurrence sits inside the net column, while every sibling of its row sits in its own, is
+detectable from the spans `place.py` now records — and this is the first population where doing so
+would catch a frontier-adjacent model rather than a regex.
+
+**And a second, narrower defect the arm found rather than confirmed.** `resolve._source_boundary`
+rejects a hit that continues into a longer run of alphanumerics *on the page*. The identifier
+projection has already stripped the separators, so when a page groups an identifier — `letterhead`
+prints `PL 049911 602207 394837 519847 27` — a prefix ending on a **grouping boundary** has a space
+after it in the source and passes the check. haiku dropped the trailing group on 5 accounts and all
+5 grounded. The rule is not wrong; it is asking about the page while the value it compares has been
+normalised past the thing that would have answered.
+
+**Nothing leaked, and the reason is the design.** All 11 wrong accounts fail mod-97 and the
+check-digit rule flags all 11 — 6 route `reject`, 5 `review`, **0 `accept`**. Grounding's silence
+cost nothing because the arithmetic covers exactly what it missed. Fixing the boundary rule (compare
+against a projection that remembers where the separators were) is worth doing and is **not urgent**:
+it would move values from `review` to `reject`, not from `accept` to caught.
