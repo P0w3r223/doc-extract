@@ -561,9 +561,9 @@ page at all.</p>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
     <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms and one paid</td></tr>
-    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on two of the three</td></tr>
+    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on all three</td></tr>
     <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">built</td></tr>
-    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">built &mdash; claude-haiku-4-5, claude-opus-5</td></tr>
     <tr><th>&mdash; an adaptive attacker, which no fixed payload set stands in for</th><td class="num">not built</td></tr>
     <tr><th>&mdash; a check that a grounded value sits where the page would <em>print</em> it</th><td class="num">not built</td></tr>
     <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
@@ -572,10 +572,11 @@ page at all.</p>
 <p class="note">The headline question &mdash; does &ldquo;the invariants hold&rdquo; actually predict
 &ldquo;the fields are correct&rdquo;? &mdash; met an awkward first answer: on the run that mattered
 most there was nothing to predict, because the model made no mistakes. It has been answered instead
-against injected errors, a weaker reader, and two held-out corpora &mdash; and the scanned one shows
-that making a page <em>harder to see</em> does not un-saturate it either. Making a page unfamiliar
-might, and that is the arm this project has not paid for. A negative result is a publishable result,
-and so is a corpus that turned out to be too easy.</p>
+against injected errors, a weaker reader, and two held-out corpora &mdash; and both of them show
+that neither making a page <em>harder to see</em> nor making it <em>unfamiliar</em> un-saturates it
+for a frontier model. What the unfamiliar page did change is the <em>shape</em> of a weaker model's
+errors: right value, wrong field, which is exactly what the grounding signal cannot see. A negative
+result is a publishable result, and so is a corpus that turned out to be too easy.</p>
 
 <h2>Reproduce it</h2>
 <pre><code>git clone https://github.com/P0w3r223/doc-extract
@@ -592,7 +593,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>9709cc2</code> &middot; part of a
+  <code>620bc1f</code> &middot; part of a
   <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by
