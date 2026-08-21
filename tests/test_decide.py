@@ -332,10 +332,19 @@ def _meta() -> RunMeta:
 
 
 def test_each_signal_is_scored_on_its_own():
+    """Three signals, kept apart. A reader of the union alone cannot tell which did the work.
+
+    The fourth row is the one `contention` owns and the other two are silent on: a value that is on
+    the page and breaks no identity, but shares its only printed figure with another of the same
+    reading. Its presence is what makes the union's recall a claim rather than a restatement of the
+    first two.
+    """
     rows = [
         Judged("d", "f", "1", Confidence.NONE, wrong=True, ungrounded=True, accused=False),
         Judged("d", "f", "2", Confidence.HIGH, wrong=True, ungrounded=False, accused=True),
         Judged("d", "f", "3", Confidence.HIGH, wrong=False, ungrounded=False, accused=True),
+        Judged("d", "f", "4", Confidence.MEDIUM, wrong=True, ungrounded=False, accused=False,
+               contended=True),
     ]
     signals = {signal.name: signal for signal in summarise(rows, missed=0,
                                                            without_prediction=0).signals}
@@ -344,7 +353,11 @@ def test_each_signal_is_scored_on_its_own():
     assert signals["grounding"].false_positive == 0
     assert signals["arithmetic"].true_positive == 1
     assert signals["arithmetic"].false_positive == 1
-    assert signals["either"].recall == 1.0
+    assert signals["contention"].true_positive == 1
+    assert signals["contention"].false_positive == 0
+    #: The other two signals' catches are this one's misses, which is the complementarity.
+    assert signals["contention"].false_negative == 2
+    assert signals["any of the three"].recall == 1.0
 
 
 # --------------------------------------------------------------------------- the formatter

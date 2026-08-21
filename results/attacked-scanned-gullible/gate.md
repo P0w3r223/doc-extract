@@ -14,15 +14,16 @@
 | gold values never asserted | 0 |
 | documents with no invoice | 6 |
 
-## The two signals, scored apart
+## The three signals, scored apart
 
-Field-level detectors of a wrong asserted value. They are complements with very different shapes, and a reader who saw only their combination could not tell which did the work.
+Field-level detectors of a wrong asserted value. They are complements with very different shapes, and a reader who saw only their combination could not tell which did the work. `contention` is the one whose precision is bounded by construction: when two of a reading's values claim one printed figure it flags **both**, because no label-free fact says which of the two is the intruder, so about half of what it flags is the correct sibling of a wrong value.
 
 | signal | TP | FP | FN | TN | precision | recall |
 |---|---:|---:|---:|---:|---:|---:|
 | `grounding` | 6 | 0 | 60 | 2631 | 100 % | 9.1 % |
 | `arithmetic` | 48 | 889 | 18 | 1742 | 5.1 % | 72.7 % |
-| `either` | 48 | 889 | 18 | 1742 | 5.1 % | 72.7 % |
+| `contention` | 12 | 0 | 54 | 2631 | 100 % | 18.2 % |
+| `any of the three` | 48 | 889 | 18 | 1742 | 5.1 % | 72.7 % |
 
 ## Coverage and accuracy
 
@@ -43,5 +44,6 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 * 6 document(s) produced no invoice, so none of their fields was assessed. The pipeline had already refused them.
 * **6048 of the 9894 asserted value(s) (61.1 %) sit on a page with no text layer at all, and are outside the curve.** Grounding resolves a value against page text and there is none, so it answers `NO_TEXT` — *I could not ask* — rather than `UNGROUNDED`, which would have claimed the value is missing from the page. They are routed `review` and carry no confidence, so every figure above is over the 2697 value(s) this pipeline could actually assess, and 0 wrong value(s) sit in the excluded set where nothing measures them. **The gate has no signal at all on those**, and that is a statement about the page rather than about the reader: a recogniser in front of the model brings the signal back.
 * **Against the ungated policy.** Accepting every asserted value — the 2697 below plus the 7197 excluded from them — is 99.3 % accurate. The `high` row is 99.0 %, so on this corpus auto-accepting the gate's confident bucket is **still less accurate than not gating at all**, because its signal exists only where the page kept text and the excluded values are largely right. The `none` row is *not* that comparison: it accepts everything the gate could assess, which is a different set.
-* **`grounding` missed 60 of the 66 wrong asserted value(s)** and flagged 6 of them. It asks whether a value is *on the page*, not whether it is in the *right place*: a reader that lifts a real figure out of the wrong column is fully grounded and completely wrong, and one that borrows a word from the other party's address is too. A **text** value is now resolved to one place rather than to whichever occurrence of each word came first, which is what makes its recorded spans a location at all; an amount or an identifier still resolves to every occurrence of itself. The geometric check that would use either is not built, and `docs/adr/0002_placement.md` carries what it turned out to need.
-* The confidence levels are produced by fixed rules over the two signals, not by weights fitted to this corpus. That is why there are four of them and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.
+* **`grounding` missed 60 of the 66 wrong asserted value(s)** and flagged 6 of them. It asks whether a value is *on the page*, not whether it is in the *right place*: a reader that lifts a real figure out of the wrong column is fully grounded and completely wrong, and one that borrows a word from the other party's address is too. A **text** value is now resolved to one place rather than to whichever occurrence of each word came first, which is what makes its recorded spans a location at all; an amount or an identifier still resolves to every occurrence of itself. `contention` uses those places to catch the one wrong-column shape that is decidable without knowing which column is which — two values claiming one figure — and `docs/adr/0002_placement.md` carries the two shapes that leaves standing.
+* `contention` flagged 12 asserted value(s), and **every one of them was already named by a hard rule**, so the gate reached the same verdict without it and what this signal adds here is the attribution, not the routing. It names the two fields that share a printed figure, where an arithmetic violation names the whole `lines` collection; the two catch overlapping populations and only the narrower one says *which* values are involved.
+* The confidence levels are produced by fixed rules over the three signals, not by weights fitted to this corpus. That is why there are four and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.

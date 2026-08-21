@@ -14,15 +14,16 @@
 | gold values never asserted | 5310 |
 | documents with no invoice | 0 |
 
-## The two signals, scored apart
+## The three signals, scored apart
 
-Field-level detectors of a wrong asserted value. They are complements with very different shapes, and a reader who saw only their combination could not tell which did the work.
+Field-level detectors of a wrong asserted value. They are complements with very different shapes, and a reader who saw only their combination could not tell which did the work. `contention` is the one whose precision is bounded by construction: when two of a reading's values claim one printed figure it flags **both**, because no label-free fact says which of the two is the intruder, so about half of what it flags is the correct sibling of a wrong value.
 
 | signal | TP | FP | FN | TN | precision | recall |
 |---|---:|---:|---:|---:|---:|---:|
 | `grounding` | 96 | 0 | 88 | 32 | 100 % | 52.2 % |
 | `arithmetic` | 0 | 0 | 184 | 32 | — | 0.0 % |
-| `either` | 96 | 0 | 88 | 32 | 100 % | 52.2 % |
+| `contention` | 0 | 0 | 184 | 32 | — | 0.0 % |
+| `any of the three` | 96 | 0 | 88 | 32 | 100 % | 52.2 % |
 
 ## Coverage and accuracy
 
@@ -42,4 +43,4 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 * **432 of the 1364 asserted value(s) (31.7 %) sit on a page with no text layer at all, and are outside the curve.** Grounding resolves a value against page text and there is none, so it answers `NO_TEXT` — *I could not ask* — rather than `UNGROUNDED`, which would have claimed the value is missing from the page. They are routed `review` and carry no confidence, so every figure above is over the 216 value(s) this pipeline could actually assess, and 368 wrong value(s) sit in the excluded set where nothing measures them. **The gate has no signal at all on those**, and that is a statement about the page rather than about the reader: a recogniser in front of the model brings the signal back.
 * **Against the ungated policy.** Accepting every asserted value — the 216 below plus the 1148 excluded from them — is 57.8 % accurate. The `high` row is 26.7 %, so on this corpus auto-accepting the gate's confident bucket is **still less accurate than not gating at all**, because its signal exists only where the page kept text and the excluded values are largely right. The `none` row is *not* that comparison: it accepts everything the gate could assess, which is a different set.
 * **`arithmetic` flagged nothing at all**, while 184 asserted value(s) were wrong. No identity was broken: a prediction can be internally consistent and still be wrong everywhere, which is what a constant or a wholly-invented answer looks like from the arithmetic's side.
-* The confidence levels are produced by fixed rules over the two signals, not by weights fitted to this corpus. That is why there are four of them and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.
+* The confidence levels are produced by fixed rules over the three signals, not by weights fitted to this corpus. That is why there are four and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.

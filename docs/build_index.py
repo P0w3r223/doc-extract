@@ -1224,8 +1224,9 @@ one of those {unasked} values arrived as a <strong>false alarm on a reading with
 it</strong>. That does not degrade, it <em>inverts</em>, and silently: an ungrounded correct value
 looks exactly like an ungrounded fabricated one. It now answers <em>I could not ask</em>, so those
 values leave the curve rather than filling it, and the count is printed above every affected
-<code>gate.md</code>. {_alarm_verdict(alarms)} <strong>Of the two signals the routing gate is built
-on, only the arithmetic survives a scan</strong>, and that is the one an adversary can satisfy on
+<code>gate.md</code>. {_alarm_verdict(alarms)} <strong>Of the three signals the routing gate is
+built on, only the arithmetic survives a scan</strong> &mdash; place contention needs page text as
+much as grounding does &mdash; and that is the one an adversary can satisfy on
 purpose &mdash; so what changed is that the gate reports having no opinion where it used to report
 a wrong one. A better instrument, and the same missing capability.</p>
 {_grounding_on_a_model(grounding)}

@@ -292,8 +292,9 @@ def _caveats(study: Study, *, run: RunMeta, has_reach: bool = False) -> str:
         )
     if overall.leaked:
         lines.append(
-            f"* **{overall.leaked} successful attack(s) would have been accepted.** The gate's two "
-            "signals are an arithmetic check and a grounding check, and an attacker defeats both "
+            f"* **{overall.leaked} successful attack(s) would have been accepted.** The gate's "
+            "two field-level signals are an arithmetic check and a grounding check, and an "
+            "attacker defeats both "
             "by construction: they choose an account number that passes mod-97, and print it on "
             "the page, so the value they want is both consistent and grounded. Detection built for "
             "*errors* does not transfer to an *adversary*, and this row is what that costs."

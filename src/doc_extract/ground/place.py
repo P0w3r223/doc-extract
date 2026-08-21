@@ -112,6 +112,29 @@ class Sheet:
                 break
         return best
 
+    def places(self, wanted: tuple[str, ...]) -> tuple[Place, ...]:
+        """**Every** place that holds the whole value, in the order `locate` would have tried them.
+
+        `locate` stops at the first, because a signal about *this* value only needs to know that one
+        exists. `joint` needs the others: a value with two places on the page can yield one of them
+        to a sibling that has only that one, and a signal that did not know the alternative existed
+        would accuse the pair of a contention the page does not actually have. Two identical
+        descriptions on two rows are the case that makes this load-bearing — before the alternatives
+        were enumerated they contended on 231 of 5892 *gold* values.
+
+        Deduplicated by the words claimed, because neighbouring anchors inside one region reach the
+        same set: it is the same place found from two directions, not two places.
+        """
+        if not wanted:
+            return ()
+        want = Counter(wanted)
+        found: dict[tuple[tuple[int, int], ...], Place] = {}
+        for anchor in self._anchors(want):
+            place = self._take(anchor, want)
+            if place.coverage >= 1.0 and place.spans:
+                found.setdefault(claim(place.spans), place)
+        return tuple(found.values())
+
     def _anchors(self, want: Counter[str]) -> list[int]:
         """Cells holding any of the wanted words, fullest first, then in reading order."""
         candidates = {index for token in want for index in self._by_token.get(token, ())}
@@ -160,6 +183,16 @@ class Sheet:
                 and _row_gap(cell, here) <= WRAP_REACH * height
             ))
         return self._regions[anchor]
+
+
+def claim(spans: tuple[Span, ...]) -> tuple[tuple[int, int], ...]:
+    """The ink a place claims, as a hashable identity: which words, not which cell reached them.
+
+    Sorted because a region is read anchor-first rather than in page order, so the same place found
+    from two anchors arrives with its words in two orders. `ground/joint.py` compares two readings'
+    places on it, which is why it is one function here and not two spellings of the same idea.
+    """
+    return tuple(sorted((span.start, span.end) for span in spans))
 
 
 def _shares_column(cell: Span, anchor: Span) -> bool:

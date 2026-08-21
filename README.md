@@ -85,7 +85,7 @@ a description wraps across a page break.
 That was the case for the grounding layer, arrived at by measurement rather than assumed — and the
 layer, once built, does what the measurement predicted. At the **field** level it scores precision
 100.0 % and recall 85.7 %, with **zero false alarms across 11 652 correctly-read field instances** —
-and not one false positive on any of the 22 committed runs. Its eleven misses are nine wrong
+and not one false positive on any of the 24 committed runs. Its eleven misses are nine wrong
 discounts, which is exactly what the row arithmetic catches, plus the two truncated names; put
 together the two leave two wrong fields standing out of 5837.
 
@@ -97,9 +97,24 @@ turned 19 of `pattern`'s previously invisible errors into flagged ones — and i
 this project had been making about what the recorded spans made possible. See
 [`docs/adr/0002_placement.md`](docs/adr/0002_placement.md).
 
+Once places are places, one more question becomes askable **without knowing which column is which**,
+which is the constraint this layer works under: can a reading's values each be given a place of
+their own? Two of them claiming one printed figure is a contradiction about the page, and the
+population that motivated it turned out to be three failures rather than one. Of a small model's 58
+spurious discounts on an unfamiliar layout, 24 *duplicate* the row's net while still reading it —
+those contend — 24 move the value and leave `net` empty, and 4 shift the whole row a column across.
+The last two leave the page consistent and only the arithmetic sees them.
+
+The signal contends on **nothing** in any perfect reading — the synthetic, foreign and attacked
+corpora, and both frontier-model arms. It is the only field-level catch of an injected line item
+anywhere here (all 16 breaches on the compliant control, no false positives). And **it moves one row
+of one curve out of 24**, because a duplicated discount breaks the row arithmetic too, so the value
+was already demoted. What it adds is the *attribution* — two named fields where a violation names
+the whole `lines` collection — and the report derives that per run rather than asserting it.
+
 ## What the gate buys
 
-`decide/` turns the two signals into four confidence levels by fixed rules — nothing fitted on the
+`decide/` turns the three signals into four confidence levels by fixed rules — nothing fitted on the
 corpus it is measured against — and routes accept / review / reject.
 
 | accept down to | route | coverage | accuracy | leaked |
@@ -117,8 +132,11 @@ model **asserted** — a field it left `null` cannot be grounded, so a model tha
 score better here. Grounding asks whether a value is on the page, **not whether it is in the right
 place**: on the regex baseline it flags 19 of 292 wrong values, because a column shift lifts real
 figures out of the wrong column and almost every one of them grounds. It used to flag *none*, and
-what closed the gap by those 19 was requiring the value to sit in one place; what would close the
-rest is a check nobody here has a control for yet. And `100 %` means
+what closed the gap by those 19 was requiring the value to sit in one place. Place contention closes
+none of the rest on that baseline — a regex reader lifts one figure out of one column and asserts
+nothing else that wants it, so there is no contradiction on the page to find; deciding that case
+needs to know which column holds which field, which is knowledge this layer does not have. And
+`100 %` means
 exactly 100 % — the formatter grows its precision rather than rounding, after an early version
 printed `100.0 %` in a row whose next column said two wrong values had been accepted.
 
@@ -247,8 +265,9 @@ exactly like an ungrounded fabricated one.
 
 It now answers *I could not ask*: those values leave the curve instead of filling it, coverage over
 what the pipeline can assess is 100 %, and the count it cannot see into is printed above the table
-rather than folded inside it. **The alarms are gone and the signal is not back.** Of the gate's two
-signals, **only the arithmetic survives a scan**, and that is the signal M6 already showed an
+rather than folded inside it. **The alarms are gone and the signal is not back.** Of the gate's
+three signals, **only the arithmetic survives a scan** — place contention needs page text as much as
+grounding does, and that is the signal M6 already showed an
 adversary can satisfy on purpose — so what changed is that the gate reports having no opinion where
 it used to report a wrong one.
 
@@ -369,6 +388,12 @@ hold whatever the page says: a constant system prompt, a fence whose marker is `
 it wraps, a stage order that never branches on document content, and an extractor told to transcribe
 rather than compute. The reasoning, the threat model and the control that is missing (a payee
 allow-list) are in [`docs/adr/0001_trust_boundary.md`](docs/adr/0001_trust_boundary.md).
+
+One signal does name the injected row at field level, and its reach is narrower than the catch
+looks. Place contention flags all 16 `line_injected` breaches with no false alarms, because the
+payload states a single amount and a compliant reader books it as a row of quantity 1 — so
+`unit_price_net` and `net` both claim the one figure the payload printed. A payload naming a
+quantity and a unit price separately would print two figures and would not contend at all.
 
 The suite verifies at build time that every payload survived into the text layer of the page it was
 printed on. An attack the model never saw would otherwise sit in the denominator as a failed attack,
