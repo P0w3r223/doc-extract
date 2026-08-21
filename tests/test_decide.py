@@ -268,6 +268,62 @@ def test_the_gate_is_compared_against_not_gating_at_all_and_the_verdict_is_count
     assert "more accurate than not gating at all" in selective_report.render(better, run=_meta())
 
 
+def _grounding(*specs):
+    """Rows where `ungrounded` is the flag under test, so grounding's own counts are set here."""
+    return [
+        Judged(doc_id="d", field="f", key=str(index), confidence=Confidence.HIGH,
+               wrong=wrong, ungrounded=flagged, accused=False)
+        for index, (wrong, flagged) in enumerate(specs)
+    ]
+
+
+def test_grounding_states_its_limit_whenever_it_missed_more_than_it_caught():
+    """The standing caveat is triggered by this run's counts, not by grounding being silent.
+
+    The earlier version fired only when grounding flagged *nothing at all*, which meant that the
+    moment it caught a single value the limit went unstated — on `pattern`, where it then missed
+    273 of 292. The trigger is a comparison between two counts of the same run, so there is no
+    threshold here that could be picked to make a report say something.
+    """
+    weak = summarise(
+        _grounding((True, True), (True, False), (True, False)),
+        missed=0, without_prediction=0,
+    )
+    bullet = _bullet(selective_report.render(weak, run=_meta()), "`grounding` missed")
+
+    assert "missed 2 of the 3 wrong asserted value(s)" in bullet
+    assert "flagged 1 of them" in bullet
+    assert "flagged nothing at all" not in bullet, "it caught one; the sharper wording is untrue"
+
+
+def _bullet(body: str, opening: str) -> str:
+    """The one caveat line starting with `opening`.
+
+    Scoped rather than searched over the whole report, because `arithmetic` carries a bullet of its
+    own with wording deliberately parallel to grounding's — an assertion against the whole body
+    would pass or fail on the wrong signal's line.
+    """
+    found = [line for line in body.splitlines() if line.startswith(f"* **{opening}")]
+    assert len(found) == 1, f"expected exactly one {opening!r} bullet, got {len(found)}"
+    return found[0]
+
+
+def test_grounding_that_caught_nothing_is_said_more_sharply():
+    silent = summarise(
+        _grounding((True, False), (True, False)), missed=0, without_prediction=0,
+    )
+    assert "**flagged nothing at all**" in selective_report.render(silent, run=_meta())
+
+
+def test_grounding_that_catches_most_of_what_is_wrong_gets_no_caveat():
+    """A report that printed the limit on every run would stop being read as a finding."""
+    strong = summarise(
+        _grounding((True, True), (True, True), (True, False)),
+        missed=0, without_prediction=0,
+    )
+    assert "`grounding` missed" not in selective_report.render(strong, run=_meta())
+
+
 def _meta() -> RunMeta:
     return RunMeta(
         baseline="gullible", model="gullible", corpus_dir="data/attacked-scanned",

@@ -20,7 +20,7 @@ Field-level detectors of a wrong asserted value. They are complements with very 
 
 | signal | TP | FP | FN | TN | precision | recall |
 |---|---:|---:|---:|---:|---:|---:|
-| `grounding` | 0 | 0 | 292 | 5064 | — | 0.0 % |
+| `grounding` | 19 | 0 | 273 | 5064 | 100 % | 6.5 % |
 | `arithmetic` | 238 | 1424 | 54 | 3640 | 14.3 % | 81.5 % |
 | `either` | 238 | 1424 | 54 | 3640 | 14.3 % | 81.5 % |
 
@@ -31,7 +31,7 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 | accept down to | route | coverage | accuracy | accepted | leaked |
 |---|---|---:|---:|---:|---:|
 | `high` | `accept` | 69.0 % | 98.5 % | 3694 | 54 |
-| `medium` | `review` | 100 % | 94.5 % | 5356 | 292 |
+| `medium` | `review` | 99.6 % | 94.9 % | 5337 | 273 |
 | `low` | `review` | 100 % | 94.5 % | 5356 | 292 |
 | `none` | `reject` | 100 % | 94.5 % | 5356 | 292 |
 
@@ -40,5 +40,5 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 * **Coverage is over the values the model asserted, not over the document.** A field it left `null` cannot be grounded, so it carries no confidence and sits outside every denominator above. 323 gold value(s) were never asserted at all, and no signal here can see them — a model that answered less would score better on this curve.
 * 759 asserted value(s) are **outside the curve** because grounding declines to ask about them: `kind` is an FA(3) code the page never prints, and a non-numeric rate is an exemption code each issuer abbreviates their own way. 0 of them are wrong, and nothing in the tables above counts those.
 * 4 document(s) produced no invoice, so none of their fields was assessed. The pipeline had already refused them.
-* **`grounding` flagged nothing at all**, while 292 asserted value(s) were wrong. It asks whether a value is *on the page*, not whether it is in the *right place*: a reader that lifts a real figure out of the wrong column is fully grounded and completely wrong, and one that borrows a word from the other party's address is too. The spans are recorded, so a geometric check could ask the second question — it is not built.
+* **`grounding` missed 273 of the 292 wrong asserted value(s)** and flagged 19 of them. It asks whether a value is *on the page*, not whether it is in the *right place*: a reader that lifts a real figure out of the wrong column is fully grounded and completely wrong, and one that borrows a word from the other party's address is too. A value is now resolved to **one place** rather than to whichever occurrence of each word came first, which is what makes the recorded spans a location at all — but the geometric check that would use them is still not built, and `docs/adr/0002_placement.md` carries what it turned out to need.
 * The confidence levels are produced by fixed rules over the two signals, not by weights fitted to this corpus. That is why there are four of them and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.

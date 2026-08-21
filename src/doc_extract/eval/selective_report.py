@@ -177,15 +177,7 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
         signal.name for signal in curve.signals
         if curve.wrong and signal.true_positive == 0 and signal.false_positive == 0
     }
-    if "grounding" in silent:
-        lines.append(
-            f"* **`grounding` flagged nothing at all**, while {curve.wrong} asserted value(s) were "
-            "wrong. It asks whether a value is *on the page*, not whether it is in the *right "
-            "place*: a reader that lifts a real figure out of the wrong column is fully grounded "
-            "and completely wrong, and one that borrows a word from the other party's address is "
-            "too. The spans are recorded, so a geometric check could ask the second question — it "
-            "is not built."
-        )
+    lines.extend(_grounding_misses(curve))
     if "arithmetic" in silent:
         lines.append(
             f"* **`arithmetic` flagged nothing at all**, while {curve.wrong} asserted value(s) "
@@ -199,6 +191,39 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
         "fitted score would draw a better curve here and would be measuring its own training set."
     )
     return "\n".join(lines)
+
+
+def _grounding_misses(curve: Curve) -> list[str]:
+    """The standing limit of grounding, printed when this run's own counts show it biting.
+
+    Grounding asks whether a value is on the page, never whether it is in the *place* that field is
+    printed. A reader that lifts a real figure out of the wrong column is fully grounded and
+    completely wrong. The bullet appears when grounding **missed more wrong values than it caught**
+    — a comparison between two counts of this run, so nothing here is a threshold picked to make a
+    report say something.
+
+    The wording splits on whether it caught anything at all, because *flagged nothing* and *flagged
+    a few* are different claims and a reader deciding how much to trust the signal needs the one
+    that is true. The earlier version printed only the first, which meant the limit went unstated
+    on exactly the runs where the signal was weak rather than absent.
+    """
+    grounding = next((s for s in curve.signals if s.name == "grounding"), None)
+    if grounding is None or not curve.wrong or grounding.false_negative <= grounding.true_positive:
+        return []
+    caught = (
+        "**flagged nothing at all**" if grounding.true_positive == 0
+        else f"flagged {grounding.true_positive} of them"
+    )
+    return [
+        f"* **`grounding` missed {grounding.false_negative} of the {curve.wrong} wrong asserted "
+        f"value(s)** and {caught}. It asks whether a value is *on the page*, not whether it is in "
+        "the *right place*: a reader that lifts a real figure out of the wrong column is fully "
+        "grounded and completely wrong, and one that borrows a word from the other party's address "
+        "is too. A value is now resolved to **one place** rather than to whichever occurrence of "
+        "each word came first, which is what makes the recorded spans a location at all — but the "
+        "geometric check that would use them is still not built, and "
+        "`docs/adr/0002_placement.md` carries what it turned out to need."
+    ]
 
 
 def summary_lines(curve: Curve) -> Iterable[str]:

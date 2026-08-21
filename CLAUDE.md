@@ -83,6 +83,8 @@ src/doc_extract/
     surface.py       # a normalised value -> the forms a Polish invoice could have printed it in
     resolve.py       # substring search over a projected page; three levels of support per field,
                      # and `NO_TEXT` for the page that gave it nothing to search
+    place.py         # M7h — one place has to hold the whole text value; the column, not the tally,
+                     # is what stops a name grounding on the other party's ink
   decide/            # M5 — the runtime gate. Reads a prediction against its page, never the gold
     confidence.py    # four levels from the two measured signals, and accept / review / reject;
                      # a value it could not check is reviewed, never accepted
@@ -289,9 +291,11 @@ re-run a paid model to be checked would be one too.
    Answered on a real model-error population: **precision 100 %, recall 76.2 %, and every miss a
    text field** — see *The headline answer* below. `ground/` answers the other half: a value is
    searched for as a substring of the page under its match class's normalisation, at three levels
-   of support, with **precision 100 % and recall 84.4 %** at the field level and zero false alarms
-   on 11 652 correctly-read fields. Its control is that gold grounds completely against its own
-   page — 0 of 5892, which is what caught the first version failing on 14.9 %. `decide/` turns the
+   of support, in **one place** rather than word by word across the whole page (M7h — see *Where a
+   grounded value sits* below), with **precision 100 % and recall 85.7 %** at the field level and
+   zero false alarms on 11 652 correctly-read fields. Its control is that gold grounds completely
+   against its own page — 0 of 5892, which is what caught the first version failing on 14.9 % and
+   which every later change to this layer has had to clear. `decide/` turns the
    two into four confidence levels by fixed rules, and `gate` measures the result as a
    coverage–accuracy curve — see *What the gate buys* below.
 6. **Injection suite, attack success rate, trust-boundary ADR.** ✅ `synth/overlay.py` teaches the
@@ -335,10 +339,16 @@ re-run a paid model to be checked would be one too.
    has — not gating at all — auto-accepting the gate's confident bucket is still the worse one
    (99.0 % against 99.3 %), because the gate's signal exists only on the rung a payload survives.
    `selective_report` now computes that comparison and derives the verdict rather than carrying it
-   in prose. Still open: a paid arm over the *foreign* corpus, which is a separate spend and a
-   separate question; a check that a grounded value sits where the page would *print* it and not
-   merely somewhere on it; an adaptive attacker, which no fixed payload set can stand in for; and
-   the synthetic↔real gap as an artifact of its own rather than as four sections.
+   in prose — **and M7h then flipped one of those verdicts, in the report rather than in a
+   sentence**, which is what that design was for. **M7h** went to build the geometric check M7g had
+   named and found its premise false: the recorded spans held whichever occurrence of each word came
+   first, not a location, so every geometric rule fired on a quarter of a perfect reading. A text
+   value now has to be found in **one place**; it cost no correct value on four populations and
+   caught 19 that were invisible before (*Where a grounded value sits* below). Still open: a paid
+   arm over the *foreign* corpus, which is a separate spend and a separate question; the
+   continuation-aware **completeness** check and the **joint placement** that M7h scoped and did not
+   build, both in `docs/adr/0002_placement.md`; an adaptive attacker, which no fixed payload set can
+   stand in for; and the synthetic↔real gap as an artifact of its own rather than as four sections.
 
 ## The headline answer, and what it is really measuring
 
@@ -367,15 +377,16 @@ level:
 
 | signal | TP | FP | FN | precision | recall |
 |---|---:|---:|---:|---:|---:|
-| grounding | 65 | 0 | 12 | **100.0 %** | 84.4 % |
+| grounding | 66 | 0 | 11 | **100.0 %** | 85.7 % |
 | arithmetic, attributed to fields | 42 | 529 | 35 | 7.4 % | 54.5 % |
 | **the two together** | 75 | 529 | 2 | 12.4 % | **97.4 %** |
 
 Three things to read out of that, and the third is a caution rather than a result:
 
-- **They are complements, not alternatives.** Grounding's twelve misses are nine wrong discounts,
-  which is exactly what the row arithmetic catches. Together they leave two wrong fields standing
-  out of 5837 measured.
+- **They are complements, not alternatives.** Grounding's eleven misses are nine wrong discounts,
+  which is exactly what the row arithmetic catches, plus the two names below. Together they leave
+  two wrong fields standing out of 5837 measured. Note that the union did **not** move when M7h
+  gained grounding its 66th catch: the value it gained was one the arithmetic already had.
 - **Grounding raised zero false alarms** across both models — 11 652 correctly-read field
   instances, none flagged.
 - **An arithmetic violation is a poor field-level accusation.** It names `lines`, so it implicates
@@ -656,10 +667,11 @@ survive the day the ordering flips.
 **And the capability did not change either.** `selective.Curve.without_text` counts the values on a
 page with no text layer and the report prints the share: **61.1 % here, and 59.8 % on M7c's clean
 scanned corpus.** The gate has *no signal at all* on those; it now says so instead of reporting a
-verdict it did not have. The candidate next step is the geometric check M5 already named — grounding
-records spans, so it could ask whether a value sits where the page would print it — but that needs a
-text layer too, and the honest reading is that a scan is where a recogniser belongs rather than
-where a better grounding rule does.
+verdict it did not have. The candidate next step named here was the geometric check M5 already
+named — *grounding records spans, so it could ask whether a value sits where the page would print
+it*. **M7h went to build it and found the premise was false** (*Where a grounded value sits* below);
+in any case it needs a text layer too, and the honest reading is that a scan is where a recogniser
+belongs rather than where a better grounding rule does.
 
 ## The heuristic half, and what it took to measure it
 
@@ -729,12 +741,70 @@ Three limits, all printed beside the numbers rather than left for a reader to fi
   signal here separates "correctly absent" from "silently dropped". A model that answered less
   would score better on this curve, so `missed` is reported above it.
 - **Grounding asks whether a value is on the page, not whether it is in the right place.** On
-  `pattern` it flags *nothing* while 292 values are wrong: a regex reader lifts real figures out of
-  the wrong column, and every one of them grounds. The spans are recorded, so a geometric check
-  could ask the second question. It is not built.
+  `pattern` it flags 19 of 292 wrong values: a regex reader lifts real figures out of the wrong
+  column, and almost every one of them grounds. It used to flag *none*, and the 19 are what
+  requiring a value to sit in **one place** bought — see *Where a grounded value sits* below, along
+  with why the geometric check that would ask the second question properly is still not built.
 - **`100 %` means exactly 100 %.** `eval/format.py` grows the precision rather than rounding, after
   the first version printed `100.0 %` in a row whose own next column said two wrong values had been
   accepted.
+
+## Where a grounded value sits, and the premise that turned out to be false (M7h)
+
+The bullet above has said since M5 that *the spans are recorded, so a geometric check could ask the
+second question*. M7h went to build that check and the premise was wrong: **the spans did not record
+a place.** `find_words` walked a text value word by word and took, for each, the first occurrence
+anywhere on the page. So `clean-0001` — whose buyer is `Przychodnia Rodzinna VITAMED sp. z o.o.`,
+printed complete in one cell — grounded three of its words against the buyer and `sp.`, `z`, `o.o.`
+against the **seller's** legal form 142 points up the page. Fully grounded, half the evidence
+belonging to another company. The value path was no better: it returns every occurrence of the
+winning candidate, so gold values came back with 4, 6, 8, 10 and once 14 spans.
+
+**Every geometric rule built on that fires on a quarter of a perfect reading**, measured on gold:
+*spans in more than one column* 1462/5892, *spans more than a row apart* 1923/5892, *a text value
+leaving words unclaimed in its cell* 934/5892. None is a bad idea about invoices; all were being
+asked of a bag of occurrences.
+
+So `ground/place.py` **locates** a text value instead: it must be found in one place — a cell, plus
+the cells a wrapped line continues into, in the same column and a neighbouring row. Both bounds are
+measured rather than assumed. Anchoring to a single cell fails the control on **52.1 %** of gold
+text values, because the renderer breaks a long description across lines and each line becomes its
+own cell. And of the two, the **column** is what discriminates: remove it and the catch on `pattern`
+falls from 19 to **0**, while every vertical reach from 0.5 to twenty times the shipped one gives
+the identical control and the identical catch — so `WRAP_REACH` admits wrapping, it is not a
+threshold tuned between two populations.
+
+It cost nothing to impose. Text values that ground before and still ground after:
+
+| population | correct values kept | wrong values newly caught |
+|---|---:|---:|
+| gold (the control) | 1238 / 1238 | — |
+| `claude-opus-5` (a perfect reading) | 1238 / 1238 | — |
+| `claude-haiku-4-5` | 1186 / 1186 | 1 / 3 |
+| `pattern` | 752 / 752 | 19 / 181 |
+
+**Grounding's precision stayed 100 % on all 22 committed runs, with zero false positives on every
+one.** Its recall on `claude-haiku-4-5` moves 84.4 % → **85.7 %**, and on the three `pattern` runs
+from 0.0 % to 6.5 / 6.9 / 6.4 %. The union with the arithmetic did *not* move: the value grounding
+gained on haiku was one a hard rule already had.
+
+**One run's verdict flipped, and the report flipped it rather than a sentence here.** On
+`attacked-scanned-claude-opus-5`, grounding goes 7.1 % → **64.3 %** recall, the confident bucket
+leaks 13 → **5**, and `selective_report`'s ungated comparison now derives *more accurate than not
+gating at all* where it had derived the opposite. That is the M7g design working as intended — the
+verdict is computed from `Curve.ungated_accuracy` and was never typed — and it is **one run on a
+population of 14 wrong values**, which is why it is reported here and not promoted into the M7e
+section. The `gullible` arms, which carry that section's numbers, did not move at all.
+
+**What it did not buy is the more useful half.** 273 of `pattern`'s 292 wrong values still ground.
+The dominant failure is a description that stops early, and the natural check — *did the value claim
+the whole cell it sat in?* — cannot see it: **100 %** of those wrong descriptions claim their entire
+cell. They are not truncations *within* a cell; the reader took one whole cell of a two-cell wrapped
+run. Asking the question of the column region instead fails the control the other way, since only
+8.9 % of gold values claim their region — the region also holds the neighbouring field. A
+completeness check has to tell *the rest of my wrapped value* from *the next field down this column*,
+and neither the cell nor the column decides it. `docs/adr/0002_placement.md` carries the whole
+measurement, including the joint-placement idea that would let the value path choose an occurrence.
 
 ## What injection buys the attacker, and what the gate does not do about it
 
@@ -809,7 +879,7 @@ different matter and is the one M7 could not put a model against: the foreign co
 yet. **A real held-out set remains load-bearing** — it is the only place the question gets asked on
 documents nobody generated.
 
-744 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+758 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`
