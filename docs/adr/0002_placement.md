@@ -133,26 +133,41 @@ label-free structural signal and it is a different piece of work, with its own c
 Two paid arms over `data/foreign` turned the wrong-column question from a property of a regex
 baseline into a property of a **real model's errors**, and added one blind spot nobody predicted.
 
-**The population.** `claude-haiku-4-5` reads the foreign corpus at 98.1 % — no worse than the 97.8 %
-it scores on the page it was tuned against — but its errors change shape. Of 58 spurious
-`lines[].discount` values, **50 are that row's own `net`**, 56 are some column of that same row, and
-2 match nothing; all 58 fall on the two dialects that reorder columns, and none on the one that does
-not. Grounding's recall against that population is **34.8 %**, against 85.7 % on the same model's
+**The population.** `claude-haiku-4-5` reads the foreign corpus at 97.2 % against 98.6 % on its own
+page (matched over the 107 documents both runs answered — the raw 97.8 %/98.1 % pair is confounded
+by one own-page `max_tokens` failure). The 1.4-point cost is not the point; the **shape** is. Its
+errors become *right value, wrong field* in two independent forms:
+
+- **58 spurious `lines[].discount`**, of which **53 are exactly that row's own `net`**, 3 its `vat`,
+  2 nothing. The same failure exists on the own page — 11 spurious discounts, 9 of them the row's
+  net — so the foreign corpus **amplifies it about fivefold rather than creating it**. All 58 are on
+  the two layouts that print an item table; the third prints its positions as running text and has
+  no column to shift into, so it is not a control and nothing here isolates *why* a table invites
+  the net into an empty discount cell.
+- **23 wrong dates**, all on that third layout, 19 of them exactly the other date printed on the
+  same invoice.
+
+Grounding's recall against the whole population is **34.8 %**, against 85.7 % on the same model's
 own-page errors, with precision **100 %** on both. A value one column over is on the page, in the
-right row — textually indistinguishable from a correct reading, and geometrically obvious.
+right row; the other date is on the page, in the right block. Both are textually indistinguishable
+from a correct reading and geometrically distinguishable from one.
 
 That is what makes joint placement worth building rather than merely coherent: a `discount` whose
 only occurrence sits inside the net column, while every sibling of its row sits in its own, is
 detectable from the spans `place.py` now records — and this is the first population where doing so
-would catch a frontier-adjacent model rather than a regex.
+would catch a real model rather than a regex. **47 of the 58 spurious discounts resolve to exactly
+one span on the page**, so joint placement would have an unambiguous location for 81 % of them; the
+remaining 11 would need the weaker "no occurrence in the discount column" formulation.
 
 **And a second, narrower defect the arm found rather than confirmed.** `resolve._source_boundary`
 rejects a hit that continues into a longer run of alphanumerics *on the page*. The identifier
-projection has already stripped the separators, so when a page groups an identifier — `letterhead`
-prints `PL 049911 602207 394837 519847 27` — a prefix ending on a **grouping boundary** has a space
-after it in the source and passes the check. haiku dropped the trailing group on 5 accounts and all
-5 grounded. The rule is not wrong; it is asking about the page while the value it compares has been
-normalised past the thing that would have answered.
+projection has already stripped the separators, so when a page groups an identifier — every foreign
+dialect prints an IBAN in groups of six via the shared `foreign/render.py::_iban`, e.g. `PL 049911
+602207 394837 519847 27` — a prefix ending on a **grouping boundary** has a space after it in the
+source and passes the check. haiku dropped a trailing group on 5 accounts and all 5 grounded. **The
+determinant is the boundary, not the layout**: an account truncated *mid*-group on another dialect
+was correctly `UNGROUNDED`. The rule is not wrong; it is asking about the page while the value it
+compares has been normalised past the thing that would have answered.
 
 **Nothing leaked, and the reason is the design.** All 11 wrong accounts fail mod-97 and the
 check-digit rule flags all 11 — 6 route `reject`, 5 `review`, **0 `accept`**. Grounding's silence

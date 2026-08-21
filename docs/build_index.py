@@ -250,6 +250,25 @@ def _is_remote(baseline: str) -> bool:
 FOREIGN_PREFIX = "foreign-"
 
 
+def foreign_arms() -> str:
+    """Whether a paid arm over the foreign corpus exists, read off what is committed.
+
+    The "what is not built yet" table used to carry this verdict as typed prose, and it went stale
+    the day the arms were run: the same page's foreign table showed two model rows while this row
+    still said `not built`. A claim about what has been run belongs to the runs — the same
+    discipline `selective_report` follows for the gate's verdict.
+    """
+    models = sorted(
+        directory.name[len(FOREIGN_PREFIX):]
+        for directory in (ROOT / "results").glob(f"{FOREIGN_PREFIX}*")
+        if (directory / prediction_file.RUN_NAME).exists()
+        and prediction_file.read_meta(directory / prediction_file.RUN_NAME).baseline == "claude"
+    )
+    if not models:
+        return "not built"
+    return f"built &mdash; {', '.join(html.escape(name) for name in models)}"
+
+
 def foreign_study(corpus: list) -> list[dict[str, object]] | None:
     """Each baseline's accuracy on its own page and on an unfamiliar one, paired.
 
@@ -1502,6 +1521,7 @@ def build() -> str:
         url=URL,
         repo=REPO,
         commit=head_commit(),
+        foreign_arms=foreign_arms(),
         xsd_bytes=f"{facts['bytes']:,}".replace(",", " "),
         assertions=facts["assertions"],
         simple_types=facts["simple_types"],
@@ -1902,9 +1922,9 @@ page at all.</p>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
     <tr><th>M5 &mdash; <strong>the detector study</strong>, grounding, routing, the coverage&ndash;accuracy curve</th><td class="num">built</td></tr>
     <tr><th>M6 &mdash; injection suite, attack success rate, trust-boundary ADR</th><td class="num">built, offline arms and one paid</td></tr>
-    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on two of the three</td></tr>
+    <tr><th>M7 &mdash; held-out corpora, the vision path, the attacked page photographed</th><td class="num">built, model arms on all three</td></tr>
     <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">built</td></tr>
-    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">{foreign_arms}</td></tr>
     <tr><th>&mdash; an adaptive attacker, which no fixed payload set stands in for</th><td class="num">not built</td></tr>
     <tr><th>&mdash; a check that a grounded value sits where the page would <em>print</em> it</th><td class="num">not built</td></tr>
     <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
@@ -1913,10 +1933,11 @@ page at all.</p>
 <p class="note">The headline question &mdash; does &ldquo;the invariants hold&rdquo; actually predict
 &ldquo;the fields are correct&rdquo;? &mdash; met an awkward first answer: on the run that mattered
 most there was nothing to predict, because the model made no mistakes. It has been answered instead
-against injected errors, a weaker reader, and two held-out corpora &mdash; and the scanned one shows
-that making a page <em>harder to see</em> does not un-saturate it either. Making a page unfamiliar
-might, and that is the arm this project has not paid for. A negative result is a publishable result,
-and so is a corpus that turned out to be too easy.</p>
+against injected errors, a weaker reader, and two held-out corpora &mdash; and both of them show
+that neither making a page <em>harder to see</em> nor making it <em>unfamiliar</em> un-saturates it
+for a frontier model. What the unfamiliar page did change is the <em>shape</em> of a weaker model's
+errors: right value, wrong field, which is exactly what the grounding signal cannot see. A negative
+result is a publishable result, and so is a corpus that turned out to be too easy.</p>
 
 <h2>Reproduce it</h2>
 <pre><code>git clone {repo}

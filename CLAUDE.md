@@ -346,9 +346,10 @@ re-run a paid model to be checked would be one too.
    value now has to be found in **one place**; it cost no correct value on four populations and
    caught 19 that were invisible before (*Where a grounded value sits* below). **M7i** then ran the
    two paid arms over the *foreign* corpus ($4.10): an unfamiliar layout costs `claude-opus-5`
-   nothing and `claude-haiku-4-5` nothing either — but it changes the **shape** of the small model's
-   errors into a column shift, and grounding's recall falls 85.7 % → 34.8 % at unchanged precision
-   (*What a model reads off it* above). Still open: the continuation-aware **completeness** check and
+   nothing and `claude-haiku-4-5` **1.4 points** on the documents both runs read — but the finding
+   is the **shape**, not the size. The small model's errors become right-value-wrong-field in two
+   independent forms, and grounding's recall falls 85.7 % → 34.8 % at unchanged precision (*What a
+   model reads off an unfamiliar page* below). Still open: the continuation-aware **completeness** check and
    the **joint placement** that M7h scoped and M7i has now given a real error population to justify,
    both in `docs/adr/0002_placement.md`; an adaptive attacker, which no fixed payload set can stand
    in for; and the synthetic↔real gap as an artifact of its own rather than as four sections.
@@ -425,7 +426,11 @@ the **page**, because nothing else moved.
 | `constant` | 3.0 % | 3.0 % | 108 / 108 |
 | `pattern` | **86.3 %** | **0.0 %** | **0 / 108** |
 | `claude-opus-5` | 100 % | **100 %** | 108 / 108 |
-| `claude-haiku-4-5` | 97.8 % | **98.1 %** | 108 / 108 |
+| `claude-haiku-4-5` | 97.8 % | 98.1 % | 108 / 108 |
+
+The haiku row is confounded — its own-page run lost one document to `max_tokens`, and on the 107
+both runs read the comparison is **98.6 % → 97.2 %**. See *What a model reads off an unfamiliar
+page* below, which is where that row is taken apart.
 
 `pattern` did not read badly — it could not *begin*: 108 of 108 `schema_invalid`. It fills three of
 the eleven wire fields it fills on its own page — five on the `statement` third, whose dialect
@@ -451,57 +456,75 @@ Three things make that number trustworthy rather than merely dramatic, and each 
 semantics fixed is what buys the attribution to presentation; it is also what leaves skew, stamps,
 scans and unanticipated layouts unmeasured.
 
-### What a model reads off it — and the one place the gate goes blind (M7i)
+### What a model reads off an unfamiliar page, and the shape its errors take (M7i)
 
-Two paid arms over the same corpus, $4.10 in all. **An unfamiliar layout costs a frontier model
-nothing and a small model nothing either**: `claude-opus-5` reads all 108 documents exactly, and
-`claude-haiku-4-5` scores 98.1 % against 97.8 % on the page it was tuned against. The row that
-moves is `pattern`, 86.3 % → 0 %. Presentation is what a *parser* is made of and very nearly
-nothing to a model.
+Two paid arms over the same corpus, **$4.10** in all.
 
-Two things the accuracy column hides, and the second is the finding:
+| reader | own page | unfamiliar page | on the 107 both read |
+|---|---:|---:|---|
+| `claude-opus-5` | 100 % | **100 %** | 100 % → 100 % |
+| `claude-haiku-4-5` | 97.8 % | 98.1 % | **98.6 % → 97.2 %** |
+| `pattern` | 86.3 % | 0.0 % | — |
 
-- **Same error rate, spread over more documents.** haiku's exactly-right documents fall **60.2 % →
-  48.1 %** while its field accuracy rises, and its schema repairs go 1 → 7. The foreign page does
-  not make it read worse per field; it makes it stumble on more documents and reach the repair loop
-  seven times as often.
-- **Its errors change *shape*, and the new shape is the one grounding cannot see.** Grounding's
-  recall falls **85.7 % → 34.8 %** between the two corpora with precision **still 100 %**, and the
-  arithmetic detector's document-level recall falls 76.2 % → 50.0 %.
+**Read the last column, not the middle one.** `claude-haiku-4-5`'s own-page run failed one document
+on `max_tokens` and contributed 64 `missed` instances from it; that single truncation is the whole
+of the apparent *gain*, and it is the same artifact this file already sets aside for the M7d haiku
+arm. On the 107 documents both runs answered, an unfamiliar layout costs the small model **1.4
+points**. So presentation costs a parser everything, a small model somewhat, and a frontier model
+nothing measurable — a gradient, and the honest version of a claim first written here as *"costs a
+model nothing"*.
 
-The mechanism is measured, not inferred. haiku's dominant foreign error is a **column shift**: of
-58 spurious `lines[].discount` values, **50 are that row's own `net`**, 56 are some column of that
-same row, and 2 match nothing. All 58 are on `letterhead` and `statement` — the two dialects that
-reorder columns — and `slip`, which keeps the familiar order, contributes **none**. A value in the
-wrong column is on the page, in the right row, one column over, so grounding resolves it and says
-nothing. **This is the blind spot M7h characterised on `pattern` and could not close, now measured
-on a real model's errors rather than a regex reader's.**
+Two further things the accuracy column hides:
 
-What the gate still buys, and what it costs:
+- **Same errors, more documents, more repairs.** haiku's exactly-right documents fall **60.2 % →
+  48.1 %** and its schema repairs go **1 → 7**.
+- **The errors change *shape*, and the new shape is one the gate is blind to.** Grounding's recall
+  falls **85.7 % → 34.8 %** with precision **still 100 %**; the arithmetic detector's document-level
+  recall falls 76.2 % → 50.0 %.
 
-| accept down to | own page | | an unfamiliar page | |
-|---|---:|---:|---:|---:|
-| | coverage / accuracy | leaked | coverage / accuracy | leaked |
-| `high` | 89.7 % / **99.96 %** | 2 | 82.3 % / **98.9 %** | 53 |
-| `none` (answer everything) | 100 % / 98.7 % | 77 | 100 % / 97.6 % | 141 |
+**The shape is a wrong-column read, and the foreign corpus amplifies it rather than creating it.**
+Of 58 spurious `lines[].discount` values, **53 are exactly that row's own `net`**, 3 are its `vat`,
+and 2 match nothing. The same failure is already on the own page — 11 spurious discounts, 9 of them
+the row's net — so this is a **5× amplification of an existing failure mode**, not a new one. All 58
+land on `letterhead` and `statement`; `slip` contributes none, but it is **not a control**: it has
+no item table at all and prints its positions as running text, so it has no column to shift into.
+Nothing here isolates *why* a table layout invites the net into an empty discount cell, and the
+corpus has no arm that would.
 
-Gating still helps — 97.6 % → 98.9 % on 82.3 % of the work — but it leaks 53 values where it leaked
-2, and the reason is entirely the collapse in grounding's recall. `claude-opus-5`'s arm is
-degenerate by construction (prevalence 0 %, curve flat, 0 leaked at every level); the one thing it
-establishes is that **the gate never blocks correct work on a layout it has never seen**.
+**`slip` hosts the second instance of the same family.** All **23** wrong dates in the run are on
+it, and 19 are exactly the *other* date printed on that invoice — an `issue_date` ↔ `sale_date`
+swap. Every one grounds. So of the 53 values the gate leaks at `high`, 28 are discounts and **25 are
+not**: 13 `sale_date`, 10 `issue_date`, 2 `number`. Right value, wrong field, twice over — which is
+precisely the blind spot M7h characterised on `pattern` and could not close, now on a real model's
+errors and in two independent shapes.
 
-**And one blind spot was found by this arm rather than predicted.** All 11 wrong `payment_account`
-values fail mod-97 and the check-digit rule flags all 11 — but grounding is silent on 5 of them,
-every one on `letterhead`, which prints an IBAN in groups of six: `PL 049911 602207 394837 519847
-27`. haiku dropped the trailing group, and a prefix that ends on a grouping boundary has a *space*
-after it in the source, so `resolve._source_boundary` — which asks whether the next page character
-is alphanumeric — lets it through. The identifier projection strips exactly the separators that
-would have made the truncation visible. **Nothing leaked**: 6 of the 11 route `reject` and 5
-`review`, 0 `accept`, because the arithmetic covers precisely what grounding missed. That is this
-project's complementarity thesis demonstrated on a population nobody designed for it — and the
-narrowest concrete case yet for `docs/adr/0002_placement.md`'s unbuilt **joint placement**, since a
-`discount` whose only occurrence sits in the net column is geometrically detectable in a way it is
-not textually detectable.
+What the gate still buys:
+
+| policy | coverage | accuracy | leaked |
+|---|---:|---:|---:|
+| accept only `high` | 82.3 % | **98.9 %** | 53 |
+| do not gate at all | 100 % | 97.9 % | 141 |
+
+A point of accuracy for a fifth less work — worth having, and it leaks 53 values where the same
+model's own-page gate leaked 2. The whole difference is the grounding collapse. (`97.9 %` is
+`Curve.ungated_accuracy` over all 6644 asserted values; the curve's `none` row reads 97.6 % because
+its denominator is the 5920 the gate could assess, which is a different policy.) `claude-opus-5`'s
+arm is degenerate by construction — prevalence 0 %, flat curve, 0 leaked at every level — and the
+one thing it establishes is that **the gate never blocks correct work on a layout it has never
+seen**.
+
+**One blind spot this arm found rather than confirmed.** Every foreign dialect prints an IBAN in
+groups of six — `foreign/render.py::_iban` is shared — so `letterhead` shows `PL 049911 602207
+394837 519847 27`. haiku dropped a trailing group on 5 accounts and **all 5 grounded**: a prefix
+ending on a grouping boundary has a *space* after it in the source, and `resolve._source_boundary`
+only rejects a hit that continues into alphanumerics, while the identifier projection has already
+stripped the separators that would have shown the truncation. The determinant is the boundary, not
+the dialect — a `statement` account truncated *mid*-group was correctly `UNGROUNDED`. **Nothing
+leaked**: all 11 wrong accounts fail mod-97, the check-digit rule flags all 11, and they route 6
+`reject` / 5 `review` / **0 `accept`**. The complementarity thesis demonstrated on a population
+nobody designed for it, and a defect worth fixing without urgency — it would move values from
+`review` to `reject`, not from `accept` to caught.
+
 
 ## What a scan costs, and what it costs the gate (M7)
 
@@ -934,13 +957,14 @@ changing the corpus and invalidating every committed run.
 no text layer — moved `claude-opus-5` from 100 % to 99.98 % while moving `pattern` from 86.3 % to
 0 % on the two rungs that lose the text layer. Legibility is not the axis a frontier model is short
 on. **M7i then put both models against the *unfamiliar* page too, and the diagnosis held there as
-well**: `claude-opus-5` reads the foreign corpus at 100 % and `claude-haiku-4-5` at 98.1 % against
-97.8 % on its own, while `pattern` goes 86.3 % → 0 %. So neither axis this project can synthesise —
-legibility or presentation — is what a frontier model is short on, and the saturation is a fact
-about M2's semantics rather than about any one page. What M7i *did* buy is a population whose
-errors have a different **shape** (a column shift the gate is blind to — see *What a model reads off
-it* above), which is the axis worth varying next. **A real held-out set remains load-bearing** — it
-is the only place the question gets asked on documents nobody generated.
+well for the frontier model**: `claude-opus-5` reads the foreign corpus at 100 %, while `pattern`
+goes 86.3 % → 0 % and `claude-haiku-4-5` pays 1.4 points. So neither axis this project can
+synthesise — legibility or presentation — un-saturates the corpus for a frontier model, and the
+saturation is a fact about M2's semantics rather than about any one page. What M7i *did* buy is a
+population whose errors have a different **shape** (right value, wrong field, in two forms the gate
+is blind to — see *What a model reads off an unfamiliar page* above), which is the axis worth
+varying next. **A real held-out set remains load-bearing** — it is the only place the question gets
+asked on documents nobody generated.
 
 762 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
