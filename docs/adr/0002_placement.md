@@ -109,15 +109,19 @@ label-free structural signal and it is a different piece of work, with its own c
 
 ## Consequences
 
-- `gate.md` is the only committed artifact affected, and all 22 were regenerated.
-  `tests/test_results_committed.py` cannot cover it — it needs the rendered pages — so this is the
-  one report that drifts in silence, which is why regenerating it is part of the change and not a
-  follow-up.
-- Grounding's field-level precision is unchanged and its recall improves slightly. It is still not a
-  detector of values read out of the wrong column, and the headline tables continue to say so.
-- `decide/` and `eval/selective.py` are untouched. Placement changes what `coverage` measures, not
-  what the levels mean, and a value that loses coverage lands in `PARTIAL` → `LOW` → `review` by the
-  rules that were already there.
+- **`gate.md` is the affected committed artifact, and all 22 were regenerated.** So is `attack.md`'s
+  **leak** column, which routes through `decide.confidence` and therefore through grounding; all 7
+  were regenerated and none moved, because the documents involved were already routed `review` on
+  some other field. That is an observation about this run and not an invariant, and neither figure
+  can be pulled into `tests/test_results_committed.py`'s equality check for the same reason: both
+  need the rendered pages, which the check exists to avoid needing. They are the two numbers in this
+  repository that can drift in silence, which is why regenerating them is part of a change to this
+  layer rather than a follow-up to it.
+- Grounding raised no new false positives anywhere, and its recall improves slightly. It is still
+  not a detector of values read out of the wrong column, and the headline tables continue to say so.
+- **`decide/`'s rules and `eval/selective.py` are unchanged** — only a figure in a docstring moved.
+  Placement changes what `coverage` measures, not what the levels mean, and a value that loses
+  coverage lands in `PARTIAL` → `LOW` → `review` by the rules that were already there.
 - The two things this leaves open are now specific rather than aspirational: a **continuation-aware
   completeness check**, which the measurement above scopes; and a **joint placement** across a
   reading's field instances, which is what would let the value path choose an occurrence and would
