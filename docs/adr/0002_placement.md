@@ -190,18 +190,22 @@ maximum matching leaves unplaced — a property of the graph, not of the walk th
 The addendum above recorded 58 spurious `lines[].discount` values as *53 are exactly that row's own
 net*. That is true and it conflates three mechanisms. Split by what the same reading did with `net`:
 
-| what the reading did to the row | `data/foreign` | own page |
-|---|---:|---:|
-| **duplication** — `discount` := the row's net, `net` still reads that net | 24 | 9 |
-| **the field moved** — `discount` := the row's net, `net` is `null` | 24 | 0 |
-| **the column shifted** — `discount` := the row's net, `net` := the row's vat | 4 | 0 |
-| the discount is not that row's net at all | 6 | 2 |
+| what the reading did to the row | `data/foreign` | of those, contend | own page |
+|---|---:|---:|---:|
+| **duplication** — `discount` := the row's net, `net` still reads that net | 24 | **24** | 9 |
+| **the field moved** — `discount` := the row's net, `net` is `null` | 24 | 0 | 0 |
+| **the column shifted** — `discount` := the row's net, `net` := the row's vat | 4 | 0 | 0 |
+| `discount` := the row's net, `net` is a third figure | 1 | 0 | 0 |
+| the discount is not that row's net at all | 5 | 1 | 2 |
 
-Only the first leaves a contradiction on the page. A moved field leaves nothing behind to contend
-with; a shifted column gives every value a place of its own. Both are caught by the arithmetic, so
-the prediction in the addendum — that joint placement would catch a real model's wrong-column read —
-holds for a third of the population and not for it entire. **The estimate that "47 of the 58 resolve
-to exactly one span, so joint placement would have an unambiguous location for 81 % of them" counted
+The first four rows are the 53 the addendum above counted. **Duplication is the only one of them
+that leaves a contradiction on the page**, and every one of the 24 contends. A moved field leaves
+nothing behind to contend with; a shifted column gives every value a place of its own; both are
+caught by the arithmetic. The 25th catch comes from the last row instead — a discount that is not
+its row's net can still duplicate some other figure the page prints once. So the prediction in the
+addendum, that joint placement would catch a real model's wrong-column read, holds for a little
+under half the population and not for it entire. **The estimate that "47 of the 58 resolve to
+exactly one span, so joint placement would have an unambiguous location for 81 % of them" counted
 locatability and not decidability, and it was the wrong number to have quoted.**
 
 ### What clearing the control cost, and the defect it exposed

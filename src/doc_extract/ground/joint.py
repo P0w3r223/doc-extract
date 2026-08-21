@@ -4,31 +4,37 @@
 answers yes can still be incoherent, because the answers can be the **same ink twice**. M7i is where
 that stopped being hypothetical. `claude-haiku-4-5` reading the foreign corpus asserts 58
 `lines[].discount` values the gold does not have, and the ADR recorded them as one failure — *53 are
-exactly that row's own net*. Split by what the prediction did with the net as well, they are three:
+exactly that row's own net*. Split by what the prediction did with the net as well, they are four:
 
-| what the reading did | count |
-|---|---:|
-| **duplication** — `discount` := the row's net, and `net` still reads that same net | 24 |
-| **the field moved** — `discount` := the row's net, and `net` is `null` | 24 |
-| **the column shifted** — `discount` := the row's net, and `net` := the row's vat | 4 |
-| the discount is not the row's net at all | 6 |
+| what the reading did | count | of those, contend |
+|---|---:|---:|
+| **duplication** — `discount` := the row's net, and `net` still reads that same net | 24 | **24** |
+| **the field moved** — `discount` := the row's net, and `net` is `null` | 24 | 0 |
+| **the column shifted** — `discount` := the row's net, and `net` := the row's vat | 4 | 0 |
+| `discount` := the row's net, and `net` is a third figure | 1 | 0 |
+| the discount is not the row's net at all | 5 | 1 |
 
-Only the first is a contradiction *about the page*, and it is the one this module sees. Two fields
-claim one printed figure; the page prints it once; at most one of them can be right. Nothing here
-needs to know which column a discount belongs in — that is the knowledge `ground/` is not allowed to
-have — only that a place cannot hold two readings.
+The first four rows are the 53. **Duplication is the only one of them that is a contradiction about
+the page**, and this module sees every one: two fields claim one printed figure, the page prints it
+once, at most one of them can be right. Nothing here needs to know which column a discount belongs
+in — that is the knowledge `ground/` is not allowed to have — only that a place cannot hold two
+readings.
 
-**The other two rows are why this is a third signal and not a repair of grounding.** A moved field
-leaves nothing behind to contend with, and a shifted column gives every value a place of its own.
-Both are invisible here and both are caught by the arithmetic, which is the complementarity this
-project has reported since M5, now on a third population.
+**The three rows below it are why this is a third signal and not a repair of grounding.** A moved
+field leaves nothing behind to contend with, and a shifted column gives every value a place of its
+own. All of them are invisible here and all are caught by the arithmetic, which is the
+complementarity this project has reported since M5, now on a third population. (The 25th catch comes
+from the last row instead: a discount that is not its row's net can still duplicate some other
+figure the page prints once.)
 
 **It accuses a pair, and that is the honest shape of the evidence.** When `discount` and `net` claim
-one figure, no label-free fact says which of the two is the intruder — so both are flagged, and the
-signal's precision is about a half by construction rather than by weakness. That is still six times
-the field-level precision of the arithmetic accusation this project already routes on (7.4 %), and
-it is why the flag **demotes** a value in `decide/confidence.py` rather than deciding it, and why
-folding it into `Support` was rejected: grounding reports 100 % precision on 22 runs, and that is a
+one figure, no label-free fact says which of the two is the intruder, so both are flagged. Where the
+sibling is a correct reading that caps precision near a half — six times the field-level precision
+of the arithmetic accusation this project already routes on (7.4 %), and nowhere near grounding's.
+Where both contenders belong to a row the page never printed, as on the attacked corpus, nothing it
+flags is correct and precision is 100 %; the two cases are reported per run rather than averaged.
+That is why the flag **demotes** a value in `decide/confidence.py` rather than deciding it, and why
+folding it into `Support` was rejected: grounding reports 100 % precision on 24 runs, and that is a
 different claim about a different question.
 
 **The control is gold, as everywhere in this layer, and it is clean: zero contentions on a perfect
@@ -69,6 +75,13 @@ def contended(groundings: Iterable[Grounding]) -> frozenset[tuple[str, str]]:
     Only `GROUNDED` instances take part. A value the page does not carry is already grounding's to
     report, and letting it compete for a place it was never found at would turn one signal's finding
     into two signals' findings.
+
+    **A grounded value with no recorded place is skipped as well, and that guard is not redundant.**
+    A text value whose every token bares to empty grounds vacuously — `place.Sheet.locate` returns
+    full coverage of nothing — and it would then be a reading with no option, unplaceable by
+    construction and flagged on every document it appeared in. The control asserts that gold records
+    a place for every grounded value, so the case does not arise on any corpus here; the guard is
+    what keeps it from becoming a silent false alarm on one that does.
     """
     demand: list[tuple[str, str]] = []
     options: dict[int, tuple[Claim, ...]] = {}

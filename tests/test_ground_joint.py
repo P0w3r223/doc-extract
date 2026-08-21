@@ -18,7 +18,7 @@ from decimal import Decimal
 
 import pytest
 
-from doc_extract.decide.confidence import Confidence, Route, assess
+from doc_extract.decide.confidence import Confidence, Route, _named_fields, assess
 from doc_extract.eval.fields import SINGLETON
 from doc_extract.ground import joint
 from doc_extract.ground.place import claim
@@ -250,8 +250,13 @@ def test_the_two_demotions_do_not_stack(invoice):
     """A value both contended and named by a hard rule falls one level, not two.
 
     They are two ways of noticing one failure — a real figure read into the wrong field — and
-    compounding them would let the coarser signal borrow the finer one's confidence. The fixture
-    breaks the row identity as well, which is what a duplicated discount does on a real page.
+    compounding them would let the coarser signal borrow the finer one's confidence.
+
+    **The precondition is asserted, not assumed.** `document:flagged` only says *some* hard rule
+    fired somewhere on the document, so a test resting on it would keep passing if the rules stopped
+    naming this field — and since both branches land on `MEDIUM`, it could not see the difference.
+    So the field's membership in both accusations is asserted directly, and both reason tokens are
+    required: dropping one is how the earlier version of `_assess` hid the overlap from a report.
     """
     page = _page([(50.0, ["Usługa"]), (200.0, ["200,00"]), (300.0, ["46,00"])])
     duplicated = _one_line(
@@ -260,8 +265,10 @@ def test_the_two_demotions_do_not_stack(invoice):
     )
     net = {(a.field, a.key): a for a in assess(page, duplicated)}[("lines[].net", "1")]
 
-    assert "document:flagged" in net.reasons, "the fixture has to break a hard identity too"
+    assert net.contended, "the fixture has to produce a contention on this field"
+    assert "lines[].net" in _named_fields(duplicated), "and a hard rule has to name it too"
     assert net.confidence is Confidence.MEDIUM
+    assert {"contended", "rule:lines[].net"} <= set(net.reasons)
 
 
 def test_an_uncontended_value_on_the_same_page_keeps_its_confidence(invoice):
@@ -298,8 +305,9 @@ def test_a_place_is_the_ink_it_claims_and_not_the_cell_that_reached_it(invoice):
 def test_a_singleton_field_and_a_line_field_can_contend(invoice):
     """Contention is not scoped to a row. The page is what runs out of places, not the collection.
 
-    `total_gross` duplicating a line's net is the shape a `total_override` payload produces once a
-    reader obeys it, and on the attacked corpus that is where the signal reaches 100 % precision.
+    A singleton and a line field claiming one figure is a shape the corpus does not happen to
+    produce — on the attacked corpus every contention is between two fields of one injected row —
+    so it is asserted here rather than left to a population that might never contain it.
     """
     page = _page([(50.0, ["Usługa"]), (200.0, ["1,00"])])
     obeyed = _one_line(

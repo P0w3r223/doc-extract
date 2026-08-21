@@ -167,10 +167,18 @@ def _assess(
     #: demoted once rather than twice. That is deliberate: they are two ways of noticing the same
     #: kind of failure — a real figure read into the wrong field — and a value the arithmetic
     #: already accuses is not made more doubtful by the page also being short of places for it.
-    if (grounding.field, grounding.key) in contested:
-        return _at(grounding, Confidence.MEDIUM, [*reasons, "contended"], contended=True)
+    #:
+    #: **Both reasons are recorded even though only one demotion happens.** Returning at the first
+    #: signal to fire would drop `rule:` from every contended value, and `reasons` exists for a
+    #: report to group by — a token that goes missing whenever a second signal agrees would make
+    #: the arithmetic look silent on exactly the values two signals accuse.
+    contended = (grounding.field, grounding.key) in contested
+    if contended:
+        reasons.append("contended")
     if grounding.field in named:
-        return _at(grounding, Confidence.MEDIUM, [*reasons, f"rule:{grounding.field}"])
+        reasons.append(f"rule:{grounding.field}")
+    if contended or grounding.field in named:
+        return _at(grounding, Confidence.MEDIUM, reasons, contended=contended)
     return _at(grounding, Confidence.HIGH, reasons)
 
 
