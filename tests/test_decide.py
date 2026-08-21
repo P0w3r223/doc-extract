@@ -242,6 +242,34 @@ def test_an_exclusion_reports_the_wrong_values_inside_it_and_not_only_its_size()
     assert "10 (wrong: 7)" in body and "3 (wrong: 2)" in body
 
 
+def test_what_completeness_added_is_derived_per_run_and_not_asserted():
+    """Both branches of `_completeness_added`, because a derived sentence can derive the wrong one.
+
+    The signal exists for values grounding is blind to, so *whether the gate would have accepted
+    them anyway* is a question about a particular run — on `pattern` 54 of its 125 carry no other
+    signal and are exactly the 54 the `high` bucket used to leak, while on `attack-gullible` its one
+    catch is also alone. A run where every catch is already flagged has to say so instead.
+    """
+    alone = summarise(
+        [Judged("d", "f", "1", Confidence.LOW, wrong=True, ungrounded=False, accused=False,
+                cut_short=True)],
+        missed=0, without_prediction=0,
+    )
+    body = selective_report.render(alone, run=_meta())
+    assert "`completeness` flagged 1 asserted value(s)" in body
+    assert "1 of them (1 wrong) carried **no** other signal" in body
+
+    shared = summarise(
+        [Judged("d", "f", "1", Confidence.LOW, wrong=True, ungrounded=True, accused=False,
+                cut_short=True)],
+        missed=0, without_prediction=0,
+    )
+    assert "already flagged by another signal" in selective_report.render(shared, run=_meta())
+
+    silent = summarise(_rows((Confidence.HIGH, False)), missed=0, without_prediction=0)
+    assert "`completeness` flagged" not in selective_report.render(silent, run=_meta())
+
+
 def test_the_gate_is_compared_against_not_gating_at_all_and_the_verdict_is_counted():
     """The comparison the curve stops being able to make once values leave it.
 
@@ -332,11 +360,12 @@ def _meta() -> RunMeta:
 
 
 def test_each_signal_is_scored_on_its_own():
-    """Three signals, kept apart. A reader of the union alone cannot tell which did the work.
+    """Four signals, kept apart. A reader of the union alone cannot tell which did the work.
 
-    The fourth row is the one `contention` owns and the other two are silent on: a value that is on
-    the page and breaks no identity, but shares its only printed figure with another of the same
-    reading. Its presence is what makes the union's recall a claim rather than a restatement of the
+    The last two rows are the ones the newer signals own and the older ones are silent on: a value
+    that is on the page and breaks no identity but shares its only printed figure with another of
+    the same reading, and a value that is on the page, in one place, and the page goes on printing
+    it. Their presence is what makes the union's recall a claim rather than a restatement of the
     first two.
     """
     rows = [
@@ -345,6 +374,8 @@ def test_each_signal_is_scored_on_its_own():
         Judged("d", "f", "3", Confidence.HIGH, wrong=False, ungrounded=False, accused=True),
         Judged("d", "f", "4", Confidence.MEDIUM, wrong=True, ungrounded=False, accused=False,
                contended=True),
+        Judged("d", "f", "5", Confidence.LOW, wrong=True, ungrounded=False, accused=False,
+               cut_short=True),
     ]
     signals = {signal.name: signal for signal in summarise(rows, missed=0,
                                                            without_prediction=0).signals}
@@ -355,9 +386,12 @@ def test_each_signal_is_scored_on_its_own():
     assert signals["arithmetic"].false_positive == 1
     assert signals["contention"].true_positive == 1
     assert signals["contention"].false_positive == 0
-    #: The other two signals' catches are this one's misses, which is the complementarity.
-    assert signals["contention"].false_negative == 2
-    assert signals["any of the three"].recall == 1.0
+    assert signals["completeness"].true_positive == 1
+    assert signals["completeness"].false_positive == 0
+    #: The other signals' catches are each of these two's misses, which is the complementarity.
+    assert signals["contention"].false_negative == 3
+    assert signals["completeness"].false_negative == 3
+    assert signals["any of the four"].recall == 1.0
 
 
 # --------------------------------------------------------------------------- the formatter

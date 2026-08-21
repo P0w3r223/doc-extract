@@ -102,10 +102,9 @@ class Sheet:
         """
         if not wanted:
             return Place((), 1.0)
-        want = Counter(wanted)
         best = Place((), 0.0)
-        for anchor in self._anchors(want):
-            found = self._take(anchor, want)
+        for anchor in self._anchors(wanted):
+            found = self._take(anchor, wanted)
             if found.coverage > best.coverage:
                 best = found
             if best.coverage >= 1.0:
@@ -127,16 +126,21 @@ class Sheet:
         """
         if not wanted:
             return ()
-        want = Counter(wanted)
         found: dict[tuple[tuple[int, int], ...], Place] = {}
-        for anchor in self._anchors(want):
-            place = self._take(anchor, want)
+        for anchor in self._anchors(wanted):
+            place = self._take(anchor, wanted)
             if place.coverage >= 1.0 and place.spans:
                 found.setdefault(claim(place.spans), place)
         return tuple(found.values())
 
-    def _anchors(self, want: Counter[str]) -> list[int]:
-        """Cells holding any of the wanted words, fullest first, then in reading order."""
+    def _anchors(self, wanted: tuple[str, ...]) -> list[int]:
+        """Cells holding any of the wanted words, fullest first, then in reading order.
+
+        Counted as a multiset here on purpose, unlike `_take`: this only decides which cell to try
+        as an anchor first, and a cell holding four of the value's words is the better place to
+        start whichever order it prints them in.
+        """
+        want = Counter(wanted)
         candidates = {index for token in want for index in self._by_token.get(token, ())}
         return sorted(candidates, key=lambda index: (-self._held(index, want), index))
 
@@ -148,40 +152,90 @@ class Sheet:
                 taken[token] += 1
         return sum(taken.values())
 
-    def _take(self, anchor: int, want: Counter[str]) -> Place:
-        """As much of `want` as the region around `anchor` holds, each occurrence used once."""
-        taken: Counter[str] = Counter()
+    def _take(self, anchor: int, wanted: tuple[str, ...]) -> Place:
+        """As much of `wanted` as the region around `anchor` holds **in the order the page prints**.
+
+        A wrapped value reads down its column, so its words arrive on the page in the order it
+        writes them. Matching them as a *sequence* rather than as a multiset is what makes the
+        spans a location: the region is walked top to bottom and each word is taken only when it is
+        the next one the value is still waiting for.
+
+        **The multiset version let a value claim the previous row's tail**, and the completeness
+        check in `ground/complete.py` is what surfaced it. A description wrapping over three lines
+        prints its middle line on the row that carries the numbers, so consecutive rows interleave:
+        `konstrukcja` (row 1's tail), `Roboty budowlane` (row 2's head), the row, `konstrukcja`
+        (row 2's tail). Anchored on row 2's head and matching a multiset, the region reached
+        upwards first and row 2 grounded its last word against **row 1's** tail — the same
+        confusion this module was built to remove, one row away instead of a page away. It grounded
+        anyway, so nothing measured it until a check asked whether the page carried more of the
+        value than the reading took: on gold it did, 15 times, on exactly those documents.
+
+        **The anchor says where in the value the walk is, and that is the second half of the rule.**
+        Order alone is not enough: a cell one row up that happens to print the value's *first* word
+        would still take it, since it is first on the page as well as first in the value. So the
+        anchor is matched to the token it starts at, everything after it is looked for at or below
+        the anchor, and only the tokens *before* it are looked for above — read upwards, because
+        that is the direction a wrapped value's earlier lines lie in.
+
+        Imposing the order costs nothing measurable and repairs that: no correct value on any of
+        the five corpora or the 24 committed runs stops being grounded, and gold's 15 go to zero.
+        """
+        region = self._region(anchor)
+        after = [index for index in region if index >= anchor]
+        before = [index for index in region if index < anchor]
+        mine = {token for token, _ in self._words[anchor]}
+        best = Place((), 0.0)
+        for start in [s for s, token in enumerate(wanted) if token in mine] or [0]:
+            ahead = self._run(after, wanted, start, +1)
+            behind = self._run(before[::-1], wanted, start - 1, -1)
+            found = Place(
+                tuple(reversed(behind)) + ahead, (len(ahead) + len(behind)) / len(wanted)
+            )
+            if found.coverage > best.coverage:
+                best = found
+        return best
+
+    def _run(
+        self, cells: list[int], wanted: tuple[str, ...], at: int, step: int
+    ) -> tuple[Span, ...]:
+        """The spans of `wanted` consumed from `at` in the direction `step`, cell by cell.
+
+        Both the cells and the words inside them are read in the direction of travel, so a walk
+        upwards takes a cell's *last* word first — a wrapped value's line above ends where this one
+        begins.
+        """
         spans: list[Span] = []
-        for index in self._region(anchor):
-            for token, span in self._words[index]:
-                if taken[token] < want[token]:
-                    taken[token] += 1
+        for index in cells:
+            words = self._words[index]
+            for token, span in words if step > 0 else reversed(words):
+                if 0 <= at < len(wanted) and token == wanted[at]:
+                    at += step
                     spans.append(span)
-        return Place(tuple(spans), sum(taken.values()) / sum(want.values()))
+        return tuple(spans)
 
     def _region(self, anchor: int) -> tuple[int, ...]:
-        """The anchor cell first, then the cells a wrapped value could continue into.
+        """The anchor cell and the cells a wrapped value could continue into, **in page order**.
 
         Same page, overlapping horizontally — which is what makes them one column, derived from the
         boxes rather than from any knowledge of what the column holds — and within `WRAP_REACH` of
         the anchor vertically, above or below: a value's first line is not always the anchor, since
         the anchor is whichever cell holds most of it.
 
-        **The anchor comes first, and the order is load-bearing.** `_take` uses each occurrence
-        once, so whichever cell it reads first gets to claim a shared word. Reading the region in
-        page order let a continuation *above* the anchor claim a word the anchor also printed, and
-        the spans then pointed at a row the value was not on — the exact confusion this module
-        exists to remove, reintroduced two cells away instead of a page away.
+        Page order, because `_take` matches the value as a sequence and the page is what supplies
+        that sequence. An earlier version put the anchor first, to stop a continuation *above* it
+        claiming a word the anchor also printed; the ordering constraint answers that directly
+        instead, and answers the harder case the anchor-first rule could not — a word the anchor
+        does *not* print, sitting above it, belonging to the row before.
         """
         if anchor not in self._regions:
             here = self._cells[anchor]
             height = here.bottom - here.top or 1.0
-            self._regions[anchor] = (anchor, *(
+            self._regions[anchor] = tuple(
                 index
                 for index, cell in enumerate(self._cells)
-                if index != anchor and cell.page == here.page and _shares_column(cell, here)
+                if cell.page == here.page and shares_column(cell, here)
                 and _row_gap(cell, here) <= WRAP_REACH * height
-            ))
+            )
         return self._regions[anchor]
 
 
@@ -195,7 +249,14 @@ def claim(spans: tuple[Span, ...]) -> tuple[tuple[int, int], ...]:
     return tuple(sorted((span.start, span.end) for span in spans))
 
 
-def _shares_column(cell: Span, anchor: Span) -> bool:
+def shares_column(cell: Span, anchor: Span) -> bool:
+    """Whether two boxes overlap horizontally — which is what makes them one column.
+
+    Public for the same reason `claim` is: `ground/complete.py` asks the identical question of the
+    identical boxes, and two spellings of *one column* would be free to drift apart while both
+    looked right. What it deliberately does **not** share with that module is the vertical test —
+    a place reaches above and below its anchor, and a completeness check only ever looks down.
+    """
     return min(cell.x1, anchor.x1) > max(cell.x0, anchor.x0)
 
 

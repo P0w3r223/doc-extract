@@ -14,16 +14,17 @@
 | gold values never asserted | 0 |
 | documents with no invoice | 6 |
 
-## The three signals, scored apart
+## The four signals, scored apart
 
-Field-level detectors of a wrong asserted value. They are complements with very different shapes, and a reader who saw only their combination could not tell which did the work. `contention` is the one that accuses a **pair**: when two of a reading's values claim one printed figure it flags both, because no label-free fact says which of the two is the intruder. Where the sibling is a correct reading that caps its precision near a half; where both belong to a row the page never printed, nothing it flags is correct and the row below says which of the two this run is.
+Field-level detectors of a wrong asserted value. They are complements with very different shapes, and a reader who saw only their combination could not tell which did the work. `contention` is the one that accuses a **pair**: when two of a reading's values claim one printed figure it flags both, because no label-free fact says which of the two is the intruder. Where the sibling is a correct reading that caps its precision near a half; where both belong to a row the page never printed, nothing it flags is correct and the row below says which of the two this run is. `completeness` asks the opposite of grounding: not whether the value is on the page but whether the page kept printing it after the reading stopped.
 
 | signal | TP | FP | FN | TN | precision | recall |
 |---|---:|---:|---:|---:|---:|---:|
 | `grounding` | 6 | 0 | 60 | 2631 | 100 % | 9.1 % |
 | `arithmetic` | 48 | 889 | 18 | 1742 | 5.1 % | 72.7 % |
 | `contention` | 12 | 0 | 54 | 2631 | 100 % | 18.2 % |
-| `any of the three` | 48 | 889 | 18 | 1742 | 5.1 % | 72.7 % |
+| `completeness` | 0 | 0 | 66 | 2631 | — | 0.0 % |
+| `any of the four` | 48 | 889 | 18 | 1742 | 5.1 % | 72.7 % |
 
 ## Coverage and accuracy
 
@@ -46,4 +47,4 @@ Cumulative: each row accepts everything at its level **and above**. `leaked` cou
 * **Against the ungated policy.** Accepting every asserted value — the 2697 below plus the 7197 excluded from them — is 99.3 % accurate. The `high` row is 99.0 %, so on this corpus auto-accepting the gate's confident bucket is **still less accurate than not gating at all**, because its signal exists only where the page kept text and the excluded values are largely right. The `none` row is *not* that comparison: it accepts everything the gate could assess, which is a different set.
 * **`grounding` missed 60 of the 66 wrong asserted value(s)** and flagged 6 of them. It asks whether a value is *on the page*, not whether it is in the *right place*: a reader that lifts a real figure out of the wrong column is fully grounded and completely wrong, and one that borrows a word from the other party's address is too. A **text** value is now resolved to one place rather than to whichever occurrence of each word came first, which is what makes its recorded spans a location at all; an amount or an identifier still resolves to every occurrence of itself. `contention` uses those places to catch the one wrong-column shape that is decidable without knowing which column is which — two values claiming one figure — and `docs/adr/0002_placement.md` carries the two shapes that leaves standing.
 * `contention` flagged 12 asserted value(s), and **every one of them was already named by a hard rule**, so the gate reached the same verdict without it and what this signal adds here is the attribution, not the routing. It names the two fields that share a printed figure, where an arithmetic violation names the whole `lines` collection; the two catch overlapping populations and only the narrower one says *which* values are involved.
-* The confidence levels are produced by fixed rules over the three signals, not by weights fitted to this corpus. That is why there are four and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.
+* The confidence levels are produced by fixed rules over the four signals, not by weights fitted to this corpus. That is why there are four and not a smooth sweep: a fitted score would draw a better curve here and would be measuring its own training set.

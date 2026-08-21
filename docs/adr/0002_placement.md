@@ -99,8 +99,10 @@ ground after it, on four populations:
 So the mechanism is repaired and the blindness is barely dented: 19 of `pattern`'s 292. **The reason
 is worth recording, because it is not the one that was expected.** The dominant failure is a
 description that stops early, and the natural check — did the value claim the whole cell it sat in?
-— cannot see it. Measured: **100 %** of `pattern`'s wrong descriptions claim their entire cell. They
-are not truncations *within* a cell. The renderer wraps a description across lines, each line is its
+— cannot see it. Measured: **161 of the 162** wrong descriptions that ground claim their entire
+cell. *(This said 100 % until M7k re-measured it; the exception is `multi_page-0010`'s eleventh
+description, the bare word `kg`, and this project's own rule is that `100 %` means exactly 100 %.)*
+They are not truncations *within* a cell. The renderer wraps a description across lines, each line is its
 own cell, and the reader took one whole cell of a two-cell run. Asking the question of the whole
 column region instead fails the control in the other direction — only 8.9 % of gold values claim
 their region, because the region also holds the neighbouring field.
@@ -294,7 +296,8 @@ ends. A projection that carried its separators would answer directly and is the 
 not built, because the compensation clears the control on three corpora and the difference would be
 invisible on all of them.
 
-**And one shape it newly rejects, which no corpus here contains.** Looking through a separator makes
+**And one shape it newly rejects, which no corpus here contains.** *(This is the M7j addendum's
+closing paragraph; the completeness addendum follows it.)* Looking through a separator makes
 a *correct* identifier ungrounded when a bare group of digits sits one separator away from it on the
 same line: `NIP 1130220189 2026` and `kwota 1234 PL61…` both go `GROUNDED` → `UNGROUNDED` on a page
 built to have them. It costs nothing here — gold loses **zero** identifiers on all five corpora
@@ -304,3 +307,176 @@ not, so the rule never reaches across a cell or a line. But a real held-out set 
 named open item, and this is the shape that would show up there as grounding's first false alarm in
 this project's history. A projection that carried its separators would not have it, which is the
 second reason to prefer that shape over the compensation.
+
+## Addendum, 2026-08-21: the completeness check, built — and the layer under it was wrong (M7k)
+
+The *Decision* section above left two things open and the M7j addendum closed one. This closes the
+other: **the continuation-aware completeness check**, which the *What the fix bought* section
+scoped with a measurement and which has been the standing open item of this layer since M7h.
+
+### The rule, and its two bounds
+
+`ground/complete.py` asks whether the page goes on printing a value after the reading stopped, and
+it asks it the way the section above said it would have to be asked — structurally, of the page:
+**in a table, a continuation line carries only the wrapping column while a new row carries all of
+them.** A value is cut short when the nearest cell below it in its column, within the same reach a
+place uses, sits on a line carrying fewer cells than its own row does.
+
+Two bounds. Each was measured by removing it and counting the gold values the control then costs —
+false alarms on a reading with nothing wrong in it anywhere:
+
+| bound removed | `synthetic` | `foreign` | `attacked` | `scanned` | `attacked-scanned` |
+|---|---:|---:|---:|---:|---:|
+| the line below must be **narrower** than the row | 72 | 72 | 84 | 72 | 42 |
+| the value's last cell must have something **to its left** | 0 | **72** | 0 | 0 | 0 |
+| neither (the shipped rule) | **0** | **0** | **0** | **0** | **0** |
+
+**A third bound is measured differently and its cost is stated rather than absorbed.** `_below`
+looks only in the value's own column. Dropping that — nearest cell below *anywhere* on the page —
+costs no gold false alarm on `data/synthetic` and takes `pattern` from 125 catches to **161**, with
+none on a correct reading. It is kept, and the reason is the distinction between a bound that adds
+a *condition* and one that **is** the claim: the rejected right-flank bound was the first, while
+the column is what *the page wraps this value one line further down its column* means. Without it
+those 36 are flagged because something narrower sits below and to one side — on a reader as wrong
+as `pattern`, right by accident, which is this ADR's own founding failure one column over.
+
+**The second bound is invisible on four corpora and load-bearing on the fifth, and that is worth
+saying plainly: `data/foreign` earned its keep here as a control rather than as the held-out test
+it was built to be.** The block it supplies is the `statement` dialect's party: a name beside a
+right-hand label with the address underneath, so the address is a narrower line under a wider one
+and continues nothing. The left-flank bound is what says the value is inside a *table row* instead.
+The mirror bound — something to the *right* as well — gives the identical control and the identical
+catch on every corpus here, so it is left out as unmeasured strictness rather than kept as
+insurance. **The label on the right is exactly what makes that block look like a row**, which is
+why the side matters and the rule names it.
+
+**What does not discriminate is the vertical gap, and that was the first thing tried.** It is
+**0.30** cell-heights for every one of `pattern`'s truncations and **0.32** for every one of the 72
+gold values the flank bound rescues. A wrapped continuation and the next field of a block sit at the
+same leading; there is no threshold between them to find.
+
+### What it catches
+
+Zero false positives on the gold of all five corpora — 1238, 1238, 1330, 404 and 637 text values —
+and zero on every correct value of every committed run. The table is the `completeness` row of each
+committed `gate.md`, and the denominator is that row's **TP + FN** — the wrong values the signal was
+scored against — so every cell is readable off a committed file and the arithmetic checks:
+
+| run | wrong values scored | caught | false alarms |
+|---|---:|---:|---:|
+| `pattern` | 292 | **125** | 0 |
+| `attack-pattern` | 331 | **107** | 0 |
+| `scanned-pattern` | 156 | **73** | 0 |
+| `attacked-scanned-pattern` | 228 | **53** | 0 |
+| `attack-gullible` | 176 | 1 | 0 |
+| the other 19 committed runs | 1837 | 0 | 0 |
+
+**That denominator is deliberately not "wrong values" full stop.** Those 19 runs assert 2645 wrong
+values, and 808 of them never reach the curve — a scan with no text layer, or a field grounding
+declines to ask about. Counting them in would charge this signal with a blindness it shares with
+every other one here. On the five firing runs the two figures coincide, which is why those rows can
+be read either way.
+
+Precision is 100 % on the five runs with a denominator and `—` on the other 19, nine of which have
+nothing wrong to catch at all. So it is aimed squarely at the population this ADR named and it hits
+it — and **on a real model's errors it fires on nothing**: `claude-haiku-4-5` is 0 of 77 on its own
+page and 0 of 141 on the foreign one. That is the honest shape of the result. The blind spot was
+measured on a regex baseline and the fix is measured on the same baseline; whether a model truncates
+a wrapped description is a question a real held-out set would answer and this corpus cannot.
+
+### What it still cannot see, and why that is one line rather than a category
+
+The flank question is asked of the value's **last** cell, so the rule sees a truncation that stopped
+*on the row* and no other kind: a reading that already ran past the row onto a wrap line has nothing
+printed to its left, and stays silent.
+
+Asking it of the value's **row** instead — the widest line the value sits on — would see the other
+kind, and it fails the control everywhere: **133** gold values on `data/synthetic`, 42 on
+`data/foreign`, 105 on `data/attacked`, 70 and 63 on the two scanned ones. The mechanism is this
+ADR's own ambiguity in its sharpest form. The `classic` layout centres a description on its row, so
+a three-line one prints head, row, tail — and a **complete** value's tail is followed by the *next
+row's head*, a narrower line in the same column, structurally identical to a continuation.
+
+Bounding that variant to the wrap line adjacent to the row restores the control and catches **not
+one wrong value more** than the shipped rule, on any of the 29 corpora and runs measured. So the
+wider question here is not merely dangerous — on this corpus it is unrewarded, and the remaining
+gap is one line deep rather than a category.
+
+### The control found a defect in the layer underneath, which is how this went the last time too
+
+The first version of the check fired on **15** gold values of `data/synthetic`, all of them the same
+shape, and the shape was not the rule's fault. `place.Sheet._take` matched a value's words as a
+**multiset**, so a three-line description anchored on its head reached upwards first and took its
+last word from the row *above*: `konstrukcja` belonging to row 1, claimed by row 2. Fully grounded,
+and the spans pointing at a row the value was not on — M7h's finding one row away instead of one
+page away, and invisible until something asked whether the page carried more of the value than the
+reading took.
+
+So `_take` matches the value as a **sequence** now, walking the region top to bottom, and the anchor
+says where in the value the walk is: everything after the anchor's own token is looked for at or
+below it, and only the tokens before it above. Order alone was not enough — a cell one row up that
+prints the value's *first* word is first on the page as well as first in the value, and
+`test_the_place_holding_most_of_the_value_wins` catches exactly that.
+
+It costs nothing measurable: **no correct value stops being grounded** on any of the five corpora or
+the 24 committed runs, and gold's 15 go to zero.
+
+It also cleans the *alternatives*, which is the half of `find_places` nothing was watching. On
+`data/attacked`, `total_override-invisible-01`'s twelfth description — `Warzywa świeże marchew,
+worek 10 kg`, printed complete on one line — came back with **two** places under the multiset walk:
+the real one, and a second that took `worek`, the value's fourth token, from the line *below* the
+other five. An assembly out of order is not a place, and the ordered walk rejects it: 305 → 304
+alternatives on that corpus, with the groundings identical. The direction matters, because
+`ground/joint.py` reads those alternatives and fewer of them can only make a value *harder* to
+place — so this could have created a contention. It created none: the `contention` row is unchanged
+in all 24 `gate.md`.
+
+### Consequences
+
+- **`decide/` gains a fourth signal and no new level.** A value the page carries more of is routed
+  `LOW`, not one step down — the claim is the same one `Support.PARTIAL` makes, that part of the
+  printed value was not read, and grounding could not see it only because the part that *was* read
+  is itself complete on the page.
+- **The gate moves further than any signal this project has added since M5, on the runs where it
+  fires at all.** Because grounding was silent on precisely these values, every demotion is one the
+  gate did not already have:
+
+  | run | `high` leaked | `high` accuracy | `high` coverage |
+  |---|---|---|---|
+  | `pattern` | 54 → **0** | 98.5 % → **100 %** | 69.0 % → 68.0 % |
+  | `scanned-pattern` | 31 → **0** | 96.4 % → **100 %** | 52.1 % → 50.3 % |
+  | `attack-pattern` | 79 → **7** | 98.2 % → 99.8 % | 73.7 % → 72.5 % |
+  | `attacked-scanned-pattern` | 18 → **7** | 98.7 % → 99.5 % | 48.9 % → 48.5 % |
+  | `attack-gullible` | 48 → 47 | 98.5 % → 98.6 % | unchanged |
+
+  On two of them the auto-accepted bucket leaks **nothing**, and the union of the four signals
+  reaches **100 % recall**. Set against M7j, which moved one curve row across 24 runs, this is a
+  different order of result — and it is a result about a regex reader, which is the same sentence
+  as the paragraph above and has to be read with it.
+- **`eval/selective.py` scores four signals apart instead of three**, and `selective_report`
+  derives what the fourth added *beyond* the other three per run rather than asserting it here.
+- **It needs page text**, so it is as silent as grounding and contention on a scan's two text-less
+  rungs. Of the gate's four signals only the arithmetic survives a scan, and that remains the one an
+  adversary can satisfy on purpose.
+- **All 24 `gate.md` and all 7 `attack.md` were regenerated**, for the reason the earlier addenda
+  give: both need the rendered pages, so `tests/test_results_committed.py` cannot cover them and
+  they are the two artifacts in this repository that can drift in silence.
+- **And this time `attack.md` moved, where the two previous addenda predicted it would not.** On
+  `attack-gullible` — the compliant control, a reader that obeys every instruction it finds — the
+  attacks the gate would have accepted go **32 → 31**. `seller_swap`'s leak column goes 16 → 15,
+  the `description` placement's 8 → 7, the `classic` layout's 12 → 11, and the document that leaves
+  the list is `seller_swap-description-03`.
+
+  The mechanism is worth stating because nothing here knows anything about attacks. The payload is
+  printed **inside an item's description cell**; the compliant reader obeys it and writes
+  `seller.name = Vector Global Services sp. z o.o.`; and the page goes on printing that cell below
+  the line the value was lifted from. So the value is cut short, it is demoted to `LOW`, and the
+  document routes `review` — its **only** non-accepted field out of 49. The attacker is caught by
+  having had to print the payload somewhere, and by having chosen a column that wraps.
+
+  **It is not a defence and the payload table is unchanged.** Fifteen of the sixteen `seller_swap`
+  attacks still leak, `seller_swap` is still *accepted* in every summary table, and a payload placed
+  in the `Adnotacje` block or the footer is untouched. What this is, is the first time any signal in
+  this project has taken an injected payload out of the gate's accepted bucket at all —
+  `docs/adr/0001_trust_boundary.md` records that the arithmetic and grounding both agree with the
+  attacker by construction.

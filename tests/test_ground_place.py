@@ -140,6 +140,49 @@ def test_a_value_wrapped_into_the_next_row_of_its_own_column_grounds(invoice):
         is Support.GROUNDED
 
 
+def test_a_wrapped_value_does_not_finish_itself_on_the_row_above(invoice):
+    """The defect `ground/complete.py` surfaced, in the shape the corpus produced it.
+
+    A description wrapping over three lines prints its middle line on the row that carries the
+    numbers, so consecutive rows interleave down the description column: row 1's tail, row 2's head
+    and row, row 2's tail. Matching the value as a *multiset* let row 2 take `konstrukcja` from
+    **row 1's** tail — the nearer occurrence in page order — and report itself fully grounded on
+    evidence belonging to the row above. It grounded either way, which is why nothing measured it
+    until a rule asked whether the page carried more of the value than the reading took: on gold it
+    did, on 15 values, all of them this shape.
+
+    The assertion is about *which* ink was claimed, not about the verdict, because the verdict was
+    never wrong.
+    """
+    page = _page(
+        [(50.0, ["konstrukcja"])],
+        [(10.0, ["2"]), (50.0, ["Roboty", "budowlane"]), (300.0, ["100,00"])],
+        [(50.0, ["konstrukcja"])],
+    )
+    grounded = _ground(page, _described(invoice, "Roboty budowlane konstrukcja"))
+
+    assert grounded.support is Support.GROUNDED
+    assert {round(span.top) for span in grounded.spans} == {10, 20}
+
+
+def test_a_places_spans_read_down_the_page(invoice):
+    """A wrapped value reads downwards, so the ink it claims does too — never back up the page.
+
+    The property the ordering imposes, asserted directly rather than only through the case above:
+    a place whose spans ran out of order would be a place assembled from lines that are not one
+    another's continuation, which is the whole failure mode of this module's predecessor.
+    """
+    page = _page(
+        [(50.0, ["Wynajem", "powierzchni"])],
+        [(50.0, ["magazynowej", "w", "Gdańsku"])],
+    )
+    grounded = _ground(page, _described(invoice, "Wynajem powierzchni magazynowej w Gdańsku"))
+
+    tops = [span.top for span in grounded.spans]
+    assert grounded.support is Support.GROUNDED
+    assert tops == sorted(tops)
+
+
 def test_a_word_taken_from_the_next_column_does_not_count(invoice):
     """`pattern`'s failure: a description stitched from its own cell and the unit beside it.
 

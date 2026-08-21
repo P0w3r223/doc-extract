@@ -24,11 +24,11 @@ pipeline could actually assess, and the count of the ones it could not is printe
 alternative was measured before it was fixed — on M7e's attacked scans, keeping them in made the
 high-confidence bucket *less* accurate than accepting everything.
 
-**The three signals are also measured apart.** Grounding, the arithmetic and place contention are
-reported as their own field-level detectors before the curve combines them, because they are
-complements with very different shapes and a reader who sees only the combination cannot tell which
-did the work — and on most runs the third is entirely inside the second, which is a fact the
-combination hides and the report derives.
+**The four signals are also measured apart.** Grounding, the arithmetic, place contention and
+completeness are reported as their own field-level detectors before the curve combines them,
+because they are complements with very different shapes and a reader who sees only the combination
+cannot tell which did the work — and on most runs contention is entirely inside the arithmetic,
+which is a fact the combination hides and the report derives.
 """
 
 from __future__ import annotations
@@ -102,10 +102,15 @@ class Judged:
     #: Whether each signal flagged this instance, kept apart so each can be scored alone.
     ungrounded: bool
     accused: bool
-    #: Whether the reading could not give this value a place of its own on the page. Third and
-    #: newest of the three, and the only one that can fire while the other two are silent — see
+    #: Whether the reading could not give this value a place of its own on the page. Third of the
+    #: four, and the only one that can fire while grounding and the arithmetic are silent — see
     #: `ground/joint.py` for the population that made it worth having.
     contended: bool = False
+    #: Whether the page wraps this value one line further than the reading took it. Fourth and
+    #: newest, and the one aimed squarely at grounding's standing blind spot — a description that
+    #: stops early is a real string in the right place and the page simply says more. See
+    #: `ground/complete.py`.
+    cut_short: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -271,6 +276,7 @@ def judge(
             #: would undercount the arithmetic signal precisely where it is the only one talking.
             accused=result.field in named,
             contended=assessment.contended,
+            cut_short=assessment.cut_short,
         ))
     return tuple(rows), Excluded(
         missed=missed, unassessable=unassessable, without_text=without_text,
@@ -312,8 +318,9 @@ def summarise(
             _signal("grounding", rows, lambda row: row.ungrounded),
             _signal("arithmetic", rows, lambda row: row.accused),
             _signal("contention", rows, lambda row: row.contended),
-            _signal("any of the three", rows,
-                    lambda row: row.ungrounded or row.accused or row.contended),
+            _signal("completeness", rows, lambda row: row.cut_short),
+            _signal("any of the four", rows,
+                    lambda row: row.ungrounded or row.accused or row.contended or row.cut_short),
         ),
         missed=missed,
         unassessable=unassessable,

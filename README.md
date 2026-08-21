@@ -125,13 +125,13 @@ the whole `lines` collection — and the report derives that per run rather than
 
 ## What the gate buys
 
-`decide/` turns the three signals into four confidence levels by fixed rules — nothing fitted on the
+`decide/` turns the four signals into four confidence levels by fixed rules — nothing fitted on the
 corpus it is measured against — and routes accept / review / reject.
 
 | accept down to | route | coverage | accuracy | leaked |
 |---|---|---:|---:|---:|
 | `high` | accept | 89.7 % | **99.96 %** | 2 |
-| `medium` | review | 98.9 % | 99.8 % | 12 |
+| `medium` | review | 98.9 % | 99.8 % | 11 |
 | `low` | review | 99.5 % | 99.2 % | 49 |
 | `none` | reject | 100 % | 98.7 % | 77 |
 
@@ -146,9 +146,15 @@ figures out of the wrong column and almost every one of them grounds. It used to
 what closed the gap by those 19 was requiring the value to sit in one place. Place contention closes
 none of the rest on that baseline — a regex reader lifts one figure out of one column and asserts
 nothing else that wants it, so there is no contradiction on the page to find; deciding that case
-needs to know which column holds which field, which is knowledge this layer does not have. And
-`100 %` means
-exactly 100 % — the formatter grows its precision rather than rounding, after an early version
+needs to know which column holds which field, which is knowledge this layer does not have. **A
+fourth signal closes a little under half of what is left**: a description that stops early is a
+real string in the right place, and only the page's own wrapping says it is not the whole one —
+`ground/complete.py` catches **125 of that baseline's 292** wrong values, which is 125 of the 273
+grounding misses, with no false alarm on gold anywhere; it takes the auto-accepted bucket's leak
+from **54 to 0** for one point of coverage. It fires on **nothing** on any model run here, which is
+the limit worth naming: the blind spot was measured on a regex reader and so is the fix. And
+`100 %` means exactly 100 % — the formatter grows its precision rather than rounding, after an
+early version
 printed `100.0 %` in a row whose next column said two wrong values had been accepted.
 
 And a **confidently wrong but internally consistent answer is invisible**: `constant` sits at
@@ -277,8 +283,8 @@ exactly like an ungrounded fabricated one.
 It now answers *I could not ask*: those values leave the curve instead of filling it, coverage over
 what the pipeline can assess is 100 %, and the count it cannot see into is printed above the table
 rather than folded inside it. **The alarms are gone and the signal is not back.** Of the gate's
-three signals, **only the arithmetic survives a scan** — place contention needs page text as much as
-grounding does, and that is the signal M6 already showed an
+four signals, **only the arithmetic survives a scan** — place contention and the completeness check
+need page text as much as grounding does, and that is the signal M6 already showed an
 adversary can satisfy on purpose — so what changed is that the gate reports having no opinion where
 it used to report a wrong one.
 
