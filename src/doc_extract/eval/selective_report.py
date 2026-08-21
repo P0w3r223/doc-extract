@@ -219,10 +219,11 @@ def _grounding_misses(curve: Curve) -> list[str]:
         f"value(s)** and {caught}. It asks whether a value is *on the page*, not whether it is in "
         "the *right place*: a reader that lifts a real figure out of the wrong column is fully "
         "grounded and completely wrong, and one that borrows a word from the other party's address "
-        "is too. A value is now resolved to **one place** rather than to whichever occurrence of "
-        "each word came first, which is what makes the recorded spans a location at all — but the "
-        "geometric check that would use them is still not built, and "
-        "`docs/adr/0002_placement.md` carries what it turned out to need."
+        "is too. A **text** value is now resolved to one place rather than to whichever occurrence "
+        "of each word came first, which is what makes its recorded spans a location at all; an "
+        "amount or an identifier still resolves to every occurrence of itself. The geometric check "
+        "that would use either is not built, and `docs/adr/0002_placement.md` carries what it "
+        "turned out to need."
     ]
 
 

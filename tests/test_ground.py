@@ -321,15 +321,22 @@ def test_the_page_and_the_candidate_go_through_one_function():
 
 
 def test_grounding_knows_nothing_about_the_renderer():
-    """It matches values, never labels. `eval/pattern.py` is allowed to; this package is not."""
+    """It matches values, never labels. `eval/pattern.py` is allowed to; this package is not.
+
+    **The package is enumerated, not listed.** This test named its three modules until `place.py`
+    became a fourth, at which point it went on passing while checking two thirds of what it claims
+    to check — a guard that narrows silently is worse than one that fails, because nothing about it
+    looks wrong. The `assert` on the count is there so that reading the directory cannot itself
+    start returning nothing.
+    """
     from pathlib import Path
 
-    package = Path(resolve.__module__.replace(".", "/")).parent
-    sources = [
-        (Path("src") / package / name).read_text(encoding="utf-8")
-        for name in ("resolve.py", "surface.py", "__init__.py")
-    ]
-    for text in sources:
+    package = Path("src") / Path(resolve.__module__.replace(".", "/")).parent
+    modules = sorted(package.glob("*.py"))
+    assert len(modules) >= 4, f"{package} yielded {len(modules)}; the glob is not reading it"
+
+    for path in modules:
+        text = path.read_text(encoding="utf-8")
         assert "doc_extract.synth" not in text
         for label in ("Numer faktury", "Do zapłaty", "Sprzedawca", "Rachunek:"):
             assert f'"{label}' not in text, f"a printed label leaked into grounding: {label}"

@@ -783,10 +783,12 @@ It cost nothing to impose. Text values that ground before and still ground after
 | `claude-haiku-4-5` | 1186 / 1186 | 1 / 3 |
 | `pattern` | 752 / 752 | 19 / 181 |
 
-**Grounding's precision stayed 100 % on all 22 committed runs, with zero false positives on every
-one.** Its recall on `claude-haiku-4-5` moves 84.4 % → **85.7 %**, and on the three `pattern` runs
-from 0.0 % to 6.5 / 6.9 / 6.4 %. The union with the arithmetic did *not* move: the value grounding
-gained on haiku was one a hard rule already had.
+**Grounding raised zero false positives on all 22 committed runs**, and its precision is 100 % on
+the 14 of them that give it a denominator — the other 8 print `—`, because a run with nothing wrong
+in it gives precision nothing to divide by, and this project's own rule is that `—` and a number
+are different claims. Its recall on `claude-haiku-4-5` moves 84.4 % → **85.7 %**, and the four
+`pattern` runs that assess anything move off 0.0 % to 6.5 / 6.9 / 6.4 / 9.2 %. The union with the
+arithmetic did *not* move: the value grounding gained on haiku was one a hard rule already had.
 
 **One run's verdict flipped, and the report flipped it rather than a sentence here.** On
 `attacked-scanned-claude-opus-5`, grounding goes 7.1 % → **64.3 %** recall, the confident bucket

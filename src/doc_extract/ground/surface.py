@@ -165,8 +165,13 @@ def tokens(text: str) -> tuple[str, ...]:
 
     Grounding a description cannot ask for one contiguous span: the renderer wraps a long
     description above and below the row's numbers, so `Wynajem powierzchni magazynowej` is on the
-    page as two fragments with an entire table row between them. Asking instead which of its words
-    are on the page at all is answerable, and it degrades in the useful direction — a description a
-    model invented has words that appear nowhere.
+    page as two fragments with an entire table row of text between them.
+
+    Splitting it is all this function does. **Which question is then asked of the pieces belongs to
+    `place.py`**, and the answer changed: they were once looked for anywhere on the page, one word
+    at a time, and are now required to sit together in one place. The distinction is not pedantic —
+    the old reading let a buyer's name ground on the seller's legal form — and it is why the
+    fragments above are reunited by *geometry*, the same column a row down, rather than by their
+    distance apart in the text.
     """
     return tuple(token for token in collapse(text).split(" ") if token)

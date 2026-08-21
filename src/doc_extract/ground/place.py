@@ -29,12 +29,12 @@ exists rather than being assumed away. The continuation is looked for in the sam
 neighbouring row, which is where a wrapped line goes on any invoice and not only on this one's.
 
 **Of the two bounds, the column is the one that discriminates.** Measured by removing each: without
-the column the catch on `pattern` falls from 19 to **0**, while the vertical reach accounts for 1 of
-the 19 and every setting from 0.5 upward — to twenty times `WRAP_REACH`, where the region is the
-whole column — gives the same control and the same catch. So the reach is not a tuned threshold
-sitting between two populations; its job is to *admit* the wrapped continuation, and below 0.5 it
-stops doing that and the control breaks. Saying so is the difference between a constant that was
-measured and one that was picked.
+the column the catch on `pattern` falls from 19 to **0**, while every vertical reach from 0.5 to
+twenty times `WRAP_REACH` gives the identical control *and* the identical catch — the reach
+contributes nothing to the discrimination over that whole range. So it is not a threshold sitting
+between two populations; its job is to *admit* the wrapped continuation, and below 0.5 it stops
+doing that and the control breaks. Saying so is the difference between a constant that was measured
+and one that was picked.
 
 **The region is therefore deliberately generous, and that direction is chosen.** A different field
 one row down in the same column is inside it, so this module can still ground a value against a
