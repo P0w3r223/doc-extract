@@ -62,8 +62,9 @@ no page text to search* — and a third verdict for that removed **3989 false al
 reading** without moving a single leaked value. The finding narrowed; it did not go away. See *Now
 photograph the attacked page* below.
 
-The one item of milestone 7 still open is the one its title names first: a **real held-out set**,
-on documents nobody here generated. The two corpora above hold the semantics fixed on purpose,
+The item of milestone 7's own title that is still open is the one it names first: a **real
+held-out set**, on documents nobody here generated. (It is not the only thing left — `CLAUDE.md`
+lists five — but it is the one the milestone was named for.) The two corpora above hold the semantics fixed on purpose,
 which is what lets them attribute a drop to presentation or to legibility and nothing else — and is
 also what stops either of them being the thing they stand in for.
 

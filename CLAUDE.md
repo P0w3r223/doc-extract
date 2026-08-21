@@ -27,7 +27,8 @@ Vendored at `schemas/fa3.xsd` — see `schemas/PROVENANCE.md`.
 
 **This file is the rules; [`docs/findings.md`](docs/findings.md) is the results.** An italicised
 section name anywhere below — *The headline answer*, *What the gate buys* — is a section of that
-file. The index under *Findings* says which one answers what, so choosing does not mean reading it.
+file, and the `## Findings` heading here indexes them: what number each one turns on, and when it is
+worth loading. Choosing does not mean reading it.
 
 ## Architecture
 
@@ -323,7 +324,9 @@ re-run a paid model to be checked would be one too.
    judge would first be exercised on a real transcription, which is the one it had to be rewritten
    for.
 7. **Held-out set, the reported gap, vision variant, site/README/ADRs.** In progress, and shipped in
-   ten sub-milestones — the results of each are in `docs/findings.md` under the section named here.
+   ten sub-milestones. Where a row below names a section, that section of `docs/findings.md` carries
+   the measurement; M7d, M7f and M7g are reported inside the sections their neighbours name rather
+   than in one of their own.
 
    | | what it built | what it found |
    |---|---|---|
