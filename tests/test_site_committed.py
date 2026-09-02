@@ -29,6 +29,7 @@ from __future__ import annotations
 import pathlib
 import re
 import sys
+from html.parser import HTMLParser
 
 import pytest
 
@@ -68,6 +69,84 @@ def test_the_committed_page_is_what_the_generator_produces():
     assert _comparable(rendered) == _comparable(committed), (
         "docs/index.html is stale — re-run `python docs/build_index.py`"
     )
+
+
+@pytest.mark.skipif(not PAGE.exists(), reason="the site has not been built in this checkout")
+def test_site_tables_scroll():
+    """A table wider than a phone must scroll inside its own box, not carry the page with it.
+
+    Five of this page's thirteen tables are wider than the 335px content box a 375px viewport
+    leaves, and the widest — fourteen columns of per-baseline figures at 448px — took the whole
+    document 93px sideways. `width: 100%` cannot help: a table is never narrower than its columns
+    need.
+
+    The two premises that make one substitution over the assembled page safe are asserted rather
+    than assumed, because both are properties of how the tables happen to be written today and
+    neither is enforced anywhere else: every table is a bare `<table>` with no attributes, and no
+    table contains another. A table written any other way would escape the wrapper silently, and
+    this is the only thing that would notice.
+    """
+    import build_index
+
+    committed = PAGE.read_text(encoding="utf-8")
+
+    assert "<table " not in committed, (
+        "a table with attributes would not match the wrapper's pattern"
+    )
+
+    class _Tables(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__()
+            self.wrappers: list[str] = []
+            self.open_tables = 0
+            self.tables = 0
+            self.unwrapped = 0
+            self.nested = 0
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "table":
+                self.tables += 1
+                if self.open_tables:
+                    self.nested += 1
+                self.open_tables += 1
+                if "table-wrap" not in self.wrappers:
+                    self.unwrapped += 1
+            elif tag == "div":
+                self.wrappers.append(dict(attrs).get("class", ""))
+
+        def handle_endtag(self, tag):
+            if tag == "table":
+                self.open_tables = max(0, self.open_tables - 1)
+            elif tag == "div" and self.wrappers:
+                self.wrappers.pop()
+
+    parser = _Tables()
+    parser.feed(committed)
+
+    assert parser.tables == 13, "the count moved — check the new table is wrapped like the others"
+    assert parser.nested == 0, "a nested table would end the wrapper's non-greedy match early"
+    assert parser.unwrapped == 0, f"{parser.unwrapped} table(s) can drag the page sideways"
+    # The wrapper is inert without the rule that makes it scroll.
+    assert re.search(r"\.table-wrap\s*\{\s*overflow-x:\s*auto", committed)
+    # And the rule has to survive `TEMPLATE.format`, where a literal brace must be doubled.
+    assert ".table-wrap {{ overflow-x: auto; }}" in build_index.TEMPLATE
+
+
+def test_a_table_is_wrapped_wherever_it_is_written():
+    """The mechanism, on both shapes this file writes: one line, and opened across several."""
+    import build_index
+
+    one_line = "<table><thead><tr><th>a</th></tr></thead><tbody></tbody></table>"
+    multi_line = "<table>\n<thead><tr><th>a</th></tr></thead>\n<tbody></tbody>\n</table>"
+
+    for markup in (one_line, multi_line):
+        assert build_index._scrollable_tables(markup) == f'<div class="table-wrap">{markup}</div>'
+
+    two = build_index._scrollable_tables(one_line + "<p>between</p>" + one_line)
+    assert two.count('<div class="table-wrap">') == 2, (
+        "each table gets its own box, not one around both"
+    )
+    assert "<p>between</p>" in two
 
 
 CORPUS = ROOT / "data" / "scanned"
