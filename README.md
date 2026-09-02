@@ -1,5 +1,7 @@
 # doc-extract — invoice extraction that knows when it is wrong
 
+[![CI](https://github.com/P0w3r223/doc-extract/actions/workflows/ci.yml/badge.svg)](https://github.com/P0w3r223/doc-extract/actions/workflows/ci.yml)
+
 Structured extraction from Polish invoices, built around a question most extraction projects skip:
 **how do you know the output is right, on a document nobody annotated?**
 

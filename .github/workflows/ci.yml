@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Everything here runs offline. The one dependency that can reach the network — and the one that
+# costs money — is the `llm` extra, which nothing in the suite needs: the whole pipeline is driven
+# through `extract.scripted`, and every published figure is recomputed from a committed prediction
+# file. A test suite that needed an API key would be a result no reader could reproduce.
+#
+# There is no separate `drift` job, unlike the sibling repositories. The staleness check lives in
+# the suite, as `tests/test_site_committed.py`, because this page has two parts that legitimately
+# differ between a rebuild and the committed bytes — the commit in the footer, and the blocks that
+# need a corpus on disk. A blunt `diff` would have to be told about both from the outside; the test
+# strips exactly those and asserts the committed page still carries the measurements the allowance
+# would otherwise hide.
+#
+# The corpus itself is not built here. `data/` is 116 MB, is a function of one seed, and none of it
+# is committed — so the corpus-dependent blocks are the part CI forgives. That allowance is
+# one-directional and tested: a page built without the corpus fails, because the committed one must
+# carry the tables rather than the notes that stand in for them.
+#
+# No deploy job either. Pages serves this repository from the `main` branch at `/docs`
+# (`build_type: legacy`), so publishing is GitHub's own `pages-build-deployment`. An
+# `actions/deploy-pages` job would need the Pages source flipped to "GitHub Actions" first, and
+# would fail on every run until it was.
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Run tests
+        run: pytest
