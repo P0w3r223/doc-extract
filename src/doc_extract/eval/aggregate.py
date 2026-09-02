@@ -153,13 +153,27 @@ class Report:
     overall: Tally
     by_field: tuple[tuple[str, Tally], ...]
     by_group: tuple[tuple[str, Tally], ...]
-    by_tier: tuple[tuple[str, Tally], ...]
-    by_template: tuple[tuple[str, Tally], ...]
+    #: One tally table per axis the corpus varies, in the order it declares them — see
+    #: `dataset.Case.facets`. A generated corpus produces exactly `tier` then `template`, which is
+    #: why the two properties below still answer and why the 24 committed reports do not move.
+    by_facet: tuple[tuple[str, tuple[tuple[str, Tally], ...]], ...]
     failures: tuple[tuple[str, int], ...]
     stop_reasons: tuple[tuple[str, int], ...]
     usage: Usage
     attempts: int
     repairs: int
+
+    def facet(self, name: str) -> tuple[tuple[str, Tally], ...]:
+        """One axis's table, or nothing where this corpus does not vary that axis."""
+        return dict(self.by_facet).get(name, ())
+
+    @property
+    def by_tier(self) -> tuple[tuple[str, Tally], ...]:
+        return self.facet("tier")
+
+    @property
+    def by_template(self) -> tuple[tuple[str, Tally], ...]:
+        return self.facet("template")
 
     @property
     def unsupported_fields(self) -> tuple[str, ...]:
@@ -207,8 +221,7 @@ def summarise(
         overall=tally(results),
         by_field=by_field,
         by_group=by_group,
-        by_tier=_grouped(scored, lambda item: item.score.tier),
-        by_template=_grouped(scored, lambda item: item.score.template),
+        by_facet=_by_facet(scored),
         failures=_counted(item.prediction.failure for item in scored),
         stop_reasons=_counted(item.prediction.stop_reason for item in scored),
         usage=sum((item.prediction.usage for item in scored), Usage()),
@@ -224,6 +237,28 @@ def _ordered_groups() -> tuple[fields.Group, ...]:
         if field.group not in seen:
             seen.append(field.group)
     return tuple(seen)
+
+
+def _by_facet(scored: Sequence[Scored]) -> tuple[tuple[str, tuple[tuple[str, Tally], ...]], ...]:
+    """A tally table per axis, over the axes the scored documents actually declare.
+
+    In order of first appearance, like the tables themselves and for the same reason: a corpus
+    declares its axes in the order it means them to be read, and sorting would put an arm before
+    the control it is read against.
+
+    **A document missing an axis another document has is grouped under the empty string, not
+    dropped.** The alternative is a per-axis table whose support silently differs from the report's
+    document count, which is the coverage failure this module asserts against everywhere else.
+    """
+    names: list[str] = []
+    for item in scored:
+        for name, _ in item.score.facets:
+            if name not in names:
+                names.append(name)
+    return tuple(
+        (name, _grouped(scored, lambda item, name=name: item.score.facet(name)))
+        for name in names
+    )
 
 
 def _grouped(scored: Sequence[Scored], key) -> tuple[tuple[str, Tally], ...]:

@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import zlib
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,8 +48,15 @@ class Case:
     """One document of the corpus: where it is, what it hashes to, and how to read either half."""
 
     doc_id: str
-    tier: str
-    template: str
+    #: The axes this corpus varies, in the order it declares them, as `(name, value)` pairs.
+    #:
+    #: **A pair rather than two named columns, because the axes are a property of the corpus and
+    #: not of this class.** A generated corpus varies difficulty and layout and calls them `tier`
+    #: and `template`; `degrade/` already repurposes `template` to mean *which scanner rung*,
+    #: which is the tell that the column was a slot all along. A corpus of documents nobody
+    #: generated has neither and wants others — who issued it, whether it is a scan — and the
+    #: report groups by whatever is here rather than by two names fixed in this file.
+    facets: tuple[tuple[str, str], ...]
     seed: int
     directory: Path
     xml: str
@@ -56,6 +64,19 @@ class Case:
     xml_sha256: str
     pdf_sha256: str
     pages: int
+
+    def facet(self, name: str) -> str:
+        """One axis's value, or the empty string where this corpus does not vary that axis."""
+        return dict(self.facets).get(name, "")
+
+    @property
+    def tier(self) -> str:
+        """The difficulty band, for the corpora that have one. Empty where a corpus has none."""
+        return self.facet("tier")
+
+    @property
+    def template(self) -> str:
+        return self.facet("template")
 
     @property
     def xml_path(self) -> Path:
@@ -179,9 +200,8 @@ def _rows(manifest: Path) -> Iterator[dict[str, Any]]:
 def _case(row: dict[str, Any], directory: Path) -> Case:
     return Case(
         doc_id=row["doc_id"],
-        tier=row["tier"],
-        template=row["template"],
-        seed=row["seed"],
+        facets=_facets(row),
+        seed=_seed(row),
         directory=directory,
         xml=row["xml"],
         pdf=row["pdf"],
@@ -189,6 +209,35 @@ def _case(row: dict[str, Any], directory: Path) -> Case:
         pdf_sha256=row["pdf_sha256"],
         pages=row["pages"],
     )
+
+
+def _facets(row: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    """The row's axes, declared or inferred.
+
+    A manifest may name its axes outright — `"facets": {"issuer": "...", "legibility": "..."}` —
+    and a generated one does not, so `tier` and `template` are read as the two axes it varies. The
+    inference is here rather than in the generator so that the 24 committed runs keep rendering the
+    same two tables from the same manifests, which is the check that this generalisation was free.
+    """
+    declared = row.get("facets")
+    if declared is not None:
+        return tuple((str(name), str(value)) for name, value in declared.items())
+    return tuple(
+        (name, str(row[name])) for name in ("tier", "template") if row.get(name) is not None
+    )
+
+
+def _seed(row: dict[str, Any]) -> int:
+    """The seed the generator used, or one derived from the document's name.
+
+    A document nobody generated has no seed, and `eval/run.py` gives every task one — `noisy` and
+    `corrupt` need it to be reproducible. Deriving it from `doc_id` the same way `synth/corpus.py`
+    derives its own keeps every baseline runnable on every corpus, which is this project's rule
+    that a baseline with its own code path is measuring its own code path. The provenance block
+    says which corpora carry a derived seed, so nobody reads one as the generator's.
+    """
+    recorded = row.get("seed")
+    return int(recorded) if recorded is not None else zlib.crc32(row["doc_id"].encode("utf-8"))
 
 
 def _provenance(directory: Path) -> dict[str, Any]:

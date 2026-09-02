@@ -67,11 +67,23 @@ class DocumentScore:
     """One document's outcomes, plus the facts about the run that the report groups them by."""
 
     doc_id: str
-    tier: str
-    template: str
+    #: The axes the report groups this document by — see `dataset.Case.facets`. Carried as pairs
+    #: rather than as two named columns so that a corpus can declare the axes it actually varies.
+    facets: tuple[tuple[str, str], ...]
     failure: FailureClass
     predicted: bool
     results: tuple[Result, ...]
+
+    def facet(self, name: str) -> str:
+        return dict(self.facets).get(name, "")
+
+    @property
+    def tier(self) -> str:
+        return self.facet("tier")
+
+    @property
+    def template(self) -> str:
+        return self.facet("template")
 
     @property
     def exact(self) -> bool:
@@ -104,8 +116,7 @@ def judge(
     prediction: Invoice | None,
     *,
     doc_id: str,
-    tier: str,
-    template: str,
+    facets: tuple[tuple[str, str], ...] = (),
     failure: FailureClass,
 ) -> DocumentScore:
     """One document end to end: the comparison, plus how the extraction itself ended.
@@ -116,8 +127,7 @@ def judge(
     """
     return DocumentScore(
         doc_id=doc_id,
-        tier=tier,
-        template=template,
+        facets=facets,
         failure=failure,
         predicted=prediction is not None,
         results=compare(gold, prediction),

@@ -105,7 +105,7 @@ def test_gold_with_a_repeated_key_is_refused(invoice):
 def test_judge_records_how_the_extraction_ended(invoice):
     score = judge(
         invoice, None,
-        doc_id="clean-0000", tier="clean", template="classic",
+        doc_id="clean-0000", facets=(("tier", "clean"), ("template", "classic")),
         failure=FailureClass.TRUNCATED,
     )
     assert score.failure is FailureClass.TRUNCATED
@@ -114,12 +114,12 @@ def test_judge_records_how_the_extraction_ended(invoice):
 
 
 def test_exact_means_every_field_including_the_absent_ones(invoice):
-    perfect = judge(invoice, invoice, doc_id="d", tier="t", template="c",
+    perfect = judge(invoice, invoice, doc_id="d", facets=(("tier", "t"), ("template", "c")),
                     failure=FailureClass.NONE)
     off_by_a_cent = invoice.model_copy(
         update={"total_gross": invoice.total_gross + Decimal("0.01")}
     )
-    nearly = judge(invoice, off_by_a_cent, doc_id="d", tier="t", template="c",
+    nearly = judge(invoice, off_by_a_cent, doc_id="d", facets=(("tier", "t"), ("template", "c")),
                    failure=FailureClass.NONE)
 
     assert perfect.exact is True
