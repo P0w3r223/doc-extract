@@ -1525,7 +1525,7 @@ def build() -> str:
     runs = baselines(corpus)
     scored_fields = len(fields.FIELDS)
 
-    return TEMPLATE.format(
+    page = TEMPLATE.format(
         url=URL,
         repo=REPO,
         commit=head_commit(),
@@ -1568,6 +1568,31 @@ def build() -> str:
         baseline_count=len(runs),
         scored_fields=scored_fields,
         field_instances=runs[0]["support"] if runs else 0,
+    )
+    return _scrollable_tables(page)
+
+
+def _scrollable_tables(page: str) -> str:
+    """Put every table in a box that scrolls, so the page itself never does.
+
+    On a 375px phone this page's content box is 335px, and five of its thirteen tables are
+    wider than that — the widest, fourteen columns of per-baseline figures, is 448px, which
+    is what dragged the whole document 93px sideways. A table cannot be made narrower than
+    its columns need, so the box around it scrolls instead, exactly as `.chart-wrap` and
+    `pre` already do here.
+
+    Applied to the assembled page rather than at each of the thirteen call sites, because
+    the tables are written as literal `<table>` strings scattered through this file and the
+    fourteenth will be too. A rule the writer has to remember is a rule that gets forgotten;
+    this one cannot be. Every table here is a bare `<table>` with no attributes and none is
+    nested, which is what makes one substitution safe — `test_site_tables_scroll` asserts
+    both, so a table that stopped being either would fail rather than silently escape.
+    """
+    return re.sub(
+        r"<table>.*?</table>",
+        lambda match: f'<div class="table-wrap">{match.group(0)}</div>',
+        page,
+        flags=re.DOTALL,
     )
 
 
@@ -1710,6 +1735,7 @@ figcaption {{ color: var(--muted); font-size: 0.85rem; margin-top: 0.35rem; }}
 .chart .range-dot {{ fill: var(--accent); }}
 .chart .range-dot.high {{ fill: var(--accent); opacity: 0.55; }}
 
+.table-wrap {{ overflow-x: auto; }}
 table {{ border-collapse: collapse; width: 100%; font-size: 0.92rem; }}
 th, td {{ text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }}
 th {{ font-weight: 600; color: var(--muted); font-size: 0.82rem; }}
