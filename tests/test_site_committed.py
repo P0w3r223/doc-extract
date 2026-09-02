@@ -132,6 +132,27 @@ def test_site_tables_scroll():
     assert ".table-wrap {{ overflow-x: auto; }}" in build_index.TEMPLATE
 
 
+@pytest.mark.skipif(not PAGE.exists(), reason="the site has not been built in this checkout")
+def test_the_way_back_is_a_page_a_reader_can_open():
+    """The one link off this page has to lead somewhere a visitor can actually reach.
+
+    It did not. The footer pointed at `P0w3r223/current_projects`, the index repository, which is
+    private — so the only route from this page to the rest of the work answered a stranger with a
+    404. That is worse than having no link at all: a dead way back reads as a portfolio that has
+    been taken down, rather than as a page that simply stands alone.
+
+    The public index is the profile README, so the footer points at the profile.
+    """
+    import build_index
+
+    committed = PAGE.read_text(encoding="utf-8")
+
+    assert "current_projects" not in committed, (
+        "the index repository is private — a link to it is a 404 for every reader"
+    )
+    assert f'href="{build_index.PROFILE}"' in committed
+
+
 def test_a_table_is_wrapped_wherever_it_is_written():
     """The mechanism, on both shapes this file writes: one line, and opened across several."""
     import build_index
