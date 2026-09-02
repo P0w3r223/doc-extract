@@ -197,8 +197,10 @@ def baselines(corpus: list) -> list[dict[str, object]]:
                         gold[record.doc_id],
                         record.parse(),
                         doc_id=record.doc_id,
-                        tier=tiers[record.doc_id],
-                        template=templates[record.doc_id],
+                        facets=(
+                            ("tier", tiers[record.doc_id]),
+                            ("template", templates[record.doc_id]),
+                        ),
                         failure=FailureClass(record.failure),
                     ),
                 )
@@ -330,7 +332,10 @@ def _summary(directory, gold: dict):
                 prediction=record,
                 score=judge(
                     gold[record.doc_id].invoice, record.parse(), doc_id=record.doc_id,
-                    tier=gold[record.doc_id].tier, template=gold[record.doc_id].template,
+                    facets=(
+                        ("tier", gold[record.doc_id].tier),
+                        ("template", gold[record.doc_id].template),
+                    ),
                     failure=FailureClass(record.failure),
                 ),
             )
@@ -358,7 +363,7 @@ def _study(corpus: list, predictions_path, severity: Severity) -> detector.Study
         document = gold[record.doc_id]
         score = judge(
             document.invoice, record.parse(), doc_id=record.doc_id,
-            tier=document.tier, template=document.template,
+            facets=(("tier", document.tier), ("template", document.template)),
             failure=FailureClass(record.failure),
         )
         verdicts.append(detector.verdict(score, record.parse(), severity=severity))
@@ -492,8 +497,9 @@ def _wrong_values(directory, gold: dict) -> int:
             continue
         document = gold[record.doc_id]
         score = judge(
-            document.invoice, invoice, doc_id=record.doc_id, tier=document.tier,
-            template=document.template, failure=FailureClass(record.failure),
+            document.invoice, invoice, doc_id=record.doc_id,
+            facets=(("tier", document.tier), ("template", document.template)),
+            failure=FailureClass(record.failure),
         )
         total += sum(1 for row in score.results if row.outcome in WRONG)
     return total
@@ -515,8 +521,9 @@ def _grounding_by_rung(directory, cases: dict, gold: dict) -> dict[str, collecti
             continue
         document = gold[record.doc_id]
         score = judge(
-            document.invoice, invoice, doc_id=record.doc_id, tier=document.tier,
-            template=document.template, failure=FailureClass(record.failure),
+            document.invoice, invoice, doc_id=record.doc_id,
+            facets=(("tier", document.tier), ("template", document.template)),
+            failure=FailureClass(record.failure),
         )
         wrong = {(row.field, row.key) for row in score.results if row.outcome in WRONG}
         for row in ground(cases[record.doc_id].source(), invoice):

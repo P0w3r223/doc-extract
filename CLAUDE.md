@@ -382,7 +382,7 @@ Two of them are load-bearing for how anything new here gets written, so they are
 before a first substantial change: *The headline answer* says why `ground/` exists at all, and
 *What the gate buys* says what the four signals are for.
 
-795 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+803 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

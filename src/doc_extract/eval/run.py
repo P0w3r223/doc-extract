@@ -275,8 +275,7 @@ def _judge(case: Case, record: Prediction) -> scorer.DocumentScore:
         case.gold(),
         record.parse(),
         doc_id=case.doc_id,
-        tier=case.tier,
-        template=case.template,
+        facets=case.facets,
         failure=FailureClass(record.failure),
     )
 
@@ -285,8 +284,7 @@ def _orphan(record: Prediction) -> scorer.DocumentScore:
     """A prediction for a document the corpus does not contain: no gold, therefore no outcomes."""
     return scorer.DocumentScore(
         doc_id=record.doc_id,
-        tier=record.tier,
-        template=record.template,
+        facets=(("tier", record.tier), ("template", record.template)),
         failure=FailureClass(record.failure),
         predicted=record.succeeded,
         results=(),
