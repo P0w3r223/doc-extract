@@ -1385,7 +1385,10 @@ def _vision_arm_paragraph(row: dict[str, object]) -> str:
     #: The claim that makes a zero a defence result rather than arithmetic — and the one sentence
     #: here that needs the corpus, so it is fenced on its own rather than with the paragraph.
     ink = (
-        f" {CORPUS_DEPENDENT}<strong>{reached} of those {row['documents']} carried their payload "
+        #: The separating space sits *inside* the fence. Outside it, it is text the comparison keeps
+        #: on the committed page and the corpus-free render never writes at all — a one-character
+        #: difference that fails the staleness check for no reason a commit caused.
+        f"{CORPUS_DEPENDENT} <strong>{reached} of those {row['documents']} carried their payload "
         f"as ink on a page it looked at.</strong> The rest are the white-ink placement the scanner "
         f"had already erased, where a rate is not evidence of anything."
         f"{CORPUS_DEPENDENT_END}"
@@ -1412,10 +1415,13 @@ def _selectivity(curve: object) -> str:
     that made it false — the same failure two earlier reviews caught elsewhere on this page.
     """
     if not curve:
-        return (  # pragma: no cover — the composed corpus has not been built here
+        #: Fenced for the reason the block it replaces is: see `_reach_section`.
+        return (
+            f'{CORPUS_DEPENDENT}\n'
             '<p class="note">Grounding resolves a value against the page\'s text, so the gate\'s '
             'curve on this corpus needs the pages. Build it with <code>python -m '
-            'doc_extract.degrade --attacked</code>.</p>'
+            'doc_extract.degrade --attacked</code>.</p>\n'
+            f'{CORPUS_DEPENDENT_END}'
         )
     row: dict[str, object] = curve  # type: ignore[assignment]
     top, ungated = row["accuracy"], row["ungated"]
@@ -1462,10 +1468,17 @@ def _reach_section(reach: object) -> str:
     would otherwise render a page that disagrees with the committed one.
     """
     if not reach:
-        return (  # pragma: no cover — the composed corpus has not been built here
+        #: Fenced like the table it stands in for, and that is the whole of the requirement: what
+        #: replaces a corpus-dependent block is corpus-dependent too. Left outside the fence it
+        #: survived `_comparable` on one side of the comparison and nothing on the other, so the
+        #: staleness check failed in every checkout without `data/attacked-scanned` — which is
+        #: every CI run, and is how this went unnoticed until there was one.
+        return (
+            f'{CORPUS_DEPENDENT}\n'
             '<p class="note">The reach table is a fact about pixels and no committed artifact '
             'records pixels. Build the corpus with <code>python -m doc_extract.degrade '
-            '--attacked</code> to render it here.</p>'
+            '--attacked</code> to render it here.</p>\n'
+            f'{CORPUS_DEPENDENT_END}'
         )
     rows = "".join(
         f'<tr><th><code>{html.escape(str(row["placement"]))}</code></th>'
