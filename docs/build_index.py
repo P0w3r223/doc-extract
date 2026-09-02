@@ -51,6 +51,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "index.html"
 URL = "https://p0w3r223.github.io/doc-extract/"
 REPO = "https://github.com/P0w3r223/doc-extract"
+#: The profile, whose README is the portfolio index a reader can actually reach. The footer used to
+#: point at `P0w3r223/current_projects`, which is the index repository and is **private** — so the
+#: one link off this page answered a visitor with a 404. A dead way back is worse than none.
+PROFILE = "https://github.com/P0w3r223"
 
 BAR_X, BAR_W, ROW_H = 150.0, 500.0, 26.0
 
@@ -1528,6 +1532,7 @@ def build() -> str:
     page = TEMPLATE.format(
         url=URL,
         repo=REPO,
+        profile=PROFILE,
         commit=head_commit(),
         foreign_arms=foreign_arms(),
         xsd_bytes=f"{facts['bytes']:,}".replace(",", " "),
@@ -1990,7 +1995,7 @@ depends on them.</p>
 <footer>
   <p><a href="{repo}">Source on GitHub</a> &middot; built from the tree after
   <code>{commit}</code> &middot; part of a
-  <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
+  <a href="{profile}">portfolio</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by
   <code>docs/build_index.py</code>.</p>
