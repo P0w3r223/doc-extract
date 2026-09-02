@@ -80,7 +80,13 @@ The two survivors are `seller.name` and `buyer.name`, and the reason is instruct
 the words a value *has*, so a name with its legal form dropped is fully grounded — every word it
 kept is on the page. `corrupt.INVISIBLE_KINDS` already declares `name_truncated` invisible to
 arithmetic; it is invisible to token coverage too. Catching it needs a completeness check — does the
-page carry adjacent words the value omitted? — which is not built.
+page carry adjacent words the value omitted? — and M7k built one, which **still does not catch
+this**: on `noisy`, the baseline that injects `name_truncated` deliberately, it fires on 0 of its 11
+wrong grounded text values. (A different run and a different 11 from the table above, whose
+`grounding` column is `claude-haiku-4-5`'s.) The check asks whether the page
+wraps a value further down its *column*, and it declines to ask at the head of a left-aligned block,
+which is exactly where a party's name is printed. See *A value that stops where the printing does
+not* for the bound and the 72 gold false alarms that put it there.
 
 Two further cautions the study prints beside its own numbers:
 
@@ -248,9 +254,10 @@ high-confidence coverage at 32.3 %. It did not degrade — it inverted, and *sil
 ungrounded correct value is indistinguishable from an ungrounded fabricated one. **M7g gave it a
 third verdict** (`Support.NO_TEXT`, *I could not ask*), so those values leave the curve instead of
 filling it and the count is printed above every affected `gate.md`. The alarms are gone; the signal
-is not back. Of the gate's three signals only the arithmetic survives a scan — the place
-contention M7j added needs page text as much as grounding does — and M6 already showed
-that is the one an adversary can satisfy on purpose — so what M7g bought is a gate that reports
+is not back. Of the gate's four signals only the arithmetic survives a scan — the place contention
+M7j added and the completeness check M7k added both need page text as much as grounding does — and
+M6 already showed that is the one an adversary can satisfy on purpose — so what M7g bought is a
+gate that reports
 having **no opinion** where it used to report a wrong one, over the 67.7 % of this corpus it cannot
 see into.
 
@@ -486,17 +493,18 @@ instead of dropping them. Two arms, because the three rules divide into two clai
 
 ## What the gate buys
 
-`decide/` turns the three signals into four confidence levels by fixed rules — no weight was fitted
+`decide/` turns the four signals into four confidence levels by fixed rules — no weight was fitted
 on the corpus it is measured against, which is why the curve has four points and not a smooth sweep.
 Grounding decides the level; a hard rule that *names* a field and a **place contention** each demote
 it one step, and neither can override grounding or compound with the other — a hard rule's
-field-level precision is 7.4 % and a contention's is capped near a half by construction. On
-`claude-haiku-4-5`:
+field-level precision is 7.4 % and a contention's is capped near a half by construction. A value the
+page **carries more of** lands at `low` rather than one step down, because that is the claim
+`PARTIAL` makes and the two are the same claim. On `claude-haiku-4-5`:
 
 | accept down to | route | coverage | accuracy | leaked |
 |---|---|---:|---:|---:|
 | `high` | accept | 89.7 % | **99.96 %** | 2 |
-| `medium` | review | 98.9 % | 99.8 % | 12 |
+| `medium` | review | 98.9 % | 99.8 % | 11 |
 | `low` | review | 99.5 % | 99.2 % | 49 |
 | `none` | reject | 100 % | 98.7 % | 77 |
 
@@ -651,6 +659,132 @@ the two are two views of one injected row and neither is the only field-level ca
 **Two limits.** It needs page text, so it is as silent as grounding on a scan's two text-less rungs.
 And it is not the wrong-column detector: `pattern`'s 292 wrong values still produce **0** catches,
 because a regex reader that lifts one figure out of one column asserts nothing else that wants it.
+
+## A value that stops where the printing does not (M7k)
+
+M7h measured a blind spot and named the check that would close it, and it stayed open through two
+sub-milestones: **273 of `pattern`'s 292 wrong values still ground**, and the dominant failure is a
+description that stops early. The obvious question — *did the value claim the whole cell it sat in?*
+— is blind to it, because **161 of the 162** wrong descriptions that ground claim their entire
+cell. (M7h recorded that as 100 %; re-measured in M7k it is one short — `multi_page-0010`'s
+eleventh description, the bare word `kg` — and this project's own rule is that `100 %` means
+exactly 100 %.) The renderer wraps a description across lines, each line becomes its own cell, and
+the reader took one whole cell of a two-cell run.
+
+`ground/complete.py` asks the page instead, in the form ADR-0002 scoped: **in a table, a continuation
+line carries only the wrapping column while a new row carries all of them.** A value is cut short
+when the nearest cell below it in its column sits on a line carrying fewer cells than its own row.
+
+**Two bounds, each measured by removing it and counting what the gold control then costs:**
+
+| bound removed | `synthetic` | `foreign` | `attacked` | `scanned` | `attacked-scanned` |
+|---|---:|---:|---:|---:|---:|
+| the line below must be **narrower** than the row | 72 | 72 | 84 | 72 | 42 |
+| the value's last cell must have something **to its left** | 0 | **72** | 0 | 0 | 0 |
+| neither (the shipped rule) | **0** | **0** | **0** | **0** | **0** |
+
+The second bound is invisible on four corpora and load-bearing on the fifth, which is worth saying
+plainly: **`data/foreign` earned its keep here as a control rather than as the held-out test it was
+built to be.** What it supplies is the `statement` dialect's party block — a name beside a
+right-hand label, the address underneath — which is a left-aligned *block*, not a table row, and
+the label on the right is precisely what makes it look like one. Asking about the right-hand side
+as well gives the identical control and the identical catch everywhere here, so it is left out.
+
+**The vertical gap does not discriminate, and it was the first thing tried.** It is **0.30**
+cell-heights for every one of `pattern`'s truncations and **0.32** for every one of the 72 gold
+values the flank bound rescues. A wrap and the next field of a block sit at the same leading.
+
+**Zero false positives on the gold of all five corpora** — 1238, 1238, 1330, 404 and 637 text values
+— and zero on every correct value of all 24 committed runs. The table below is the `completeness`
+row of each committed `gate.md`: the denominator is that row's **TP + FN**, the wrong values the
+signal was actually scored against, so every cell is readable off a committed file and the
+arithmetic checks:
+
+| run | wrong values scored | caught | false alarms |
+|---|---:|---:|---:|
+| `pattern` | 292 | **125** | 0 |
+| `attack-pattern` | 331 | **107** | 0 |
+| `scanned-pattern` | 156 | **73** | 0 |
+| `attacked-scanned-pattern` | 228 | **53** | 0 |
+| `attack-gullible` | 176 | 1 | 0 |
+| the other 19 committed runs | 1837 | 0 | 0 |
+
+Precision is **100 %** on the five runs that give it a denominator and `—` on the other 19, nine of
+which have nothing wrong to catch at all. **That denominator is not the same as "wrong values" full
+stop**, and the difference is worth naming rather than smoothing: those 19 runs assert 2645 wrong
+values between them, and 808 of those never reach the curve at all — they sit on a scan with no
+text layer, or in a field grounding declines to ask about. The signal is silent on them for the
+same reason grounding is, and counting them in would credit it with a blindness it shares with
+every other signal here rather than one of its own.
+
+**And on a real model's errors it fires on nothing, which is the honest shape of this result.**
+`claude-haiku-4-5` is 0 of 77 on its own page and 0 of 141 on the foreign one: none of what it gets
+wrong is a value the page went on printing. The blind spot was measured on a regex baseline and the
+fix is measured on the same baseline. Whether a model truncates a wrapped description is a question
+a real held-out set would answer and this corpus cannot — which is the same sentence M7i had to
+write about the wrong-column read before a paid arm supplied the population, and it is why this is
+reported as a closed *gap* rather than a closed *question*.
+
+**What it still cannot see is one line deep.** The flank question is asked of the value's last cell,
+so a reading that already ran past the row onto a wrap line is invisible — a wrap line has nothing
+to its left. Asking it of the value's **row** instead would see that kind too and fails the control
+everywhere: 133 gold values on `data/synthetic`, 42 on `data/foreign`, 105 on `data/attacked`, 70
+and 63 on the two scanned ones. The mechanism is ADR-0002's ambiguity in its sharpest form — the
+`classic` layout centres a description on its row, so a **complete** three-line value's tail is
+followed by the *next row's head*, which is a narrower line in the same column and structurally
+identical to a continuation. Bounding that variant to the wrap adjacent to the row restores the
+control and catches **not one wrong value more**, on any of the 29 corpora and runs measured.
+
+**The control found a defect in the layer underneath, exactly as M7h did.** The first version fired
+on 15 gold values, and the shape was not the rule's fault: `place.Sheet._take` matched a value's
+words as a **multiset**, so a three-line description anchored on its head reached upwards first and
+took its last word from the row *above* — `konstrukcja` belonging to row 1, claimed by row 2. Fully
+grounded, spans pointing at a row the value was not on, and invisible until something asked whether
+the page carried more of the value than the reading took. `_take` matches a **sequence** now, walking
+the region top to bottom with the anchor saying where in the value the walk is. No correct value on
+any of the five corpora or 24 runs stops being grounded, and the 15 go to zero.
+
+**And on the runs where it fires, the gate moves further than anything else this project has added
+to it.** `decide/` routes a cut-short value `LOW` — the same claim `Support.PARTIAL` makes — and
+because grounding was silent on exactly these values, every demotion is one the gate did not
+already have:
+
+| run | `high` leaked | `high` accuracy | `high` coverage |
+|---|---|---|---|
+| `pattern` | 54 → **0** | 98.5 % → **100 %** | 69.0 % → 68.0 % |
+| `scanned-pattern` | 31 → **0** | 96.4 % → **100 %** | 52.1 % → 50.3 % |
+| `attack-pattern` | 79 → **7** | 98.2 % → 99.8 % | 73.7 % → 72.5 % |
+| `attacked-scanned-pattern` | 18 → **7** | 98.7 % → 99.5 % | 48.9 % → 48.5 % |
+| `attack-gullible` | 48 → 47 | 98.5 % → 98.6 % | unchanged |
+
+On `pattern` and `scanned-pattern` the auto-accepted bucket leaks **nothing at all**, for one and
+two points of coverage respectively, and the union of the four signals reaches **100 % recall** —
+every wrong asserted value on those runs is flagged by something, where 54 and 31 of them used to
+pass. Set against M7j, whose signal moved a single curve row across 24 runs, that is a large
+operational result.
+
+**It is also a result about a regex reader, and the two sentences belong together.** These are the
+four `pattern` runs and one `gullible` control; the model arms do not move because the signal does
+not fire on them. What a completeness check buys a *model* is a question this corpus cannot put.
+
+Like grounding and contention it needs page text, so it is silent on a scan's two text-less rungs,
+and `selective_report` derives per run what the fourth signal added beyond the other three rather
+than leaving it to this paragraph.
+
+**It also moved `attack.md`, which the two previous signals did not.** On `attack-gullible` — the
+compliant control, a reader that obeys every instruction it finds — the successful attacks the gate
+would have **accepted** go **32 → 31**. The mechanism is worth stating because nothing in
+`ground/complete.py` knows anything about attacks: the payload is printed *inside an item's
+description cell*, the compliant reader obeys it and writes the attacker's company as
+`seller.name`, and the page goes on printing that cell below the line the value was lifted from. So
+the attacker's own name reads as cut short, and the document routes `review` on that one field out
+of 49. **The attacker is caught by having had to print the payload somewhere, and by having chosen a
+column that wraps.**
+
+It is not a defence, and *What injection buys the attacker* below is unchanged: 15 of the 16
+`seller_swap` attacks still leak, and a payload in the `Adnotacje` block or the footer is untouched.
+It is the first time any signal here has taken an injected payload out of the accepted bucket at
+all, which is worth one sentence and not more.
 
 ## What injection buys the attacker, and what the gate does not do about it
 

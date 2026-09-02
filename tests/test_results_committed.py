@@ -145,8 +145,13 @@ def _scored(records, gold):
                 gold[record.doc_id].invoice,
                 record.parse(),
                 doc_id=record.doc_id,
-                tier=gold[record.doc_id].tier,
-                template=gold[record.doc_id].template,
+                #: The two axes a generated corpus varies, in the order it declares them — which is
+                #: what makes this check the acceptance criterion for generalising the report's
+                #: axes: render them as facets and every committed report must stay byte-identical.
+                facets=(
+                    ("tier", gold[record.doc_id].tier),
+                    ("template", gold[record.doc_id].template),
+                ),
                 failure=FailureClass(record.failure),
             ),
         )

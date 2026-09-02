@@ -92,7 +92,7 @@ def _with_wrong(total: int, wrong: int) -> str:
 def _signals(curve: Curve) -> str:
     """Each signal alone, before the gate combines them."""
     return "\n".join([
-        "## The three signals, scored apart",
+        "## The four signals, scored apart",
         "",
         "Field-level detectors of a wrong asserted value. They are complements with very different "
         "shapes, and a reader who saw only their combination could not tell which did the work. "
@@ -100,7 +100,9 @@ def _signals(curve: Curve) -> str:
         "printed figure it flags both, because no label-free fact says which of the two is the "
         "intruder. Where the sibling is a correct reading that caps its precision near a half; "
         "where both belong to a row the page never printed, nothing it flags is correct and the "
-        "row below says which of the two this run is.",
+        "row below says which of the two this run is. `completeness` asks the opposite of "
+        "grounding: not whether the value is on the page but whether the page kept printing it "
+        "after the reading stopped.",
         "",
         "| signal | TP | FP | FN | TN | precision | recall |",
         "|---|---:|---:|---:|---:|---:|---:|",
@@ -184,6 +186,7 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
     }
     lines.extend(_grounding_misses(curve))
     lines.extend(_contention_added(curve))
+    lines.extend(_completeness_added(curve))
     if "arithmetic" in silent:
         lines.append(
             f"* **`arithmetic` flagged nothing at all**, while {curve.wrong} asserted value(s) "
@@ -192,7 +195,7 @@ def _caveats(curve: Curve, *, run: RunMeta) -> str:
             "like from the arithmetic's side."
         )
     lines.append(
-        "* The confidence levels are produced by fixed rules over the three signals, not by "
+        "* The confidence levels are produced by fixed rules over the four signals, not by "
         "weights fitted to this corpus. That is why there are four and not a smooth sweep: a "
         "fitted score would draw a better curve here and would be measuring its own training set."
     )
@@ -226,6 +229,35 @@ def _contention_added(curve: Curve) -> list[str]:
         "fields that share a printed figure, where an arithmetic violation names the whole `lines` "
         "collection; the two catch overlapping populations and only the narrower one says *which* "
         "values are involved."
+    ]
+
+
+def _completeness_added(curve: Curve) -> list[str]:
+    """What the fourth signal contributed **beyond** the other three, from this run's own counts.
+
+    Derived rather than settled in prose for the same reason `_contention_added` is: the signal
+    exists because grounding is blind to a description that stops early, and whether that blindness
+    was the *only* thing standing between the gate and those values is a question about a
+    particular run. On a run where the arithmetic happened to accuse the same rows, the answer is
+    that it added attribution and not routing, and a sentence in a docstring would go on claiming
+    otherwise.
+    """
+    flagged = [row for row in curve.judged if row.cut_short]
+    if not flagged:
+        return []
+    alone = [row for row in flagged if not row.ungrounded and not row.accused and not row.contended]
+    wrong_alone = sum(1 for row in alone if row.wrong)
+    verdict = (
+        f"{len(alone)} of them ({wrong_alone} wrong) carried **no** other signal, so the gate "
+        "would have accepted them"
+        if alone else
+        "**every one of them was already flagged by another signal**, so the gate reached the same "
+        "verdict without it"
+    )
+    return [
+        f"* `completeness` flagged {len(flagged)} asserted value(s), and {verdict}. It is the one "
+        "signal aimed at grounding's standing blind spot: a value that stops early is a real "
+        "string, in the right place, and only the page's own wrapping says it is not the whole one."
     ]
 
 

@@ -1,4 +1,4 @@
-"""Per-field confidence, from the three signals this project measured rather than assumed.
+"""Per-field confidence, from the four signals this project measured rather than assumed.
 
 `eval/detector.py` and `ground/` each answered part of "is this value right", and the measurements
 say exactly how to combine them — which is the only reason this module is shaped the way it is:
@@ -17,10 +17,18 @@ say exactly how to combine them — which is the only reason this module is shap
   Precision is therefore about a half by construction — six times the arithmetic's field-level
   figure and nowhere near grounding's — so it demotes on the same terms as a hard rule and for the
   same reason.
+* **A value the page carries more of is a partial reading grounding could not see.**
+  `ground/complete.py` asks whether the column wraps one line further than the reading took it. It
+  fires on a value that is fully grounded — what was read is on the page, in one place — and says
+  the printing did not stop there. That is the same claim `Support.PARTIAL` makes and it lands at
+  the same level, which is why it is the one signal here that does not merely demote a step: a
+  description read down to its first line is not a doubtful value, it is half of one.
 
-**Two demotions do not stack.** A value that is both contended and named by a hard rule falls one
+**Demotions do not stack.** A value that is both contended and named by a hard rule falls one
 level, not two. They are two ways of noticing one kind of failure — a real figure read into the
 wrong field — and compounding them would let the coarser signal borrow the finer one's confidence.
+A value cut short lands at `LOW` whatever else is true of it, for the mirror reason: it is already
+being called a partial reading, and no further signal makes it more so.
 
 **Deterministic, not fitted.** Every rule below is a statement about the signals, and no threshold
 was tuned on the corpus it is measured against. The cost is a coarse ordering — four levels, so the
@@ -52,7 +60,7 @@ from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 
 from doc_extract.eval import detector
-from doc_extract.ground import joint
+from doc_extract.ground import complete, joint
 from doc_extract.ground.resolve import Grounding, Support, resolve
 from doc_extract.schema import invariants
 from doc_extract.schema.invariants import Severity
@@ -109,9 +117,14 @@ class Assessment:
     #: own, and recovering it by prefix-matching `reasons` would go silently all-negative the day a
     #: token is renamed.
     contended: bool = False
+    #: Whether the page wraps this value one line further than the reading took it. Carried
+    #: structurally for the same reason `support` and `contended` are: `eval/selective.py` scores
+    #: each signal on its own, and recovering this one by prefix-matching `reasons` would go
+    #: silently all-negative the day a token is renamed.
+    cut_short: bool = False
     #: Stable tokens naming what drove the verdict, for a report to group by: `ungrounded`,
-    #: `partial:0.60`, `contended`, `rule:lines.net_matches_quantity_times_price`,
-    #: `document:flagged`.
+    #: `partial:0.60`, `cut_short`, `contended`,
+    #: `rule:lines.net_matches_quantity_times_price`, `document:flagged`.
     reasons: tuple[str, ...] = ()
 
     @property
@@ -136,8 +149,10 @@ def assess(document: SourceDocument, invoice: Invoice) -> tuple[Assessment, ...]
     flagged = bool(_hard(invoice))
     groundings = resolve(document, invoice)
     contested = joint.contended(groundings)
+    truncated = complete.cut_short(document, groundings)
     return tuple(
-        _assess(grounding, named=named, flagged=flagged, contested=contested)
+        _assess(grounding, named=named, flagged=flagged, contested=contested,
+                truncated=truncated)
         for grounding in groundings
     )
 
@@ -148,6 +163,7 @@ def _assess(
     named: frozenset[str],
     flagged: bool,
     contested: frozenset[tuple[str, str]],
+    truncated: frozenset[tuple[str, str]],
 ) -> Assessment:
     if not grounding.measured:
         return _unassessed(grounding)
@@ -172,11 +188,21 @@ def _assess(
     #: signal to fire would drop `rule:` from every contended value, and `reasons` exists for a
     #: report to group by — a token that goes missing whenever a second signal agrees would make
     #: the arithmetic look silent on exactly the values two signals accuse.
-    contended = (grounding.field, grounding.key) in contested
+    instance = (grounding.field, grounding.key)
+    cut_short = instance in truncated
+    contended = instance in contested
+    if cut_short:
+        reasons.append("cut_short")
     if contended:
         reasons.append("contended")
     if grounding.field in named:
         reasons.append(f"rule:{grounding.field}")
+    if cut_short:
+        #: `LOW` and not one step down, because the claim is the same one `PARTIAL` makes: the page
+        #: prints more of this value than the reading took. Placed before the other two so that a
+        #: value carrying all three lands where the strongest of them puts it rather than where the
+        #: order of the code happens to.
+        return _at(grounding, Confidence.LOW, reasons, contended=contended, cut_short=True)
     if contended or grounding.field in named:
         return _at(grounding, Confidence.MEDIUM, reasons, contended=contended)
     return _at(grounding, Confidence.HIGH, reasons)
@@ -188,6 +214,7 @@ def _at(
     reasons: list[str],
     *,
     contended: bool = False,
+    cut_short: bool = False,
 ) -> Assessment:
     return Assessment(
         field=grounding.field,
@@ -197,6 +224,7 @@ def _at(
         route=ROUTES[confidence],
         support=grounding.support,
         contended=contended,
+        cut_short=cut_short,
         reasons=tuple(reasons),
     )
 

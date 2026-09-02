@@ -92,8 +92,10 @@ src/doc_extract/
                      # is what stops a name grounding on the other party's ink
     joint.py         # M7j — a reading's values must each get a place of their own; two fields
                      # claiming one printed figure is a contradiction about the page
+    complete.py      # M7k — the page kept printing and the reading stopped; a wrap line carries
+                     # one column where the row carries all of them, and that is what decides
   decide/            # M5 — the runtime gate. Reads a prediction against its page, never the gold
-    confidence.py    # four levels from the three measured signals, and accept / review / reject;
+    confidence.py    # four levels from the four measured signals, and accept / review / reject;
                      # a value it could not check is reviewed, never accepted
   foreign/           # M7 — the same gold on a page whose vocabulary nothing here has seen
     dialect.py       # three Polish label sets, number formats and column orders, as data
@@ -305,8 +307,9 @@ re-run a paid model to be checked would be one too.
    zero false alarms on 11 652 correctly-read fields. Its control is that gold grounds completely
    against its own page — 0 of 5892, which is what caught the first version failing on 14.9 % and
    which every later change to this layer has had to clear. `ground/joint.py` adds a third signal
-   in M7j — a reading's values must each get a place of their own — and `decide/` turns the three
-   into four confidence levels by fixed rules, and `gate` measures the result as a
+   in M7j — a reading's values must each get a place of their own — and `ground/complete.py` a
+   fourth in M7k — the page must not go on printing a value after the reading stopped. `decide/`
+   turns the four into four confidence levels by fixed rules, and `gate` measures the result as a
    coverage–accuracy curve — see *What the gate buys* in `docs/findings.md`.
 6. **Injection suite, attack success rate, trust-boundary ADR.** ✅ `synth/overlay.py` teaches the
    renderer four places a page can carry foreign text — an item description, the `Adnotacje` block, a
@@ -340,14 +343,17 @@ re-run a paid model to be checked would be one too.
    | M7h | `ground/place.py` — a text value is located | the premise was false: the spans held first occurrences, not a place (*Where a grounded value sits*) |
    | M7i | two paid arms over `foreign` ($4.10) | the finding is the **shape**: right value, wrong field, in two independent forms (*What a model reads off an unfamiliar page*) |
    | M7j | `ground/joint.py` — place contention | M7i's population was four mechanisms; only duplication contradicts the page (*Two fields cannot read one figure*) |
+   | M7k | `ground/complete.py` — the wrap the reading did not take | M7h's blind spot closed on the baseline that measured it: **125 of `pattern`'s 292** wrong values at 0 false alarms, `high` leaking **54 → 0** — and the control found the spans were taking the row above (*A value that stops where the printing does not*) |
 
    The vision path is one pipeline rather than two: `images` on the request chooses the modality, and
    the schema, the repair loop with its own budget, the failure taxonomy and the usage accounting are
    the same objects.
 
    **Still open.** A **real held-out set** — the one item in this milestone's own title that is not
-   built, and the only place the question gets asked on documents nobody generated; the
-   continuation-aware **completeness** check in `docs/adr/0002_placement.md`; the wrong-column read
+   built, and the only place the question gets asked on documents nobody generated, and now also the
+   only place M7k's catch could be shown on a model rather than on a regex; the truncation that
+   stopped on a *wrap* line rather than on the row, which M7k measures as costing more than it
+   catches on every corpus here; the wrong-column read
    that asserts nothing else wanting the same figure, which M7j argues is out of `ground/`'s reach
    rather than pending; an adaptive attacker, which no fixed payload set can stand in for; and the
    synthetic↔real gap as an artifact of its own rather than as four sections.
@@ -364,6 +370,7 @@ the section you need; the headline of each is here so that choosing does not req
 | What the gate buys | accept only `high`: 89.7 % coverage at 99.96 %, 2 leaked against 77 | touching `decide/` or `eval/selective.py` |
 | Where a grounded value sits (M7h) | a text value must be found in **one place**; the column discriminates, the reach does not | touching `ground/place.py` or anything that reads `Grounding.spans` |
 | Two fields cannot read one figure (M7j) | place contention: 0 false alarms on every correct reading, and it moves one curve row in 24 | touching `ground/joint.py`, or asking what a third signal bought |
+| A value that stops where the printing does not (M7k) | completeness: **125 of `pattern`'s 292** wrong values at 0 false alarms, and the `high` bucket's leak 54 → **0** — but 0 catches on every model run | touching `ground/complete.py`, or asking why a wrap line cannot be asked about |
 | How much of a reading was the template? (M7b, M7i) | an unfamiliar layout costs `pattern` everything, a small model 1.4 points, a frontier model nothing | touching `foreign/`, or claiming anything about generalisation |
 | What a scan costs (M7c, M7d) | **the gate does not survive a scan; it survives an OCR** | touching `degrade/`, `source/raster.py` or the vision path |
 | What a scan does to an attacked page (M7e–M7g) | gating an attacked scan is still *worse* than not gating, and why | touching `degrade/attacked.py`, or reading a `gate.md` over an attacked corpus |
@@ -373,9 +380,9 @@ the section you need; the headline of each is here so that choosing does not req
 
 Two of them are load-bearing for how anything new here gets written, so they are worth reading
 before a first substantial change: *The headline answer* says why `ground/` exists at all, and
-*What the gate buys* says what the three signals are for.
+*What the gate buys* says what the four signals are for.
 
-778 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+803 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`

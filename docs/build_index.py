@@ -197,8 +197,10 @@ def baselines(corpus: list) -> list[dict[str, object]]:
                         gold[record.doc_id],
                         record.parse(),
                         doc_id=record.doc_id,
-                        tier=tiers[record.doc_id],
-                        template=templates[record.doc_id],
+                        facets=(
+                            ("tier", tiers[record.doc_id]),
+                            ("template", templates[record.doc_id]),
+                        ),
                         failure=FailureClass(record.failure),
                     ),
                 )
@@ -330,7 +332,10 @@ def _summary(directory, gold: dict):
                 prediction=record,
                 score=judge(
                     gold[record.doc_id].invoice, record.parse(), doc_id=record.doc_id,
-                    tier=gold[record.doc_id].tier, template=gold[record.doc_id].template,
+                    facets=(
+                        ("tier", gold[record.doc_id].tier),
+                        ("template", gold[record.doc_id].template),
+                    ),
                     failure=FailureClass(record.failure),
                 ),
             )
@@ -358,7 +363,7 @@ def _study(corpus: list, predictions_path, severity: Severity) -> detector.Study
         document = gold[record.doc_id]
         score = judge(
             document.invoice, record.parse(), doc_id=record.doc_id,
-            tier=document.tier, template=document.template,
+            facets=(("tier", document.tier), ("template", document.template)),
             failure=FailureClass(record.failure),
         )
         verdicts.append(detector.verdict(score, record.parse(), severity=severity))
@@ -492,8 +497,9 @@ def _wrong_values(directory, gold: dict) -> int:
             continue
         document = gold[record.doc_id]
         score = judge(
-            document.invoice, invoice, doc_id=record.doc_id, tier=document.tier,
-            template=document.template, failure=FailureClass(record.failure),
+            document.invoice, invoice, doc_id=record.doc_id,
+            facets=(("tier", document.tier), ("template", document.template)),
+            failure=FailureClass(record.failure),
         )
         total += sum(1 for row in score.results if row.outcome in WRONG)
     return total
@@ -515,8 +521,9 @@ def _grounding_by_rung(directory, cases: dict, gold: dict) -> dict[str, collecti
             continue
         document = gold[record.doc_id]
         score = judge(
-            document.invoice, invoice, doc_id=record.doc_id, tier=document.tier,
-            template=document.template, failure=FailureClass(record.failure),
+            document.invoice, invoice, doc_id=record.doc_id,
+            facets=(("tier", document.tier), ("template", document.template)),
+            failure=FailureClass(record.failure),
         )
         wrong = {(row.field, row.key) for row in score.results if row.outcome in WRONG}
         for row in ground(cases[record.doc_id].source(), invoice):
@@ -1224,9 +1231,9 @@ one of those {unasked} values arrived as a <strong>false alarm on a reading with
 it</strong>. That does not degrade, it <em>inverts</em>, and silently: an ungrounded correct value
 looks exactly like an ungrounded fabricated one. It now answers <em>I could not ask</em>, so those
 values leave the curve rather than filling it, and the count is printed above every affected
-<code>gate.md</code>. {_alarm_verdict(alarms)} <strong>Of the three signals the routing gate is
-built on, only the arithmetic survives a scan</strong> &mdash; place contention needs page text as
-much as grounding does &mdash; and that is the one an adversary can satisfy on
+<code>gate.md</code>. {_alarm_verdict(alarms)} <strong>Of the four signals the routing gate is
+built on, only the arithmetic survives a scan</strong> &mdash; place contention and the
+completeness check need page text as much as grounding does &mdash; and that is the one an adversary can satisfy on
 purpose &mdash; so what changed is that the gate reports having no opinion where it used to report
 a wrong one. A better instrument, and the same missing capability.</p>
 {_grounding_on_a_model(grounding)}
@@ -1927,7 +1934,8 @@ page at all.</p>
     <tr><th>&mdash; a grounding signal that can say <em>there was nothing to look in</em></th><td class="num">built</td></tr>
     <tr><th>&mdash; a paid arm over the <em>foreign</em> corpus</th><td class="num">{foreign_arms}</td></tr>
     <tr><th>&mdash; an adaptive attacker, which no fixed payload set stands in for</th><td class="num">not built</td></tr>
-    <tr><th>&mdash; a check that a grounded value sits where the page would <em>print</em> it</th><td class="num">not built</td></tr>
+    <tr><th>&mdash; a check that a grounded value sits where the page would <em>print</em> it</th><td class="num">built in part &mdash; two fields cannot share one figure, and the page must not go on printing a value after the reading stopped</td></tr>
+    <tr><th>&mdash; the rest of it: a value lifted from the wrong column that nothing else wants</th><td class="num">not built &mdash; needs to know which column holds which field</td></tr>
     <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
 </table>
