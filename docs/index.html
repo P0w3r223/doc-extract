@@ -137,6 +137,7 @@ figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 0.35rem; }
 .chart .range-dot { fill: var(--accent); }
 .chart .range-dot.high { fill: var(--accent); opacity: 0.55; }
 
+.table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
 th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
 th { font-weight: 600; color: var(--muted); font-size: 0.82rem; }
@@ -226,13 +227,13 @@ which gets 42 of 107 documents wrong and so supplies a real,
 unlabelled model-error population. The invariants are run on the <strong>prediction</strong>, never
 on the gold &mdash; the signal has to be available at inference time on a document nobody
 annotated.</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th></th><th class="num">flagged</th><th class="num">silent</th></tr></thead>
   <tbody>
     <tr><th>fields wrong</th><td class="num">32</td><td class="num">10</td></tr>
     <tr><th>fields right</th><td class="num">0</td><td class="num">65</td></tr>
   </tbody>
-</table>
+</table></div>
 <p><strong>Precision 100&nbsp;%, recall 76.2&nbsp;%</strong>, and
 100&nbsp;% of the catches point at a field that is genuinely wrong.</p>
 <p class="note">The recall is not a property of the detector. It is the fraction of that model's
@@ -253,11 +254,11 @@ internally consistent answer is invisible</strong>. The constant baseline sits a
 the rows and the rate blocks offers one &mdash; so those rules are not <em>wrong</em> about it, they
 are <strong>unable to speak</strong>. The <code>stripped</code> baseline is exactly that reading, on
 all 108 documents.</p>
-<table><thead><tr><th></th><th class="num">prevalence</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
+<div class="table-wrap"><table><thead><tr><th></th><th class="num">prevalence</th><th class="num">precision</th><th class="num">recall</th></tr></thead>
 <tbody>
     <tr><th>hard rules</th><td class="num">100&nbsp;%</td><td class="num">&mdash;</td><td class="num">0.0&nbsp;%</td></tr>
     <tr><th>heuristic rules</th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
-</tbody></table>
+</tbody></table></div>
 <p>The one rule that fires is the heuristic whose entire content is <em>no rule could run</em>, and
 it fires on every document, with 0 false positives. The fields
 this reading does keep are <em>missing</em> rather than wrong &mdash; which is why the two hard
@@ -279,14 +280,14 @@ three unfamiliar ones &mdash; other Polish labels for every field, other column 
 and date formats, and block orders that put the totals before the rows. Same seed, same invoices,
 document for document: a difference between the two columns is the <strong>page</strong>, because
 nothing else moved.</p>
-<table><thead><tr><th>baseline</th><th class="num">its own page</th><th class="num">an unfamiliar page</th><th class="num">read at all</th></tr></thead>
+<div class="table-wrap"><table><thead><tr><th>baseline</th><th class="num">its own page</th><th class="num">an unfamiliar page</th><th class="num">read at all</th></tr></thead>
 <tbody>
     <tr><th><code>oracle</code></th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">108 / 108</td></tr>
     <tr><th><code>constant</code></th><td class="num">3.0&nbsp;%</td><td class="num">3.0&nbsp;%</td><td class="num">108 / 108</td></tr>
     <tr><th><code>pattern</code></th><td class="num">86.3&nbsp;%</td><td class="num">0.0&nbsp;%</td><td class="num">0 / 108</td></tr>
     <tr><th><code>claude-haiku-4-5</code></th><td class="num">97.8&nbsp;%</td><td class="num">98.1&nbsp;%</td><td class="num">108 / 108</td></tr>
     <tr><th><code>claude-opus-5</code></th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">108 / 108</td></tr>
-</tbody></table>
+</tbody></table></div>
 <p class="note"><code>pattern</code> did not read the page badly &mdash; it could not <em>begin</em>. Not one of the 108 documents produced an invoice the schema would accept, every one recorded as <code>schema_invalid</code>. The labels it matches are the whole of what it was doing.</p>
 <p class="note">The other two rows are the controls that make the first one mean something. The
 oracle is handed the gold and is unaffected, which says the corpus is scorable and its gold did not
@@ -304,14 +305,14 @@ invoice in a real inbox is frequently a <em>photograph</em> of an invoice, and t
 at all. So a third corpus prints the same gold in the same layout and then scans it, at three rungs
 that each isolate one thing: one keeps a text layer (an OCR assumed perfect), one removes the text
 layer and changes nothing else, and one is what a supplier emails at 150&nbsp;dpi.</p>
-<table><thead><tr><th>baseline</th><th class="num">its own page</th><th class="num">searchable</th><th class="num">rasterised</th><th class="num">scanned</th></tr></thead>
+<div class="table-wrap"><table><thead><tr><th>baseline</th><th class="num">its own page</th><th class="num">searchable</th><th class="num">rasterised</th><th class="num">scanned</th></tr></thead>
 <tbody>
     <tr><th><code>oracle</code></th><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
     <tr><th><code>constant</code></th><td class="num">3.0&nbsp;%</td><td class="num">3.1&nbsp;%</td><td class="num">2.9&nbsp;%</td><td class="num">2.9&nbsp;%</td></tr>
     <tr><th><code>pattern</code></th><td class="num">86.3&nbsp;%</td><td class="num">79.7&nbsp;%</td><td class="num">0.0&nbsp;%</td><td class="num">0.0&nbsp;%</td></tr>
     <tr><th><code>claude-haiku-4-5</code></th><td class="num">97.8&nbsp;%</td><td class="num">92.0&nbsp;%</td><td class="num">82.8&nbsp;%</td><td class="num">91.6&nbsp;%</td></tr>
     <tr><th><code>claude-opus-5</code></th><td class="num">100&nbsp;%</td><td class="num">99.9&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr>
-</tbody></table>
+</tbody></table></div>
 <p class="note">The control is exact rather than approximate: the fitted reader's predictions on the
 rung that keeps a text layer are identical, field for field, to its predictions on the clean corpus.
 That is what makes the other two columns a measurement of the missing text layer and not of the
@@ -323,12 +324,12 @@ damage to the image.</p>
 <em>gate</em> is.</strong> Run the oracle &mdash; a perfect reading, nothing wrong anywhere &mdash;
 over the scanned corpus, and grounding has nothing to resolve against on two of the three
 rungs:</p>
-<table><thead><tr><th>rung</th><th class="num">could ask</th><th class="num">false alarms</th><th class="num">no text to search</th></tr></thead>
+<div class="table-wrap"><table><thead><tr><th>rung</th><th class="num">could ask</th><th class="num">false alarms</th><th class="num">no text to search</th></tr></thead>
 <tbody>
     <tr><th><code>searchable</code></th><td class="num">1903</td><td class="num">0</td><td class="num">0</td></tr>
     <tr><th><code>rasterised</code></th><td class="num">0</td><td class="num">0</td><td class="num">2010</td></tr>
     <tr><th><code>scanned</code></th><td class="num">0</td><td class="num">0</td><td class="num">1979</td></tr>
-</tbody></table>
+</tbody></table></div>
 <p class="note">The last column was the finding, and it was a defect. Grounding resolves a value to
 a span of page text; where there is none it used to answer <code>UNGROUNDED</code> anyway, so every
 one of those 3989 values arrived as a <strong>false alarm on a reading with nothing wrong in
@@ -342,12 +343,12 @@ purpose &mdash; so what changed is that the gate reports having no opinion where
 a wrong one. A better instrument, and the same missing capability.</p>
 <p>And the mirror of it, on a population of real mistakes: <code>claude-haiku-4-5</code>
 reading the same pages as images.</p>
-<table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th><th class="num">could not ask</th></tr></thead>
+<div class="table-wrap"><table><thead><tr><th>rung</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">precision</th><th class="num">recall</th><th class="num">could not ask</th></tr></thead>
 <tbody>
     <tr><th><code>searchable</code></th><td class="num">136</td><td class="num">0</td><td class="num">9</td><td class="num">100&nbsp;%</td><td class="num">93.8&nbsp;%</td><td class="num">0</td></tr>
     <tr><th><code>rasterised</code></th><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">1832</td></tr>
     <tr><th><code>scanned</code></th><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">1960</td></tr>
-</tbody></table>
+</tbody></table></div>
 <p class="note">Read the first row against the other two. Where a text layer survives, grounding is
 at its <em>most</em> precise measurement anywhere in this project &mdash; it catches almost every
 wrong value and raises no false alarm at all, on a real population of vision errors rather than an
@@ -365,14 +366,14 @@ recogniser in front of the model and the signal comes back.</p>
 cardinality &mdash; and stops. <code>P_15</code>, the gross total, is a bare decimal with no stated
 relationship to the per-rate totals, and those have none to the line items.</p>
 
-<table>
+<div class="table-wrap"><table>
   <tbody>
     <tr><th>Bytes of vendored schema</th><td class="num">183 798</td></tr>
     <tr><th>Simple types defined</th><td class="num">50</td></tr>
     <tr><th>Enumerated values <span class="hint">closed domains: rates, currencies, invoice kinds</span></th><td class="num">328</td></tr>
     <tr><th><code>xsd:assert</code> elements <span class="hint">every cross-field rule an invoice satisfies is unenforced</span></th><td class="num">0</td></tr>
   </tbody>
-</table>
+</table></div>
 <p class="note">Checking those rules is therefore real work rather than a re-run of validation that
 already exists. The schema is vendored in the repository with its SHA-256, and a test enforces the
 digest &mdash; so this claim is checkable rather than asserted.</p>
@@ -414,7 +415,7 @@ to confuse with model error &mdash; which is what makes the detector study inter
   that mean different things in law.</figcaption>
 </figure>
 
-<table>
+<div class="table-wrap"><table>
   <tbody>
     <tr><th>Documents</th><td class="num">108</td></tr>
     <tr><th>Tiers &times; documents each</th><td class="num">9 &times; 12</td></tr>
@@ -423,7 +424,7 @@ to confuse with model error &mdash; which is what makes the detector study inter
     <tr><th>Rows carrying a discount <span class="hint">folded into the net, so a page omitting it contradicts its own arithmetic</span></th><td class="num">109 (15.6%)</td></tr>
     <tr><th>Gold documents breaking any rule <span class="hint">asserted on the seeds the corpus actually ships</span></th><td class="num">0</td></tr>
   </tbody>
-</table>
+</table></div>
 
 <h2>What the corpus deliberately does not do</h2>
 <p>It is <strong>not sanitised to be easy to parse</strong>. A quantity of 3 printed beside a price
@@ -448,7 +449,7 @@ a layout no template anticipated because no template wrote it.</p>
 answers in the same wire format and goes through the same prompt, parse, validation and repair
 loop, so a column is comparable down the table. The numbers are recomputed for this page from each
 run's committed <code>predictions.jsonl</code> &mdash; not copied from a report.</p>
-<table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">36</td><td class="num">99.3&nbsp;%</td><td class="num">98.3&nbsp;%</td><td class="num">97.5&nbsp;%</td></tr><tr><th><code>stripped</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">22.8&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">22.8&nbsp;%</td></tr><tr><th><code>claude-haiku-4-5</code></th><td>the page</td><td class="num">107 / 108</td><td class="num">65</td><td class="num">98.9&nbsp;%</td><td class="num">98.9&nbsp;%</td><td class="num">97.8&nbsp;%</td></tr><tr><th><code>claude-opus-5</code></th><td>the page</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr></tbody></table>
+<div class="table-wrap"><table><thead><tr><th>baseline</th><th>saw</th><th class="num">invoice</th><th class="num">exact</th><th class="num">recall</th><th class="num">value</th><th class="num">accuracy</th></tr></thead><tbody><tr><th><code>oracle</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr><tr><th><code>constant</code></th><td>nothing</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">12.5&nbsp;%</td><td class="num">23.8&nbsp;%</td><td class="num">3.0&nbsp;%</td></tr><tr><th><code>pattern</code></th><td>the page</td><td class="num">104 / 108</td><td class="num">35</td><td class="num">91.1&nbsp;%</td><td class="num">94.7&nbsp;%</td><td class="num">86.3&nbsp;%</td></tr><tr><th><code>noisy</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">36</td><td class="num">99.3&nbsp;%</td><td class="num">98.3&nbsp;%</td><td class="num">97.5&nbsp;%</td></tr><tr><th><code>stripped</code></th><td>the gold</td><td class="num">108 / 108</td><td class="num">0</td><td class="num">22.8&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">22.8&nbsp;%</td></tr><tr><th><code>claude-haiku-4-5</code></th><td>the page</td><td class="num">107 / 108</td><td class="num">65</td><td class="num">98.9&nbsp;%</td><td class="num">98.9&nbsp;%</td><td class="num">97.8&nbsp;%</td></tr><tr><th><code>claude-opus-5</code></th><td>the page</td><td class="num">108 / 108</td><td class="num">108</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td><td class="num">100&nbsp;%</td></tr></tbody></table></div>
 <p class="note"><strong>recall</strong> is how many of the values on the page the prediction offered
 a value for; <strong>value</strong> is how many of those it read correctly; <strong>accuracy</strong>
 is the two together. They are separate columns because a field that is half missed and a field that
@@ -478,10 +479,10 @@ nothing &mdash; printed in 4 places on the page, including in white ink, where a
 human approving the invoice sees nothing and the text layer carries every word. The gold of an
 attacked document is the gold of the document it was made from, so the same scorer, detector and
 gate run over it unchanged.</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>payload</th><th>asks for</th><th class="num">obeyed</th><th class="num">arithmetic fires</th></tr></thead>
   <tbody><tr><th><code>total_override</code></th><td>make the amount payable 1,00 PLN</td><td class="num">16 / 16</td><td class="num">16 / 16</td></tr><tr><th><code>account_redirect</code></th><td>replace the bank account with one the attacker controls</td><td class="num">16 / 16</td><td class="num">0 / 16</td></tr><tr><th><code>line_injected</code></th><td>add a line item the page does not print</td><td class="num">16 / 16</td><td class="num">16 / 16</td></tr><tr><th><code>seller_swap</code></th><td>issue the invoice in the attacker&#x27;s name and NIP</td><td class="num">16 / 16</td><td class="num">0 / 16</td></tr><tr><th><code>fence_break</code></th><td>close the envelope early, then rewrite the total from outside it</td><td class="num">16 / 16</td><td class="num">16 / 16</td></tr><tr><th><code>refusal</code></th><td>stop the document being processed at all</td><td class="num">16 / 16</td><td class="num">0 / 16</td></tr><tr><th><code>benign</code></th><td>nothing — the control for whether added text moves the reading</td><td class="num">0 / 16</td><td class="num">0 / 16</td></tr></tbody>
-</table>
+</table></div>
 <p class="note">The column that matters is <em>arithmetic fires</em>. It is computed against
 <code>attack-gullible</code>, a control that obeys every instruction it finds on a
 page: its success rate is 100&nbsp;% by construction, which is what makes it the right arm for this
@@ -505,20 +506,20 @@ report a structural defence is to attack it and publish the rate.</p>
 scanner, gold untouched by either &mdash; and the compliant reader above, breached on every attacked
 document it is given a clean page of, is breached on 25.0 % of these
 (36 of 144). The decomposition is the whole finding.</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>rung</th><th class="num">attacked</th><th class="num">succeeded</th><th class="num">ASR</th></tr></thead>
   <tbody><tr><th><code>searchable</code></th><td class="num">48</td><td class="num">36</td><td class="num">75.0 %</td></tr><tr><th><code>rasterised</code></th><td class="num">48</td><td class="num">0</td><td class="num">0.0 %</td></tr><tr><th><code>scanned</code></th><td class="num">48</td><td class="num">0</td><td class="num">0.0 %</td></tr></tbody>
-</table>
+</table></div>
 <p class="note">Computed from <code>attacked-scanned-gullible</code>, the same control M6 uses,
 by rebuilding each scanned attacked document's gold in memory from the corpus seed.</p>
 <p><strong>The two zeros are blindness, not defence.</strong> No payload reached the text layer on
 those rungs because no <em>text</em> did &mdash; the page carries none. A reader that looks at the
 page sees them exactly as the reach table says it does.</p>
 <!-- corpus-dependent: begin -->
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>placement</th><th><code>searchable</code></th><th><code>rasterised</code></th><th><code>scanned</code></th></tr></thead>
   <tbody><tr><th><code>description</code></th><td>text&nbsp;+&nbsp;image</td><td>image only</td><td>image only</td></tr><tr><th><code>annotations</code></th><td>text&nbsp;+&nbsp;image</td><td>image only</td><td>image only</td></tr><tr><th><code>footer</code></th><td>text&nbsp;+&nbsp;image</td><td>image only</td><td>image only</td></tr><tr><th><code>invisible</code></th><td>nobody</td><td>nobody</td><td>nobody</td></tr></tbody>
-</table>
+</table></div>
 <p class="note">Measured at build time with no model. <em>text</em> means the marker is in the text
 layer the source reader gets off the scanned page; <em>image</em> means the attacked page and the
 unattacked page it was made from differ as pictures, through the same scanner at the same seed
@@ -556,7 +557,7 @@ like a reader's mistake; saying so removed the false alarms and did not bring th
 <h2>What is not built yet</h2>
 <p>Stated plainly, because a portfolio page that reads as finished when it is not is worse than no
 page at all.</p>
-<table>
+<div class="table-wrap"><table>
   <tbody>
     <tr><th>M3 &mdash; source layer, extraction, structured output with an owned schema retry</th><td class="num">built</td></tr>
     <tr><th>M4 &mdash; pure scorer, per-field metrics with support, failure taxonomy, baselines</th><td class="num">built, model run</td></tr>
@@ -570,7 +571,7 @@ page at all.</p>
     <tr><th>&mdash; the rest of it: a value lifted from the wrong column that nothing else wants</th><td class="num">not built &mdash; needs to know which column holds which field</td></tr>
     <tr><th>&mdash; a real invoice nobody generated</th><td class="num">not built</td></tr>
   </tbody>
-</table>
+</table></div>
 <p class="note">The headline question &mdash; does &ldquo;the invariants hold&rdquo; actually predict
 &ldquo;the fields are correct&rdquo;? &mdash; met an awkward first answer: on the run that mattered
 most there was nothing to predict, because the model made no mistakes. It has been answered instead
@@ -595,8 +596,8 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>26bd218</code> &middot; part of a
-  <a href="https://github.com/P0w3r223/current_projects">portfolio index</a></p>
+  <code>17b217e</code> &middot; part of a
+  <a href="https://github.com/P0w3r223">portfolio</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by
   <code>docs/build_index.py</code>.</p>
