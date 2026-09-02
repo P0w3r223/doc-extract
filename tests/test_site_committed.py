@@ -242,21 +242,34 @@ def test_the_committed_page_carries_the_block_the_comparison_forgives():
 
     committed = PAGE.read_text(encoding="utf-8")
 
-    assert build_index.CORPUS_DEPENDENT in committed, (
-        "docs/index.html was built without data/scanned — rebuild it with the corpus present"
+    #: Counted rather than found. The page carries four fenced regions and only one of them —
+    #: the scanned corpus's gate — vanishes to nothing rather than to a placeholder, so a
+    #: presence check is satisfied by its three neighbours while that block is missing.
+    assert committed.count(build_index.CORPUS_DEPENDENT) == 4, (
+        "a corpus-dependent block is missing from docs/index.html, or a new one was added — "
+        "rebuild the page with the corpus present, and move this count if the page grew one"
     )
-    assert build_index.CORPUS_DEPENDENT_END in committed
+    assert committed.count(build_index.CORPUS_DEPENDENT_END) == 4
     assert "When the page is a picture" in _comparable(committed), (
         "the fence is wider than the block it is meant to cover"
     )
-    #: The assertion above passes on a page built without the corpus too, because the placeholders
-    #: are fenced as well — which is why the committed page has to be checked for the tables
-    #: themselves rather than for the fence around whatever stands in their place.
-    for placeholder in ("The reach table is a fact about pixels", "curve on this corpus needs"):
+    #: The count above passes on a page built without the corpus too, because the placeholders are
+    #: fenced as well — so the committed page is checked for the measurements themselves. Derived
+    #: from the generator rather than quoted from it: a reworded placeholder would leave a quoted
+    #: literal matching nothing and this assertion vacuously true.
+    for placeholder in (build_index._reach_section(None), build_index._selectivity(None)):
         assert placeholder not in committed, (
             "docs/index.html was built without the composed corpus — it carries a placeholder "
             "where a measurement belongs"
         )
+    #: The footer's allowance is one-directional for the same reason the fence's is. `_comparable`
+    #: normalises `unknown` so a reader without git can run this test at all — but a *committed*
+    #: page saying "built from the tree after unknown" has published no provenance at all, which
+    #: is the claim this page exists to make and which `d331882` was a fix for.
+    assert re.search(r"built from the tree after\n  <code>[0-9a-f]{7,}</code>", committed), (
+        "docs/index.html was built where `git rev-parse` could not answer — its footer names no "
+        "tree"
+    )
 
 
 def test_a_corpus_absent_placeholder_is_erased_by_the_comparison():

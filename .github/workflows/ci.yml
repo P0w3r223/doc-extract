@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# A force-push to a pull-request branch otherwise leaves the superseded run to finish against a
+# tree nobody is going to merge.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Everything here runs offline. The one dependency that can reach the network — and the one that
 # costs money — is the `llm` extra, which nothing in the suite needs: the whole pipeline is driven
 # through `extract.scripted`, and every published figure is recomputed from a committed prediction
@@ -33,6 +39,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The suite takes under a minute. The default is six hours, which is what a hung test would
+    # otherwise cost before anyone noticed it had not simply failed.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
