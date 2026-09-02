@@ -116,7 +116,7 @@ def judge(
     prediction: Invoice | None,
     *,
     doc_id: str,
-    facets: tuple[tuple[str, str], ...] = (),
+    facets: tuple[tuple[str, str], ...],
     failure: FailureClass,
 ) -> DocumentScore:
     """One document end to end: the comparison, plus how the extraction itself ended.
@@ -124,6 +124,14 @@ def judge(
     Takes an invoice and a failure class rather than an `Extraction`, so the same function serves a
     run in flight and a prediction file read back off disk. A number in the report is therefore
     computed by the same code whether or not the model was called again.
+
+    **`facets` is required, and deliberately has no default.** It replaced `tier` and `template`,
+    which were required too, and briefly carried `()` — under which a caller who forgot it got a
+    report whose per-axis tables did not render *empty* but **vanished**, because `_table` returns
+    nothing for an axis with no rows. The headline rates stay right and the grouping evidence
+    disappears, which on a project whose argument is that figures come from artifacts is the worst
+    failure available: a well-formed report that quietly says less than it claims to. A corpus that
+    genuinely varies nothing passes `()` and says so.
     """
     return DocumentScore(
         doc_id=doc_id,
@@ -134,9 +142,26 @@ def judge(
     )
 
 
-def score(gold: Invoice, extraction: Extraction, **where: str) -> DocumentScore:
-    """`judge`, for a run in flight, taking the failure class off the extraction itself."""
-    return judge(gold, extraction.invoice, failure=extraction.failure, **where)
+def score(
+    gold: Invoice,
+    extraction: Extraction,
+    *,
+    doc_id: str,
+    facets: tuple[tuple[str, str], ...],
+) -> DocumentScore:
+    """`judge`, for a run in flight, taking the failure class off the extraction itself.
+
+    The arguments are named rather than collected as `**where: str`, which had become a lie: every
+    pass-through was a `str` when the axes were `tier` and `template`, and `facets` is not one.
+    Passing what that annotation invited was a `TypeError`.
+    """
+    return judge(
+        gold,
+        extraction.invoice,
+        doc_id=doc_id,
+        facets=facets,
+        failure=extraction.failure,
+    )
 
 
 _EMPTY = Reading(values={}, duplicates=())

@@ -107,3 +107,22 @@ def test_an_empty_manifest_is_refused_rather_than_scored_as_a_complete_run(tmp_p
     """Nothing scored over nothing is 100 % of nothing, and coverage would agree with it."""
     with pytest.raises(dataset.CorpusError, match="describes no documents"):
         dataset.load(_manifest(tmp_path))
+
+
+def test_a_derived_seed_is_recorded_in_the_provenance_block(tmp_path):
+    """A reader must be able to tell an invented seed from the one that made the document.
+
+    Without this the distinction lived only in a docstring, and the docstring claimed a record
+    that did not exist. A generated corpus contributes nothing here, so the committed runs'
+    provenance blocks do not move.
+    """
+    row = _row("hand-written")
+    del row["seed"]
+    corpus = dataset.load(_manifest(tmp_path, row))
+
+    assert corpus.provenance["derived_seeds"] == 1
+
+
+def test_a_generated_corpus_says_nothing_about_derived_seeds(tmp_path):
+    corpus = dataset.load(_manifest(tmp_path, _row(seed=7)))
+    assert "derived_seeds" not in corpus.provenance

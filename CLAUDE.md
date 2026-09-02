@@ -327,7 +327,7 @@ re-run a paid model to be checked would be one too.
    judge would first be exercised on a real transcription, which is the one it had to be rewritten
    for.
 7. **Held-out set, the reported gap, vision variant, site/README/ADRs.** In progress, and shipped in
-   ten sub-milestones. Where a row below names a section, that section of `docs/findings.md` carries
+   eleven sub-milestones, M7a–M7k. Where a row below names a section, that section of `docs/findings.md` carries
    the measurement; M7d, M7f and M7g are reported inside the sections their neighbours name rather
    than in one of their own.
 
@@ -382,7 +382,9 @@ Two of them are load-bearing for how anything new here gets written, so they are
 before a first substantial change: *The headline answer* says why `ground/` exists at all, and
 *What the gate buys* says what the four signals are for.
 
-803 tests, `ruff` clean. The count is here rather than in the milestone list because it moves with
+809 passing tests (826 collected, 17 skipped), `ruff` clean. The count is the passing one, said so
+because an audit read it as the collected total and published a third number. It is here rather
+than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 ## Metric rules — read before writing anything under `eval/`
