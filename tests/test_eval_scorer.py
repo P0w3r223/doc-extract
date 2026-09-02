@@ -124,3 +124,18 @@ def test_exact_means_every_field_including_the_absent_ones(invoice):
 
     assert perfect.exact is True
     assert nearly.exact is False
+
+
+def test_judge_will_not_silently_score_a_document_with_no_axes(invoice):
+    """`facets` has no default, so forgetting it is a `TypeError` rather than a quiet report.
+
+    It briefly defaulted to `()`. Under that, a caller who omitted it got a report whose per-axis
+    tables did not render empty but *vanished* — `report._table` emits nothing for an axis with no
+    rows — while every headline rate stayed correct. A well-formed report saying less than it
+    claims to is the one failure this project cannot afford.
+    """
+    with pytest.raises(TypeError):
+        judge(invoice, invoice, doc_id="d", failure=FailureClass.NONE)
+
+    explicit = judge(invoice, invoice, doc_id="d", facets=(), failure=FailureClass.NONE)
+    assert explicit.facets == (), "a corpus that varies nothing may still say so"
