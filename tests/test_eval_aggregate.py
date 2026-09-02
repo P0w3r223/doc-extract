@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from doc_extract.eval import report as eval_report
 from doc_extract.eval.aggregate import Coverage, CoverageError, Scored, Tally, summarise, tally
 from doc_extract.eval.predictions import AttemptRecord, Prediction, RunMeta
 from doc_extract.eval.scorer import Outcome, Result, judge
@@ -39,7 +40,8 @@ def _attempt(stage: Stage, output: int, failure: str = "none") -> AttemptRecord:
 def _scored(invoice, prediction_invoice, doc_id="clean-0000", **over) -> Scored:
     return Scored(
         prediction=_prediction(doc_id, **over),
-        score=judge(invoice, prediction_invoice, doc_id=doc_id, tier="clean", template="classic",
+        score=judge(invoice, prediction_invoice, doc_id=doc_id,
+                    facets=(("tier", "clean"), ("template", "classic")),
                     failure=FailureClass.NONE),
     )
 
@@ -134,12 +136,45 @@ def test_failure_classes_are_counted_as_a_partition(invoice):
     assert sum(count for _, count in report.failures) == report.documents
 
 
+def test_a_corpus_is_reported_by_the_axes_it_declares_and_not_by_two_fixed_names(invoice):
+    """The held-out case, end to end: axes this project's generator never produces get their own
+    tables, with the heading and key taken from the corpus rather than from `report.py`.
+
+    Both halves are asserted, because either alone is satisfiable without the other: the tallies
+    have to be grouped by the new axes, *and* the rendered document has to carry a table per axis
+    and no table for `tier`. The byte-identity of the 24 committed reports is the other side of
+    this contract and lives in `tests/test_results_committed.py`.
+    """
+    scored = [
+        Scored(
+            prediction=_prediction(doc_id),
+            score=judge(invoice, invoice, doc_id=doc_id,
+                        facets=(("issuer", issuer), ("legibility", legibility)),
+                        failure=FailureClass.NONE),
+        )
+        for doc_id, issuer, legibility in [
+            ("a", "comarch", "born-digital"), ("b", "ifirma", "scan"), ("c", "comarch", "scan"),
+        ]
+    ]
+    report = summarise(scored, run=RUN, expected=["a", "b", "c"])
+
+    assert [name for name, _ in report.by_facet] == ["issuer", "legibility"]
+    assert [name for name, _ in report.facet("issuer")] == ["comarch", "ifirma"]
+    assert report.by_tier == (), "a corpus with no tier must not grow one"
+
+    body = eval_report.render(report)
+    assert "## Per issuer" in body and "| issuer |" in body
+    assert "## Per legibility" in body
+    assert "## Per tier" not in body
+
+
 def test_tiers_are_reported_in_the_order_the_corpus_declares_them(invoice):
     """Alphabetical would put `advance` ahead of the `clean` arm every tier is read against."""
     scored = [
         Scored(
             prediction=_prediction(doc_id),
-            score=judge(invoice, invoice, doc_id=doc_id, tier=tier, template="classic",
+            score=judge(invoice, invoice, doc_id=doc_id,
+                        facets=(("tier", tier), ("template", "classic")),
                         failure=FailureClass.NONE),
         )
         for doc_id, tier in [("a", "clean"), ("b", "mixed_rates"), ("c", "advance"), ("d", "clean")]

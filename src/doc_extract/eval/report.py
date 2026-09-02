@@ -32,8 +32,11 @@ def render(report: Report, *, predictions: Sequence[Prediction] = ()) -> str:
         _summary(report),
         _table("Per field", report.by_field, key="field"),
         _table("Per group", report.by_group, key="group"),
-        _table("Per tier", report.by_tier, key="tier"),
-        _table("Per template", report.by_template, key="template"),
+        #: One table per axis the corpus declares, rather than two named here. A generated corpus
+        #: declares `tier` then `template` and renders exactly the two tables it always did — which
+        #: is the check that generalising the axes cost nothing, and
+        #: `tests/test_results_committed.py` re-renders all 24 committed reports to make it.
+        *(_table(f"Per {name}", rows, key=name) for name, rows in report.by_facet),
         _failures(report),
         _cost(report),
     ]

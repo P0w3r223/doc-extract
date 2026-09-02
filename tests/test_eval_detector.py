@@ -30,7 +30,8 @@ from doc_extract.schema.invariants import Severity
 
 def _score(gold, prediction, *, doc_id="doc-0000", failure=FailureClass.NONE):
     return judge(
-        gold, prediction, doc_id=doc_id, tier="clean", template="classic", failure=failure
+        gold, prediction, doc_id=doc_id,
+        facets=(("tier", "clean"), ("template", "classic")), failure=failure
     )
 
 
