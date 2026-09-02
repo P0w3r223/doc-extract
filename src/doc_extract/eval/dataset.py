@@ -180,15 +180,27 @@ def load(directory: Path) -> Corpus:
             f"no {MANIFEST_NAME} in {directory}; build the corpus with "
             "`python -m doc_extract.synth --out " + str(directory) + "`"
         )
-    cases = tuple(_case(row, directory) for row in _rows(manifest))
+    rows = list(_rows(manifest))
+    cases = tuple(_case(row, directory) for row in rows)
     if not cases:
         raise CorpusError(f"{manifest} describes no documents")
     return Corpus(
         directory=directory,
         cases=cases,
-        provenance=_provenance(directory),
+        provenance=_provenance(directory) | _derived_seeds(rows),
         manifest_ids=tuple(case.doc_id for case in cases),
     )
+
+
+def _derived_seeds(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """How many documents carry a seed this module invented rather than the generator's.
+
+    Recorded rather than assumed, because `_seed` derives one for a manifest that has none and a
+    reader would otherwise have no way to tell the two apart. A generated corpus has a seed on
+    every row and this contributes nothing, so the committed runs' provenance blocks do not move.
+    """
+    derived = sum(1 for row in rows if row.get("seed") is None)
+    return {"derived_seeds": derived} if derived else {}
 
 
 def _rows(manifest: Path) -> Iterator[dict[str, Any]]:
@@ -231,10 +243,20 @@ def _seed(row: dict[str, Any]) -> int:
     """The seed the generator used, or one derived from the document's name.
 
     A document nobody generated has no seed, and `eval/run.py` gives every task one — `noisy` and
-    `corrupt` need it to be reproducible. Deriving it from `doc_id` the same way `synth/corpus.py`
-    derives its own keeps every baseline runnable on every corpus, which is this project's rule
-    that a baseline with its own code path is measuring its own code path. The provenance block
-    says which corpora carry a derived seed, so nobody reads one as the generator's.
+    `corrupt` need it to be reproducible. Deriving one keeps every baseline runnable on every
+    corpus, which is this project's rule that a baseline with its own code path is measuring its
+    own code path.
+
+    `zlib.crc32` for the same reason `synth/corpus.py` uses it: `hash()` is randomised per
+    interpreter run, so a "reproducible" baseline would not be. It is **not** the generator's
+    formula and must not be read as one — `synth.corpus` mixes in the corpus seed
+    (`(corpus_seed * 1_000_003 + crc32(doc_id)) % 2**31`), which this has no access to and would
+    have no meaning without. Two documents with the same name in a generated and a hand-written
+    corpus therefore get different seeds, which is correct: one is the number that produced the
+    document and the other is a number invented so a baseline can run.
+
+    `load` records how many rows carry a derived seed in the corpus's provenance block, so the
+    distinction is in the artifact rather than only here.
     """
     recorded = row.get("seed")
     return int(recorded) if recorded is not None else zlib.crc32(row["doc_id"].encode("utf-8"))
