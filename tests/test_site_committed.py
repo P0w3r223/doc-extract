@@ -49,8 +49,12 @@ def _comparable(html: str) -> str:
     """
     import build_index
 
+    #: `unknown` is the other thing that stamp can say: `head_commit` answers it where `git` is not
+    #: on the path or the tree is not a checkout — a source tarball, an sdist, a vendored copy.
+    #: Without it here, this test measures whether the reader has git rather than whether the page
+    #: is stale.
     without_commit = re.sub(
-        r"built from the tree after\n  <code>[0-9a-f]+</code>",
+        r"built from the tree after\n  <code>(?:[0-9a-f]+|unknown)</code>",
         "built from the tree after <code>COMMIT</code>",
         html,
     )
@@ -238,10 +242,70 @@ def test_the_committed_page_carries_the_block_the_comparison_forgives():
 
     committed = PAGE.read_text(encoding="utf-8")
 
-    assert build_index.CORPUS_DEPENDENT in committed, (
-        "docs/index.html was built without data/scanned — rebuild it with the corpus present"
+    #: Counted rather than found. The page carries four fenced regions and only one of them —
+    #: the scanned corpus's gate — vanishes to nothing rather than to a placeholder, so a
+    #: presence check is satisfied by its three neighbours while that block is missing.
+    assert committed.count(build_index.CORPUS_DEPENDENT) == 4, (
+        "a corpus-dependent block is missing from docs/index.html, or a new one was added — "
+        "rebuild the page with the corpus present, and move this count if the page grew one"
     )
-    assert build_index.CORPUS_DEPENDENT_END in committed
+    assert committed.count(build_index.CORPUS_DEPENDENT_END) == 4
     assert "When the page is a picture" in _comparable(committed), (
         "the fence is wider than the block it is meant to cover"
     )
+    #: The count above passes on a page built without the corpus too, because the placeholders are
+    #: fenced as well — so the committed page is checked for the measurements themselves. Derived
+    #: from the generator rather than quoted from it: a reworded placeholder would leave a quoted
+    #: literal matching nothing and this assertion vacuously true.
+    for placeholder in (build_index._reach_section(None), build_index._selectivity(None)):
+        assert placeholder not in committed, (
+            "docs/index.html was built without the composed corpus — it carries a placeholder "
+            "where a measurement belongs"
+        )
+    #: The footer's allowance is one-directional for the same reason the fence's is. `_comparable`
+    #: normalises `unknown` so a reader without git can run this test at all — but a *committed*
+    #: page saying "built from the tree after unknown" has published no provenance at all, which
+    #: is the claim this page exists to make and which `d331882` was a fix for.
+    assert re.search(r"built from the tree after\n  <code>[0-9a-f]{7,}</code>", committed), (
+        "docs/index.html was built where `git rev-parse` could not answer — its footer names no "
+        "tree"
+    )
+
+
+def test_a_corpus_absent_placeholder_is_erased_by_the_comparison():
+    """What replaces a corpus-dependent block is corpus-dependent too, so it lives inside the fence.
+
+    Two of these placeholders were written outside it. The effect was not a cosmetic one: the
+    staleness check compared a page carrying a *table* against one carrying a note saying which
+    command renders it, and failed — in every checkout without `data/attacked-scanned`, which is
+    every checkout a CI runner makes. The repository had no CI when they were written, so nothing
+    ever rendered this page without the corpus and the hole stayed open.
+    """
+    import build_index
+
+    for markup in (build_index._reach_section(None), build_index._selectivity(None)):
+        assert build_index.CORPUS_DEPENDENT in markup
+        assert _comparable(markup).strip() == "", (
+            "a corpus-absent placeholder survives the comparison the block it replaces does not"
+        )
+
+
+def test_the_ink_sentence_costs_nothing_outside_its_fence():
+    """The fence has to cover the space that separates the sentence, not start after it.
+
+    A space is text like any other: kept on the committed page and never written by a corpus-free
+    render, it is a one-character difference that fails the staleness check for no reason any
+    commit caused. The two renders are compared rather than the markup inspected, because what
+    matters is that they are *the same page* once the allowance is applied.
+    """
+    import build_index
+
+    row: dict[str, object] = {
+        "model": "claude-opus-5", "documents": 144, "succeeded": 0,
+        "repairs": 0, "unanswered": 0, "uniform": True,
+    }
+    with_corpus = build_index._vision_arm_paragraph({**row, "reached": 108})
+    without = build_index._vision_arm_paragraph({**row, "reached": None})
+
+    assert "carried their payload" in with_corpus, "the fenced sentence did not render at all"
+    assert _comparable(with_corpus) == _comparable(without)
