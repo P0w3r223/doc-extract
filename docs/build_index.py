@@ -690,6 +690,11 @@ def injection_study(corpus: list) -> dict[str, object] | None:
             name for name, row in rows.items()
             if not PAYLOADS[name].harmless and row["succeeded"] and not row["flagged"]
         ),
+        #: How many payloads *ask* for something, so the page can print the invisible ones as a
+        #: share rather than as a bare count. It is computed here for the same reason `invisible`
+        #: is: the prose beside that list said "two" while the list had grown to three, and a
+        #: byte-diff of the page cannot see a word that the generator itself gets wrong.
+        "attacking": len(attacking),
         "placements": len(tuple(meta.corpus["placements"])),
     }
 
@@ -1290,6 +1295,12 @@ absent&rdquo; from &ldquo;silently dropped&rdquo;; the count of what was never a
 column that sees it.</p>"""
 
 
+#: Small counts read as words in this page's prose, and the prose is where the drift happened: the
+#: sentence below said "two" while the computed list beside it had grown to three. Spelling the
+#: number from the same list that renders the names is what stops the two disagreeing again.
+_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven"}
+
+
 def injection_section(study: dict[str, object] | None) -> str:
     """M6, rendered from `injection_study` rather than from memory."""
     if study is None:  # pragma: no cover — a checkout without the attacked run
@@ -1304,6 +1315,7 @@ def injection_section(study: dict[str, object] | None) -> str:
         for name, row in rows.items()
     )
     invisible = ", ".join(f"<code>{html.escape(name)}</code>" for name in study["invisible"])
+    invisible_count = _WORDS.get(len(study["invisible"]), str(len(study["invisible"])))
     return f"""<p>Seven payloads &mdash; six that ask for something and one control that asks for
 nothing &mdash; printed in {study["placements"]} places on the page, including in white ink, where a
 human approving the invoice sees nothing and the text layer carries every word. The gold of an
@@ -1318,8 +1330,9 @@ gate run over it unchanged.</p>
 page: its success rate is 100&nbsp;% by construction, which is what makes it the right arm for this
 question. What a <em>defence</em> does about an attack that worked is a property of the defence, and
 does not need a model to have been fooled first.</p>
-<p><strong>The two payloads the arithmetic never sees are {invisible}</strong> &mdash; and they are
-the two an attacker would actually run. Redirecting a payment or reissuing the invoice under another
+<p><strong>The {invisible_count} payloads the arithmetic never sees are {invisible}</strong> &mdash;
+and two of them are what an attacker would actually run, the third only stopping the document being
+processed. Redirecting a payment or reissuing the invoice under another
 NIP does not break any identity: the attacker picks an account they control, so the check digits are
 valid, and the value is printed on the page, so grounding finds it too. Both of M5's signals were
 measured on a model's <em>errors</em>, where a wrong digit is a random digit. Neither transfers to an
@@ -1542,6 +1555,13 @@ def build() -> str:
     runs = baselines(corpus)
     scored_fields = len(fields.FIELDS)
 
+    # Computed once and read twice: the injection section renders the grid, and the fourth KPI tile
+    # quotes its headline. The tile used to read `5 / 7` milestones, which is a project-management
+    # number rather than a measurement — it disagreed with this page's own eyebrow, with the
+    # milestone table at its foot, and with the caution card twenty lines below it, and its note
+    # denied that injection was measured while the grid measuring it sat further down the page.
+    injection = injection_study(corpus)
+
     page = TEMPLATE.format(
         url=URL,
         repo=REPO,
@@ -1579,7 +1599,9 @@ def build() -> str:
         stripped_section=stripped_section(stripped_study(corpus)),
         foreign_section=foreign_section(foreign_study(corpus)),
         scanned_section=scanned_section(scanned_study(corpus), grounding_on_a_scan()),
-        injection_section=injection_section(injection_study(corpus)),
+        injection_section=injection_section(injection),
+        attack_invisible=len(injection["invisible"]) if injection else "&mdash;",
+        attack_attacking=injection["attacking"] if injection else "&mdash;",
         scanned_injection_section=scanned_injection_section(scanned_injection_study(corpus)),
         formatting_only=formatting_only_differences(corpus),
         opus_cost=OPUS_COST,
@@ -1814,27 +1836,31 @@ footer {{
     <div class="kpi-note">{rows} rows, gold with no annotation step</div>
   </li>
   <li class="kpi">
-    <div class="kpi-value">5 / 7</div>
-    <div class="kpi-label">Milestones built</div>
-    <div class="kpi-note">the gate is measured; injection and the real set are not</div>
+    <div class="kpi-value">{attack_invisible} / {attack_attacking}</div>
+    <div class="kpi-label">Attacks the gate never sees</div>
+    <div class="kpi-note">the arithmetic defends against misreading, not against injection</div>
   </li>
 </ul>
 
 <div class="card caution">
   <strong>This is a project in progress, and the page says so on purpose.</strong> What exists is
-  the domain layer, the corpus generator, the extraction pipeline, the scorer and the first half of
-  the detector study, grounding and the routing gate. Everything but one command runs offline with
+  the domain layer, the corpus generator, the extraction pipeline, the scorer, the detector study,
+  grounding and the routing gate, the injection suite below, and the seventh milestone's three
+  arms &mdash; an unfamiliar vocabulary, the page photographed, and the attacked page photographed
+  &mdash; each put to a model. What is not built is named in the table at the foot of this page.
+  Everything but one command runs offline with
   no network and no API key; that command has been run, and <strong><code>claude-opus-5</code>
-  reads all 108 documents perfectly</strong>.
+  reads all {documents} documents perfectly</strong>.
   <br><br>
   That is a result about the corpus as much as about the model. The nine tiers vary what an invoice
   <em>means</em> &mdash; grosz rounding, corrections, reverse charge, multiple pages &mdash; not how
   hard the page is to <em>read</em>. With no errors left to find, the detector has nothing to detect
   on that run, so the headline question is answered on a second arm: the same corpus and the same
   pipeline, with a weaker model. Grounding, routing and the coverage&ndash;accuracy curve are the
-  rest of milestone 5. Milestone 6 attacks the whole thing: seven payloads printed on the page,
+  rest of milestone 5. Milestone 6 attacked the whole thing: seven payloads printed on the page,
   one of them in white ink, and the finding is a negative one &mdash; the arithmetic gate stops the
-  attacks that lie about a total and is blind to the one that redirects a payment.
+  attacks that lie about a total and is blind to the ones that redirect a payment, reissue the
+  invoice under another name, or refuse the document outright &mdash; the tile above counts them.
 </div>
 
 <h2>Does &ldquo;the arithmetic holds&rdquo; predict &ldquo;the fields are right&rdquo;?</h2>
