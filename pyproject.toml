@@ -7,6 +7,7 @@ name = "doc-extract"
 version = "0.1.0"
 description = "Structured extraction from Polish invoices, with arithmetic invariants as a label-free error detector"
 requires-python = ">=3.12"
+license = { text = "MIT" }
 dependencies = [
     "pydantic>=2.7",
     # Renders the synthetic corpus; pure Python, no system libraries. The upper bound is not
