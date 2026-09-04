@@ -394,6 +394,47 @@ def test_each_signal_is_scored_on_its_own():
     assert signals["any of the four"].recall == 1.0
 
 
+def test_the_composite_signal_counts_the_signals_it_composes():
+    """Its name is a cardinal describing the tuple it sits in, and it is published.
+
+    `summarise` used to spell that cardinal by hand — `"any of the four"` — beside a predicate that
+    was a four-term chain written out separately. Two places to edit for one change, and the string
+    goes verbatim into every committed `gate.md`, so a fifth signal would have shipped a report
+    saying "four" while summing five. Both now come from `_SIGNALS`.
+
+    The composite is also asserted to be the disjunction rather than merely to exist: a name that
+    counts correctly over a predicate that dropped a term would read right and measure less.
+
+    **What it cannot fail on.** Adding a fifth signal, on its own, keeps this green — which is the
+    whole point of the derivation. It goes red when the name is typed again: proved by reinstating
+    the literal alongside a fifth entry, which gives
+    `assert 'any of the four' == 'any of the five'`.
+    """
+    from doc_extract.eval import selective
+
+    composite = selective._composite_name()
+    assert composite == f"any of the {selective._CARDINALS[len(selective._SIGNALS)]}"
+    assert str(len(selective._SIGNALS)) not in composite, "the count is spelled, not printed"
+
+    rows = [
+        Judged("d", "f", "1", Confidence.NONE, wrong=True, ungrounded=True, accused=False),
+        Judged("d", "f", "2", Confidence.HIGH, wrong=True, ungrounded=False, accused=True),
+        Judged("d", "f", "3", Confidence.MEDIUM, wrong=True, ungrounded=False, accused=False,
+               contended=True),
+        Judged("d", "f", "4", Confidence.LOW, wrong=True, ungrounded=False, accused=False,
+               cut_short=True),
+        Judged("d", "f", "5", Confidence.HIGH, wrong=False, ungrounded=False, accused=False),
+    ]
+    signals = {signal.name: signal for signal in summarise(
+        rows, missed=0, without_prediction=0).signals}
+    assert set(signals) == {name for name, _ in selective._SIGNALS} | {composite}
+
+    flagged = sum(1 for row in rows
+                  if any(flags(row) for _, flags in selective._SIGNALS))
+    caught = signals[composite].true_positive + signals[composite].false_positive
+    assert caught == flagged, "the composite is not the disjunction of the signals it names"
+
+
 # --------------------------------------------------------------------------- the formatter
 
 

@@ -33,7 +33,7 @@ which is a fact the combination hides and the report derives.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
 from doc_extract.decide.confidence import Assessment, Confidence, assess
@@ -299,6 +299,28 @@ def _named(invoice: Invoice) -> frozenset[str]:
     )
 
 
+#: The individual signals, in the order the report prints them, and the single source the
+#: composite below is derived from — its predicate is the disjunction of these, and its *name*
+#: counts them. Both used to be written out by hand: the name was the literal "any of the four"
+#: while the predicate was a four-term chain beside it, so adding a fifth signal meant editing two
+#: places and nothing could see if only one was edited. That string is written verbatim into every
+#: committed `gate.md`, so the stale version would have been published rather than merely wrong.
+_SIGNALS: tuple[tuple[str, Callable[[Judged], bool]], ...] = (
+    ("grounding", lambda row: row.ungrounded),
+    ("arithmetic", lambda row: row.accused),
+    ("contention", lambda row: row.contended),
+    ("completeness", lambda row: row.cut_short),
+)
+
+#: Small counts read as words in a report a person reads. Only the lengths `_SIGNALS` can take.
+_CARDINALS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven"}
+
+
+def _composite_name() -> str:
+    """`any of the four`, with the four counted rather than typed."""
+    return f"any of the {_CARDINALS.get(len(_SIGNALS), len(_SIGNALS))}"
+
+
 def summarise(
     judged: Iterable[Judged],
     *,
@@ -315,12 +337,9 @@ def summarise(
         judged=rows,
         points=_points(rows),
         signals=(
-            _signal("grounding", rows, lambda row: row.ungrounded),
-            _signal("arithmetic", rows, lambda row: row.accused),
-            _signal("contention", rows, lambda row: row.contended),
-            _signal("completeness", rows, lambda row: row.cut_short),
-            _signal("any of the four", rows,
-                    lambda row: row.ungrounded or row.accused or row.contended or row.cut_short),
+            *(_signal(name, rows, flags) for name, flags in _SIGNALS),
+            _signal(_composite_name(), rows,
+                    lambda row: any(flags(row) for _, flags in _SIGNALS)),
         ),
         missed=missed,
         unassessable=unassessable,

@@ -382,15 +382,25 @@ Two of them are load-bearing for how anything new here gets written, so they are
 before a first substantial change: *The headline answer* says why `ground/` exists at all, and
 *What the gate buys* says what the four signals are for.
 
-811 passing tests (828 collected, 17 skipped), `ruff` clean. The count is the passing one, said so
+817 passing tests (834 collected, 17 skipped), `ruff` clean. The count is the passing one, said so
 because an audit read it as the collected total and published a third number. It is here rather
 than in the milestone list because it moves with
 every commit; what the milestones claim is what is *asserted*, not how many assertions there are.
 
 **CI runs `ruff check .` then `pytest` on every push to `main` and every pull request.** A runner
 has no `data/`, so the corpus-dependent parts of the suite skip there and the count it reports is
-806 passing, 22 skipped — the same suite, asked what a checkout without 116 MB of rendered pages
-can answer. Publishing is not in the workflow: Pages serves `/docs` from `main` directly.
+**812 passing, 22 skipped** — the same suite, asked what a checkout without 116 MB of rendered pages
+can answer. Six more than the 806 it reported before, because `tests/test_site_claims.py` reads the
+committed page, the committed attacked run and the generator's own template, and builds its corpus
+from seeds rather than from disk, so none of its five skips there; the sixth is a unit test of the gate's composite signal.
+
+*That figure was written as a derivation — from the local run and from what the new tests touch —
+and flagged as the one number here a runner was allowed to correct. It was then read off run
+`33861892274` and is **812 passed, 22 skipped**, which is what the derivation said. The note is kept
+rather than deleted: a number that turned out right is not evidence the method was, and the next
+person to add a test that touches `data/` will need the same flag.*
+
+Publishing is not in the workflow: Pages serves `/docs` from `main` directly.
 
 ## Metric rules — read before writing anything under `eval/`
 
