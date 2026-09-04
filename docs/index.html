@@ -199,8 +199,8 @@ footer {
   </li>
   <li class="kpi">
     <div class="kpi-value">3 / 6</div>
-    <div class="kpi-label">Attacks the gate never sees</div>
-    <div class="kpi-note">the arithmetic defends against misreading, not against injection</div>
+    <div class="kpi-label">Attacks the arithmetic never sees</div>
+    <div class="kpi-note">it defends against misreading, and an attacker is not a misreading</div>
   </li>
 </ul>
 
@@ -224,6 +224,8 @@ footer {
   approving the invoice sees nothing, and the finding is a negative one &mdash; the arithmetic gate stops the
   attacks that lie about a total and is blind to the ones that redirect a payment, reissue the
   invoice under another name, or refuse the document outright &mdash; the tile above counts them.
+  Two of those three take money and the gate accepts them; the third returns no answer to accept,
+  which is an availability attack succeeding rather than a defence holding.
 </div>
 
 <h2>Does &ldquo;the arithmetic holds&rdquo; predict &ldquo;the fields are right&rdquo;?</h2>
@@ -494,8 +496,10 @@ page: its success rate is 100&nbsp;% by construction, which is what makes it the
 question. What a <em>defence</em> does about an attack that worked is a property of the defence, and
 does not need a model to have been fooled first.</p>
 <p><strong>The three payloads the arithmetic never sees are <code>account_redirect</code>, <code>refusal</code>, <code>seller_swap</code></strong> &mdash;
-and two of them are what an attacker would actually run, the third only stopping the document being
-processed. Redirecting a payment or reissuing the invoice under another
+and two of them, <code>account_redirect</code>, <code>seller_swap</code>, are what an attacker would actually run. The other
+one, <code>refusal</code>, can only stop the document being processed, and the committed
+<code>attack.md</code> records why that is not the gate defending: no value was accepted from them
+because none was returned. That is an availability attack succeeding. Redirecting a payment or reissuing the invoice under another
 NIP does not break any identity: the attacker picks an account they control, so the check digits are
 valid, and the value is printed on the page, so grounding finds it too. Both of M5's signals were
 measured on a model's <em>errors</em>, where a wrong digit is a random digit. Neither transfers to an
@@ -602,7 +606,7 @@ depends on them.</p>
 
 <footer>
   <p><a href="https://github.com/P0w3r223/doc-extract">Source on GitHub</a> &middot; built from the tree after
-  <code>9f4bd21</code> &middot; part of a
+  <code>cd88610</code> &middot; part of a
   <a href="https://github.com/P0w3r223">portfolio</a></p>
   <p>Vendored schema &copy; Ministerstwo Finans&oacute;w, via the Centralne Repozytorium
   Wzor&oacute;w Dokument&oacute;w. Every figure on this page is generated from the repository by

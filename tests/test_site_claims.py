@@ -237,7 +237,10 @@ def test_the_grid_is_introduced_by_a_headcount_of_its_own_rows(committed, study)
     under it rather than only to what the generator knows.
     """
     section = _section(study)
-    assert section in committed
+    assert section in committed, (
+        "the injection section on docs/index.html is not what the generator renders — "
+        "re-run `python docs/build_index.py`"
+    )
 
     match = re.search(
         r"<p>(\w+) payloads &mdash;\s+(\w+) that ask for something and (\w+) control",
@@ -284,6 +287,11 @@ def _counted_sets(corpus, study) -> dict[str, set[int]]:
         "tier": {len(build_index.TIERS)},
         "layout": {len({document.template for document in corpus})},
         "rung": {len(RUNGS)},
+        # A union, deliberately, and weaker than "the set it counts": a cardinal naming the
+        # wrong subset *within* this family passes. The per-sentence tests above are what pin the
+        # sentences that matter; this entry's job is to catch a number belonging to no subset at
+        # all. Narrowing it would need a noun per subset, and the page says "payloads" for three
+        # different ones.
         "payload": {rows, attacking, rows - attacking, len(study["invisible"])},
         #: The page says *places*, not *placements* — and the dead-entry check above is what said
         #: so: a `placement` key was written here first and failed for having nothing to cover.
@@ -320,6 +328,11 @@ def test_every_counted_claim_on_the_page_matches_the_set_it_counts(committed, co
     Deliberately a matcher over words as well as digits. The equivalent rule in the sibling project
     tokenises digits and names words as its known blind spot — and both of the defects this file
     exists for were words, or a digit pair that no artifact produced.
+
+    **What the name promises and this does not deliver.** A noun with several countable subsets —
+    `payload` has three — is checked against their *union*, so a cardinal naming the wrong subset
+    within one family still passes. What it does catch is a number belonging to no subset at all,
+    which is what both defects were. The sentences that matter are pinned individually above.
     """
     expected = _counted_sets(corpus, study)
     claims = _cardinal_claims(committed, expected)

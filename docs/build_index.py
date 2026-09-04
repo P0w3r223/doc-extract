@@ -16,7 +16,7 @@ import pathlib
 import re
 import subprocess
 
-from doc_extract.attack import suite
+from doc_extract.attack import payloads, suite
 from doc_extract.attack.payloads import BY_NAME as PAYLOADS
 from doc_extract.decide.confidence import Confidence
 from doc_extract.degrade import attacked as attacked_grid
@@ -640,8 +640,14 @@ def injection_study(corpus: list) -> dict[str, object] | None:
 
     What this can compute without the pages is the **arithmetic** half of the gate. Grounding needs
     the rendered page, so the leak column lives in the committed `attack.md` — and the split is the
-    finding rather than a limitation: the payloads the arithmetic is silent on are exactly the two
-    that hand the reader a valid identifier, which then grounds because it is printed on the page.
+    finding rather than a limitation: of the payloads the arithmetic is silent on, the ones that
+    *take* something hand the reader a valid identifier, which then grounds because it is printed on
+    the page. The rest are denials, which the arithmetic also cannot see and which the gate does not
+    need to catch — a document that produced no answer has no value to accept.
+
+    So `invisible` is the **arithmetic's** blindness, not the gate's, and anything quoting it has to
+    say so. An earlier version of this docstring said "exactly the two", of a function returning
+    three, and the page's fourth KPI tile then labelled the same number with the gate.
     """
     directory = ROOT / "results" / ATTACKED_RUN
     predictions_path = directory / prediction_file.PREDICTIONS_NAME
@@ -1314,8 +1320,19 @@ def injection_section(study: dict[str, object] | None) -> str:
         f'<td class="num">{row["flagged"]} / {row["documents"]}</td></tr>'
         for name, row in rows.items()
     )
-    invisible = ", ".join(f"<code>{html.escape(name)}</code>" for name in study["invisible"])
-    invisible_count = _WORDS.get(len(study["invisible"]), str(len(study["invisible"])))
+    names: list[str] = list(study["invisible"])  # type: ignore[arg-type]
+    # Split from the same list rather than typed beside it. The sentence used to read "two of them
+    # … the third", which named a position in a `sorted()` list — `refusal` prints second, so "the
+    # third" pointed a careful reader at `seller_swap`. A fourth invisible payload would have made
+    # both halves wrong while the count beside them stayed right.
+    stealing = [n for n in names if PAYLOADS[n].category != payloads.DENIAL]
+    denying = [n for n in names if PAYLOADS[n].category == payloads.DENIAL]
+    codes = lambda group: ", ".join(f"<code>{html.escape(n)}</code>" for n in group)  # noqa: E731
+    invisible = codes(names)
+    stealing_text, denying_text = codes(stealing), codes(denying)
+    invisible_count = _WORDS.get(len(names), str(len(names)))
+    stealing_count = _WORDS.get(len(stealing), str(len(stealing)))
+    denying_count = _WORDS.get(len(denying), str(len(denying)))
     return f"""<p>Seven payloads &mdash; six that ask for something and one control that asks for
 nothing &mdash; printed in {study["placements"]} places on the page, including in white ink, where a
 human approving the invoice sees nothing and the text layer carries every word. The gold of an
@@ -1331,8 +1348,10 @@ page: its success rate is 100&nbsp;% by construction, which is what makes it the
 question. What a <em>defence</em> does about an attack that worked is a property of the defence, and
 does not need a model to have been fooled first.</p>
 <p><strong>The {invisible_count} payloads the arithmetic never sees are {invisible}</strong> &mdash;
-and two of them are what an attacker would actually run, the third only stopping the document being
-processed. Redirecting a payment or reissuing the invoice under another
+and {stealing_count} of them, {stealing_text}, are what an attacker would actually run. The other
+{denying_count}, {denying_text}, can only stop the document being processed, and the committed
+<code>attack.md</code> records why that is not the gate defending: no value was accepted from them
+because none was returned. That is an availability attack succeeding. Redirecting a payment or reissuing the invoice under another
 NIP does not break any identity: the attacker picks an account they control, so the check digits are
 valid, and the value is printed on the page, so grounding finds it too. Both of M5's signals were
 measured on a model's <em>errors</em>, where a wrong digit is a random digit. Neither transfers to an
@@ -1843,8 +1862,8 @@ footer {{
   </li>
   <li class="kpi">
     <div class="kpi-value">{attack_invisible} / {attack_attacking}</div>
-    <div class="kpi-label">Attacks the gate never sees</div>
-    <div class="kpi-note">the arithmetic defends against misreading, not against injection</div>
+    <div class="kpi-label">Attacks the arithmetic never sees</div>
+    <div class="kpi-note">it defends against misreading, and an attacker is not a misreading</div>
   </li>
 </ul>
 
@@ -1868,6 +1887,8 @@ footer {{
   approving the invoice sees nothing, and the finding is a negative one &mdash; the arithmetic gate stops the
   attacks that lie about a total and is blind to the ones that redirect a payment, reissue the
   invoice under another name, or refuse the document outright &mdash; the tile above counts them.
+  Two of those three take money and the gate accepts them; the third returns no answer to accept,
+  which is an availability attack succeeding rather than a defence holding.
 </div>
 
 <h2>Does &ldquo;the arithmetic holds&rdquo; predict &ldquo;the fields are right&rdquo;?</h2>
