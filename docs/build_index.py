@@ -1602,6 +1602,12 @@ def build() -> str:
         injection_section=injection_section(injection),
         attack_invisible=len(injection["invisible"]) if injection else "&mdash;",
         attack_attacking=injection["attacking"] if injection else "&mdash;",
+        # The caution card used to say "seven payloads printed on the page, one of them in white
+        # ink". White ink is one of the four *placements* and every payload is printed in it, so
+        # "one of them" was counting the wrong set — while `injection_section`, further down the
+        # same page, rendered the same fact correctly from this study. Both now read from it.
+        attack_payloads=_WORDS.get(len(injection["rows"]), len(injection["rows"])) if injection else "&mdash;",
+        attack_places=_WORDS.get(injection["placements"], injection["placements"]) if injection else "&mdash;",
         scanned_injection_section=scanned_injection_section(scanned_injection_study(corpus)),
         formatting_only=formatting_only_differences(corpus),
         opus_cost=OPUS_COST,
@@ -1857,8 +1863,9 @@ footer {{
   hard the page is to <em>read</em>. With no errors left to find, the detector has nothing to detect
   on that run, so the headline question is answered on a second arm: the same corpus and the same
   pipeline, with a weaker model. Grounding, routing and the coverage&ndash;accuracy curve are the
-  rest of milestone 5. Milestone 6 attacked the whole thing: seven payloads printed on the page,
-  one of them in white ink, and the finding is a negative one &mdash; the arithmetic gate stops the
+  rest of milestone 5. Milestone 6 attacked the whole thing: {attack_payloads} payloads printed in
+  {attack_places} places on the page, one of the places being white ink on white paper where a human
+  approving the invoice sees nothing, and the finding is a negative one &mdash; the arithmetic gate stops the
   attacks that lie about a total and is blind to the ones that redirect a payment, reissue the
   invoice under another name, or refuse the document outright &mdash; the tile above counts them.
 </div>
