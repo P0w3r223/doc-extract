@@ -394,9 +394,11 @@ can answer. Six more than the 806 it reported before, because `tests/test_site_c
 committed page, the committed attacked run and the generator's own template, and builds its corpus
 from seeds rather than from disk, so none of its five skips there; the sixth is a unit test of the gate's composite signal.
 
-*That last figure is derived — from the local run and from what the new tests touch — rather than
-read off a runner. It is the one number on this page a CI run is allowed to correct, and this
-sentence exists so a later reader knows which one that is.*
+*That figure was written as a derivation — from the local run and from what the new tests touch —
+and flagged as the one number here a runner was allowed to correct. It was then read off run
+`33861892274` and is **812 passed, 22 skipped**, which is what the derivation said. The note is kept
+rather than deleted: a number that turned out right is not evidence the method was, and the next
+person to add a test that touches `data/` will need the same flag.*
 
 Publishing is not in the workflow: Pages serves `/docs` from `main` directly.
 
