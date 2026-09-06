@@ -417,3 +417,17 @@ nine lines are:
 - No metric that is a hardcoded value.
 - Report cost over all attempts, including retries — not over the successful one.
 - Separate `max_tokens` for extraction and for repair; one budget hides which stage ran out.
+
+## The published page
+
+`docs/index.html` is one of twelve surfaces held to a single specification: ten house colour tokens
+with pinned per-theme values, a dark override, six card-metadata tags, a profile back-link, a
+result-shaped `h1`, and — since S4 — the rule that **every figure the surface prints is a figure
+a committed artifact prints**, never a rounding and never a re-derivation. The spec is
+`docs/audit/0007_divergence-and-the-page-spec.md` §5 in the private portfolio index, and
+`tools/pagespec` there sweeps all twelve from the submodule working trees on every push.
+
+That checker reads HTML and CSS, so it cannot see this repository's artifacts and cannot tell an
+exempt page from one nobody built tiles for. What it structurally cannot carry lives in
+`tests/test_site_claims.py` — the other half of the carrier, and the reason `docs/adr/0004_what-carries-the-page-spec.md`
+chose one checker plus local assertions over eleven vendored copies.
