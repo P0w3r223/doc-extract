@@ -1685,8 +1685,8 @@ TEMPLATE = """<!doctype html>
   --text: #1c2430;
   --muted: #5b6472;
   --accent: #2563eb;
-  --accent-soft: #93c5fd;
-  --positive: #059669;
+  --accent-soft: #5b93e4;
+  --positive: #047857;
   --warn: #b45309;
   --radius: 10px;
 }}
@@ -1699,7 +1699,7 @@ TEMPLATE = """<!doctype html>
     --text: #e6eaf2;
     --muted: #98a3b6;
     --accent: #6ea8fe;
-    --accent-soft: #2c4a7c;
+    --accent-soft: #4167a6;
     --positive: #34d399;
     --warn: #fbbf24;
   }}
