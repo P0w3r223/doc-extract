@@ -2,7 +2,7 @@
 
 Date: 2026-08-21
 Status: accepted
-Author: P0w3r223 + Claude
+Author: Piotr Cząstkiewicz + Claude
 Related to: milestone 5 (`src/doc_extract/ground/`), milestone 7 (`src/doc_extract/ground/place.py`),
 `results/*/gate.md`
 

@@ -7,7 +7,7 @@ composition as unbuilt.
 Updated: 2026-08-21 — the grounding bullet under *What follows from it* claimed the recorded spans
 already supported a geometric check. They did not; see `0002_placement.md`.
 Status: accepted
-Author: P0w3r223 + Claude
+Author: Piotr Cząstkiewicz + Claude
 Related to: milestone 6 (`src/doc_extract/attack/`), `results/attack-*/attack.md`, milestone 7
 (`src/doc_extract/degrade/attacked.py`), `results/attacked-scanned-*/attack.md`
 
