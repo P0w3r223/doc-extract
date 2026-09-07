@@ -2,7 +2,7 @@
 
 Date: 2026-08-21
 Status: living — appended by each milestone, corrected in place when a later one narrows it
-Author: P0w3r223 + Claude
+Author: Piotr Cząstkiewicz + Claude
 Related to: `CLAUDE.md` (the rules these results were produced under), `results/*/report.md`,
 `results/*/detector.md`, `results/*/gate.md`, `results/*/attack.md`,
 `docs/adr/0001_trust_boundary.md`, `docs/adr/0002_placement.md`
