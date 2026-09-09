@@ -10,7 +10,7 @@ gross, Σ line items = rate total, rate × net = VAT, NIP and IBAN check digits 
 is a **label-free correctness signal available at inference time on every document**, including
 documents nobody annotated.
 
-Three pillars, none of which exist in the sibling projects P3 `apply-scout` or P4 `pl-jobs-lora`:
+Three pillars, none of which exist in the sibling projects `apply-scout` or `pl-jobs-lora`:
 
 1. **Invariants as a runtime gate.** A document that breaks them is routed, not returned as a
    confident answer.
