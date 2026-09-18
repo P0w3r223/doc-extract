@@ -29,7 +29,7 @@ unenforced.** Checking those rules is therefore real work, not a re-run of valid
 exists. The vendored schema is in `schemas/` with its provenance and SHA-256, so the claim is
 checkable rather than asserted.
 
-## Status — milestones 1–6 of 7, and most of the seventh
+## Status — what is built, and what is not
 
 The domain layer, the corpus generator, the extraction pipeline and the scorer are complete, and the
 real model has been run through the identical path. Everything except that one command runs with no
