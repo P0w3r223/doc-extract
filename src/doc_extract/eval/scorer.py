@@ -30,7 +30,7 @@ from enum import StrEnum
 
 from doc_extract.eval import fields
 from doc_extract.eval.fields import Reading, Value
-from doc_extract.extract.result import Extraction, FailureClass
+from doc_extract.extract.result import FailureClass
 from doc_extract.schema.ksef import Invoice
 
 
@@ -142,27 +142,14 @@ def judge(
     )
 
 
-def score(
-    gold: Invoice,
-    extraction: Extraction,
-    *,
-    doc_id: str,
-    facets: tuple[tuple[str, str], ...],
-) -> DocumentScore:
-    """`judge`, for a run in flight, taking the failure class off the extraction itself.
-
-    The arguments are named rather than collected as `**where: str`, which had become a lie: every
-    pass-through was a `str` when the axes were `tier` and `template`, and `facets` is not one.
-    Passing what that annotation invited was a `TypeError`.
-    """
-    return judge(
-        gold,
-        extraction.invoice,
-        doc_id=doc_id,
-        facets=facets,
-        failure=extraction.failure,
-    )
-
+# `score(gold, extraction, *, doc_id, facets)` stood here: a wrapper forwarding to `judge` with
+# the failure class taken off the extraction. **Nothing called it.** Nine modules import from this
+# one and every import pulls `judge`, `compare`, `Outcome`, `Result`, `DocumentScore`, `DETECTED`
+# or `SUPPORTED`; `ruff` could not see it, because an unused module-level function is not an
+# unused import. Removed by `0010` A-5, whose point was not the dead line but where it sat — a
+# reader opening this module for the entry point met a public function with the obvious name, and
+# it was the one nothing used. **`judge` is the entry point.** The evaluation CLI's `score`
+# subcommand is a different thing in a different module and is unaffected.
 
 _EMPTY = Reading(values={}, duplicates=())
 
