@@ -12,7 +12,7 @@
 | Size | 183 798 bytes |
 | SHA-256 | `b646b6b525f51adf1bb2545f111fc8ca6e7aa6dd2f98948f1667d3695c06d958` |
 | Fixed attributes | `kodSystemowy="FA (3)"`, `wersjaSchemy="1-0E"` |
-| Licence | **The publisher states none, and on the reading below none is needed.** See *On what terms these files are redistributed*, which covers this file and the three under it |
+| Licence | **No terms are stated in the file, and none were recorded at retrieval (2026-08-18); on the reading below none is needed.** See *On what terms these files are redistributed*, which covers this file and the three under it |
 
 ### The three files it imports
 
@@ -50,12 +50,14 @@ silence about terms is the expected state rather than a gap.
 
 *Three things this row deliberately does not do.* It does not claim a grant: the Ministry has
 licensed nothing, because on this reading it has nothing to license. It does not assert the
-reading as settled law — it is the ordinary one for a document of this kind, and it is written
-down so that a reader who disagrees knows exactly which sentence to disagree with. And it does
-not extend to the **root `LICENSE`**: the MIT grant covers this repository's own work, and these
-268 kB of ministry XSD are not that. A reader who takes `README.md`'s licence section as covering
-the whole tree would be wrong about these four files in both directions — they are not MIT, and
-they do not need to be.
+reading as settled law, and it does not claim a consensus for it either — it is written down so
+that a reader who disagrees knows exactly which sentence to disagree with, and the article it
+rests on is named so they can go and read it. And it does not extend to the **root `LICENSE`**:
+the MIT grant covers this repository's own work, and these 268 kB of ministry XSD are not that —
+which the root `LICENSE` and `README.md` now both say, under *Third-party components*. *They did
+not until 2026-09-18: the licence section read `MIT.` and nothing else, so every automated reader
+— GitHub's detector, a wheel's metadata, a licence scanner — saw MIT over the vendored files
+while this paragraph said otherwise. The prose was right and nothing carried it.*
 
 *Why the row exists at all.* `src/doc_extract/assets/fonts/PROVENANCE.md` has carried a `Licence`
 row since it was written, because DejaVu's terms are a real obligation with a real notice. This

@@ -663,17 +663,24 @@ python -m doc_extract.eval attack --run results/attacked-scanned-gullible  # wit
 
 **The block above is a recipe book, not a manual, and `--help` is the manual.** Those are the
 worked command lines — the ones whose output is in this document and in `results/` — and between
-them they show a small fraction of what the five CLIs accept. `python -m doc_extract.synth`,
+them they show a fraction of what the five CLIs accept. `python -m doc_extract.synth`,
 `.attack`, `.degrade`, `.foreign` and `.eval` each answer `--help`, and `doc_extract.eval` also
 answers it per subcommand (`eval run --help`). That is where `--limit` lives, which is what you
 want for a smoke run before committing to a full corpus, along with `--seed`, `--tier`,
-`--quiet`, `--max-tokens`, `--rate`, `--placement`, `--rung` and around two dozen more.
+`--quiet`, `--max-tokens`, `--rate`, `--placement` and `--rung`.
 
 *Why this paragraph exists.* The recipe-book register is deliberate and this document is not
 becoming a manual. But it was never **declared**, and neither this file nor `CLAUDE.md` mentioned
 `--help` anywhere — so a reader who wanted a cheap first run had no route to `--limit` and no way
-to know one existed. Thirty-one accepted flags appear in no documented command line here, none of
-them wrong; the count and the diagnosis are `portfolio-index` `0010` B-5e.
+to know one existed. Accepted flags that appear in no worked command line here are the subject of
+`portfolio-index` `0010` B-5e, none of them wrong.
+
+**No count is given, on purpose.** Three sweeps have now measured this and returned three
+answers, because the population depends on choices none of them stated — whether the unit is a
+flag name or a `(CLI, flag)` pair, whether the corpus is this file or this file and `CLAUDE.md`,
+and whether subcommand parsers are enumerated. B-5e's own record already contains one sweep that
+reported `43 undocumented and 12 wrong` purely as an artifact of how it keyed the CLI. A figure
+whose unit is unstated is not a measurement, and the audit is where the unit is written down.
 
 Each run writes `results/<run>/` — `predictions.jsonl`, `run.meta.json`, `report.md`,
 `detector.md` and `gate.md` — and those are **committed**. A number in either report is therefore recomputable
@@ -687,7 +694,8 @@ rather than one overwritten one.
 
 ## Licence
 
-MIT — for this repository's own work, which is everything except the six vendored files.
+MIT — for this repository's own work, which is everything except the vendored files under
+`schemas/` and `src/doc_extract/assets/fonts/`.
 
 - **The two DejaVu fonts** under `src/doc_extract/assets/fonts/` carry their own permissive
   terms, and the `LICENSE` beside them is a **notice that must travel with them**. Its digest is

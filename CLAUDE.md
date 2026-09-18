@@ -235,6 +235,13 @@ ruff check .
 python -m doc_extract.synth --out data/synthetic          # build the corpus (not committed)
 python -m doc_extract.schema.generate_vocab --check       # vocab.py vs the vendored XSD
 python docs/build_index.py                                # the site; reads data/scanned if built
+                                                          #   -> WITHOUT it the rebuild DELETES the
+                                                          #      corpus-dependent blocks. Diff before
+                                                          #      committing; see 0010 §6, 2026-09-18
+
+# Every CLI above answers --help, and `eval` answers it per subcommand (`eval run --help`).
+# The command lines here and in README.md are a recipe book: the flags worth knowing that no
+# recipe shows -- --limit for a smoke run above all -- are only there.
 
 python -m doc_extract.eval run --baseline pattern         # one baseline over the corpus, offline
 python -m doc_extract.eval score  --run results/pattern   # re-score a committed run, no model

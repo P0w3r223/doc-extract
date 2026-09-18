@@ -12,12 +12,18 @@ asserted.
 *What construction actually delivers.* `nip()` draws nine digits — first non-zero, second and
 third not both zero — and computes the tenth, discarding a weighted remainder of 10: **810 000 001
 constructible values**, by residue arithmetic over `_NIP_WEIGHTS` rather than by enumeration. The
-committed `results/` hold 221 distinct strings that `schema.checksums.is_valid_nip` accepts.
+committed `results/` hold a few hundred distinct strings that `schema.checksums.is_valid_nip`
+accepts — a count deliberately not given here, because every run writes a new committed
+`results/<run>/` and a cardinal in this docstring would go stale without anything noticing.
+
 *Not copied from a register* is a statement about provenance; *not in one* is a statement about
-the register, and drawing from a space the register also draws from cannot make the second. At a
-register holding one to five million entries, the chance that at least one published NIP is also
-a real one runs from roughly a quarter to three quarters. The corpus is therefore **more likely
-than not to contain a real NIP**, and nothing here prevents it.
+the register, and drawing from a space the register also draws from cannot make the second. The
+chance that at least one published NIP is also a real one runs from **23.9 % at a register of a
+million to 74.5 % at five million**, crossing even odds at about **2.5 million**. So the corpus
+is more likely than not to contain a real NIP *if the register is larger than that*, and the
+register's size is precisely the number nobody here measured. **What holds unconditionally is the
+weaker statement, and it is the one that matters**: the construction does not prevent a
+collision, and the docstring used to say it did.
 
 *What that costs, stated so it is neither hidden nor inflated.* A NIP is public business data in
 Poland — printed on every invoice, carried by CEIDG and the KRS — so a collision attaches a real
