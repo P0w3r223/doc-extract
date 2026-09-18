@@ -1,9 +1,43 @@
 """The material a generated invoice is made of: parties, goods, and valid Polish identifiers.
 
 Everything here is invented. The names are plausible-but-fictional companies and the identifiers
-are constructed to satisfy their check digits rather than copied from a register, so no real
-taxpayer appears in the corpus. That is a requirement, not a courtesy — the alternative would put
-real NIP numbers in a public repository.
+are constructed to satisfy their check digits rather than copied from a register.
+
+**The IBANs carry a structural guarantee and the NIPs do not, and this docstring used to claim
+otherwise.** It said the construction meant *"no real taxpayer appears in the corpus"* and called
+that *"a requirement, not a courtesy"* — an assertion its own arithmetic does not support, in a
+project whose subject is the difference between a figure that is checked and a figure that is
+asserted.
+
+*What construction actually delivers.* `nip()` draws nine digits — first non-zero, second and
+third not both zero — and computes the tenth, discarding a weighted remainder of 10: **810 000 001
+constructible values**, by residue arithmetic over `_NIP_WEIGHTS` rather than by enumeration. The
+committed `results/` hold a few hundred distinct strings that `schema.checksums.is_valid_nip`
+accepts — a count deliberately not given here, because every run writes a new committed
+`results/<run>/` and a cardinal in this docstring would go stale without anything noticing.
+
+*Not copied from a register* is a statement about provenance; *not in one* is a statement about
+the register, and drawing from a space the register also draws from cannot make the second. The
+chance that at least one published NIP is also a real one runs from **23.9 % at a register of a
+million to 74.5 % at five million**, crossing even odds at about **2.5 million**. So the corpus
+is more likely than not to contain a real NIP *if the register is larger than that*, and the
+register's size is precisely the number nobody here measured. **What holds unconditionally is the
+weaker statement, and it is the one that matters**: the construction does not prevent a
+collision, and the docstring used to say it did.
+
+*What that costs, stated so it is neither hidden nor inflated.* A NIP is public business data in
+Poland — printed on every invoice, carried by CEIDG and the KRS — so a collision attaches a real
+company's public tax number to an invented name, address and amount, and identifies no person. It
+is a defect in a claim rather than a disclosure of anything private. Recorded as `portfolio-index`
+`0010` E-5c, where the arithmetic is given as a table over register sizes rather than as a single
+figure, because the register's size was not measured.
+
+*The repair that would restore the guarantee, and why it is not taken here.* `_BANK_PREFIXES`
+below shows the shape: draw from a range the real scheme does not use, and the guarantee becomes
+structural rather than probabilistic. The equivalent for a NIP would be a prefix range assigned to
+no tax office — **whether one exists is an open question this module does not answer**, and
+inventing one on an unsourced belief about Polish tax administration would replace a measured
+overclaim with an unmeasured one. So the claim is corrected and the guarantee is not manufactured.
 
 **Identifiers are generated here and validated by `schema.checksums`.** The dependency runs one
 way on purpose: a check-digit routine that also produced the values it checks would agree with

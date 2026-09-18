@@ -12,6 +12,7 @@
 | Size | 183 798 bytes |
 | SHA-256 | `b646b6b525f51adf1bb2545f111fc8ca6e7aa6dd2f98948f1667d3695c06d958` |
 | Fixed attributes | `kodSystemowy="FA (3)"`, `wersjaSchemy="1-0E"` |
+| Licence | **No terms are stated in the file, and none were recorded at retrieval (2026-08-18); on the reading below none is needed.** See *On what terms these files are redistributed*, which covers this file and the three under it |
 
 ### The three files it imports
 
@@ -35,6 +36,36 @@ In force since **2026-02-01**, when it replaced FA(2). The KSeF mandate applies 
 taxpayers whose 2024 sales exceeded 200 M PLN and from 2026-04-01 to everyone else; taxpayers under
 10 000 PLN of monthly sales may defer *issuing* until the end of 2026 but must *receive* from
 2026-02-01.
+
+## On what terms these files are redistributed
+
+**Nothing here is licensed to this repository, and on the reading below nothing needs to be.**
+
+The four vendored XSDs are *urzędowe materiały* published by a ministry through the Centralne
+Repozytorium Wzorów Dokumentów. Article 4 of the Polish `ustawa o prawie autorskim i prawach
+pokrewnych` places official materials, documents, signs and symbols — and normative acts and
+their official drafts — **outside the subject matter of copyright** altogether. On that reading
+no permission is required to vendor them, no notice has to travel with them, and the publisher's
+silence about terms is the expected state rather than a gap.
+
+*Three things this row deliberately does not do.* It does not claim a grant: the Ministry has
+licensed nothing, because on this reading it has nothing to license. It does not assert the
+reading as settled law, and it does not claim a consensus for it either — it is written down so
+that a reader who disagrees knows exactly which sentence to disagree with, and the article it
+rests on is named so they can go and read it. And it does not extend to the **root `LICENSE`**:
+the MIT grant covers this repository's own work, and these 268 kB of ministry XSD are not that —
+which the root `LICENSE` and `README.md` now both say, under *Third-party components*. *They did
+not until 2026-09-18: the licence section read `MIT.` and nothing else, so every automated reader
+— GitHub's detector, a wheel's metadata, a licence scanner — saw MIT over the vendored files
+while this paragraph said otherwise. The prose was right and nothing carried it.*
+
+*Why the row exists at all.* `src/doc_extract/assets/fonts/PROVENANCE.md` has carried a `Licence`
+row since it was written, because DejaVu's terms are a real obligation with a real notice. This
+document, same author and same repository, recorded source, publisher, dates, size, digest, fixed
+attributes and the complete import closure — and said nothing about terms, for 268 kB of
+government standard. The asymmetry was the finding (`portfolio-index` `0010` E-5b), not the legal
+position: the answer was probably always *no terms needed*, and that is a sentence, which is
+cheaper than the silence it replaces.
 
 ## Why it is vendored rather than fetched
 

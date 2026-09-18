@@ -5,7 +5,7 @@ establishes one thing — the committed bytes are not stale — and it cannot es
 both sides of that comparison come out of `build_index`. A sentence the generator itself gets wrong
 is identical on both sides, so a claim that is false about the artifacts stays green forever.
 
-Two were, until `9f4bd21`:
+Two were, until `05ed544` (#8):
 
 * **A KPI tile read `5 / 7` &mdash; &ldquo;Milestones built&rdquo;**, with the note *the gate is
   measured; injection and the real set are not*. The same page's eyebrow said milestones 1&ndash;6

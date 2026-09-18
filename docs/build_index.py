@@ -1835,7 +1835,7 @@ footer {{
 </head>
 <body>
 <header>
-  <p class="eyebrow">KSeF FA(3) &middot; milestones 1&ndash;6 of 7, and most of the seventh</p>
+  <p class="eyebrow">KSeF FA(3) &middot; what is not built is named at the foot of this page</p>
   <h1>Poland's national e-invoice schema checks nothing an accountant would</h1>
   <p class="lead">FA(3) &mdash; mandatory since 2026 &mdash; is {xsd_bytes} bytes of XSD carrying
   {enumerations} enumerations and <strong>{assertions} assertions</strong>. It knows what shape an

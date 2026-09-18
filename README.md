@@ -29,7 +29,7 @@ unenforced.** Checking those rules is therefore real work, not a re-run of valid
 exists. The vendored schema is in `schemas/` with its provenance and SHA-256, so the claim is
 checkable rather than asserted.
 
-## Status — milestones 1–6 of 7, and most of the seventh
+## Status — what is built, and what is not
 
 The domain layer, the corpus generator, the extraction pipeline and the scorer are complete, and the
 real model has been run through the identical path. Everything except that one command runs with no
@@ -661,6 +661,27 @@ python -m doc_extract.eval run --baseline gullible --corpus data/attacked-scanne
 python -m doc_extract.eval attack --run results/attacked-scanned-gullible  # with the reach table
 ```
 
+**The block above is a recipe book, not a manual, and `--help` is the manual.** Those are the
+worked command lines — the ones whose output is in this document and in `results/` — and between
+them they show a fraction of what the five CLIs accept. `python -m doc_extract.synth`,
+`.attack`, `.degrade`, `.foreign` and `.eval` each answer `--help`, and `doc_extract.eval` also
+answers it per subcommand (`eval run --help`). That is where `--limit` lives, which is what you
+want for a smoke run before committing to a full corpus, along with `--seed`, `--tier`,
+`--quiet`, `--max-tokens`, `--rate`, `--placement` and `--rung`.
+
+*Why this paragraph exists.* The recipe-book register is deliberate and this document is not
+becoming a manual. But it was never **declared**, and neither this file nor `CLAUDE.md` mentioned
+`--help` anywhere — so a reader who wanted a cheap first run had no route to `--limit` and no way
+to know one existed. Accepted flags that appear in no worked command line here are the subject of
+`portfolio-index` `0010` B-5e, none of them wrong.
+
+**No count is given, on purpose.** Three sweeps have now measured this and returned three
+answers, because the population depends on choices none of them stated — whether the unit is a
+flag name or a `(CLI, flag)` pair, whether the corpus is this file or this file and `CLAUDE.md`,
+and whether subcommand parsers are enumerated. B-5e's own record already contains one sweep that
+reported `43 undocumented and 12 wrong` purely as an artifact of how it keyed the CLI. A figure
+whose unit is unstated is not a measurement, and the audit is where the unit is written down.
+
 Each run writes `results/<run>/` — `predictions.jsonl`, `run.meta.json`, `report.md`,
 `detector.md` and `gate.md` — and those are **committed**. A number in either report is therefore recomputable
 from the file that produced it, without re-running anything: `score` and `detect` both read the
@@ -673,4 +694,16 @@ rather than one overwritten one.
 
 ## Licence
 
-MIT.
+MIT — for this repository's own work, which is everything except the vendored files under
+`schemas/` and `src/doc_extract/assets/fonts/`.
+
+- **The two DejaVu fonts** under `src/doc_extract/assets/fonts/` carry their own permissive
+  terms, and the `LICENSE` beside them is a **notice that must travel with them**. Its digest is
+  pinned and `tests/test_vendored_artifacts.py` fails if the file goes missing or changes.
+- **The four Ministerstwo Finansów XSDs** under `schemas/` are neither MIT nor licensed at all:
+  they are *urzędowe materiały*, which Article 4 of the Polish copyright act places outside the
+  subject matter of copyright, so no permission is required and none was granted.
+
+Both readings, with their sources and their limits, are in the two `PROVENANCE.md` files. *This
+section read `MIT.` and nothing else until 2026-09-18, which is a claim about 268 kB of
+government standard and two vendored typefaces that it had no standing to make.*
