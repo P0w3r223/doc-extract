@@ -299,7 +299,7 @@ re-run a paid model to be checked would be one too.
    what makes it a check on the harness), `constant` (the floor, and a per-field prior), `pattern`
    (regex and columns, no model) and `noisy` (the oracle with known errors, for M5). The real model
    has since been run through the identical path: **`claude-opus-5` scores 100 % on all 108
-   documents and 6066 field instances**, for $3.20. That is a result about the corpus as much as
+   documents and 6066 field instances**. That is a result about the corpus as much as
    about the model — see *The corpus is saturated* in `docs/findings.md`.
 5. **Grounding, confidence, routing; the detector study and the curve.** ✅ `eval/detector.py`
    measures `invariants` as a binary classifier of
